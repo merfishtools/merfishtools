@@ -7,3 +7,10 @@ authors = ["Johannes Koester <johannes.koester@tu-dortmund.de>"]
 bio = "*"
 csv = "*"
 nalgebra = "*"
+itertools = "*"
+rand = "*"
+
+[[bin]]
+name = "merfishtools"
+test = false
+doc = false
