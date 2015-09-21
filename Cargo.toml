@@ -2,3 +2,8 @@
 name = "merfishtools"
 version = "0.1.0"
 authors = ["Johannes Koester <johannes.koester@tu-dortmund.de>"]
+
+[dependencies]
+bio = "*"
+csv = "*"
+nalgebra = "*"
