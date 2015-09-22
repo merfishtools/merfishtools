@@ -153,7 +153,7 @@ mod tests {
     #[test]
     fn test_posterior_prob() {
         let readout = setup();
-        let expression = Expression::new(5, 4, &readout);
+        let expression = Expression::new(5, 0, &readout);
         // check if x=5 yields highest probability
         assert_eq!((0..20).sorted_by(|&x, &y| {
             expression.posterior_prob(x).partial_cmp(&expression.posterior_prob(y)).unwrap()
