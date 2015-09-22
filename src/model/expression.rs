@@ -28,7 +28,8 @@ fn likelihood(x: u64, count: u64, count_exact: u64, readout_model: &model::Reado
         readout_model.prob_miscall_exact * (count_exact - i) as f64 +
         readout_model.prob_miscall_mismatch * (x_m + i - count_exact) as f64
     }).collect_vec();
-    let likelihood = readout_model.prob_missed * (x - x_c) as f64 - combinations(count, x_c).ln() as f64 +
+    // TODO think about the combinations (divide or multiply??)
+    let likelihood = readout_model.prob_missed * (x - x_c) as f64 + combinations(count, x_c).ln() as f64 +
                      logprobs::log_prob_sum(&summands);
     likelihood
 }
@@ -153,13 +154,14 @@ mod tests {
     #[test]
     fn test_posterior_prob() {
         let readout = setup();
-        let expression = Expression::new(5, 0, &readout);
-        println!("{}", expression.posterior_prob(6).exp());
-        assert!(false);
+        let expression = Expression::new(50, 30, &readout);
+        println!("{:?}", (0..55).map(|x| expression.posterior_prob(x).exp()).collect_vec());
+        //assert!(false);
+        let expression = Expression::new(5, 5, &readout);
         // check if x=5 yields highest probability
-        assert_eq!((0..20).sorted_by(|&x, &y| {
+        assert_eq!((0..21).sorted_by(|&x, &y| {
             expression.posterior_prob(x).partial_cmp(&expression.posterior_prob(y)).unwrap()
-        })[19], 5);
+        })[20], 5);
         // check that expression beyond window yields zero probability
         assert!(expression.posterior_prob(100).exp().approx_eq(&0.0));
     }

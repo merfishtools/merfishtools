@@ -53,6 +53,7 @@ impl<'a> Foldchange<'a> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(non_upper_case_globals)]
     use super::*;
 
     use bio::stats::logprobs::Prob;
