@@ -55,7 +55,7 @@ impl Expression {
     }
 
     pub fn posterior_prob(&self, x: usize) -> LogProb {
-        if x < self.offset || x > self.offset + self.likelihoods.len() {
+        if x < self.offset || x >= self.offset + self.likelihoods.len() {
             f64::NEG_INFINITY
         }
         else {
@@ -110,10 +110,12 @@ impl ExpressionSet {
     }
 
     pub fn min_x(&self) -> usize {
+        // TODO use something more sophisticated here (e.g. credible intervals)
         self.expressions.iter().map(|e| e.min_x()).min().unwrap()
     }
 
     pub fn max_x(&self) -> usize {
+        // TODO use something more sophisticated here (e.g. credible intervals)
         self.expressions.iter().map(|e| e.max_x()).max().unwrap()
     }
 }
@@ -151,7 +153,7 @@ mod tests {
     #[test]
     fn test_posterior_prob() {
         let readout = setup();
-        let expression = Expression::new(5, 0, &readout);
+        let expression = Expression::new(5, 4, &readout);
         // check if x=5 yields highest probability
         assert_eq!((0..20).sorted_by(|&x, &y| {
             expression.posterior_prob(x).partial_cmp(&expression.posterior_prob(y)).unwrap()

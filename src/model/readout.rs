@@ -12,8 +12,9 @@ fn prob_call_exact(N: u8, m: u8, p0: Prob, p1: Prob) -> Prob {
 
 /// Probability to see a readout with one mismatch given that we have a call.
 fn prob_call_mismatch(N: u8, m: u8, p0: Prob, p1: Prob) -> Prob {
-    m as Prob * p1 * (1.0 - p1).powi((m - 1) as i32) * (1.0 - p0).powi((N - m) as i32) +
-    (N - m) as Prob * p0 * (1.0 - p1).powi(m as i32) * (1.0 - p0).powi((N - m - 1) as i32)
+    // TODO update whitepaper
+    p1 * (1.0 - p1).powi((m - 1) as i32) * (1.0 - p0).powi((N - m) as i32) +
+    p0 * (1.0 - p1).powi(m as i32) * (1.0 - p0).powi((N - m - 1) as i32)
 }
 
 
@@ -92,7 +93,7 @@ mod tests {
     #[test]
     fn test_prob_call_mismatch() {
         let p = prob_call_mismatch(N, m, p0, p1);
-        assert!(p.approx_eq(&0.3796656011293902));
+        assert!(p.approx_eq(&0.06141649430034256));
     }
 
     #[test]
