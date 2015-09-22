@@ -99,8 +99,8 @@ impl ExpressionSet {
 
             let mut rng = rand::thread_rng();
             let idx = rand::distributions::Range::new(0, n);
-            // bootstrap 1000 times
-            let bootstrap_n = 100;
+            // bootstrap 500 times
+            let bootstrap_n = 500;
             let bootstrap_values = itertools::RepeatCall::new(|| {
                 itertools::RepeatCall::new(|| posteriors[idx.ind_sample(&mut rng)]).take(n).sum()
             }).take(bootstrap_n).collect_vec();
@@ -154,6 +154,8 @@ mod tests {
     fn test_posterior_prob() {
         let readout = setup();
         let expression = Expression::new(5, 0, &readout);
+        println!("{}", expression.posterior_prob(6).exp());
+        assert!(false);
         // check if x=5 yields highest probability
         assert_eq!((0..20).sorted_by(|&x, &y| {
             expression.posterior_prob(x).partial_cmp(&expression.posterior_prob(y)).unwrap()
