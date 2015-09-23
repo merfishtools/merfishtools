@@ -155,7 +155,7 @@ mod tests {
     fn test_posterior_prob() {
         let readout = setup();
         let expression = Expression::new(50, 30, &readout);
-        println!("{:?}", (0..55).map(|x| expression.posterior_prob(x).exp()).collect_vec());
+        println!("{:?}", (0..51).map(|x| expression.posterior_prob(x).exp()).collect_vec());
         //assert!(false);
         let expression = Expression::new(5, 5, &readout);
         // check if x=5 yields highest probability

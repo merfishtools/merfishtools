@@ -78,7 +78,7 @@ mod tests {
         a.push(model::Expression::new(5, 5, &readout));
         a.push(model::Expression::new(5, 5, &readout));
         a.push(model::Expression::new(5, 5, &readout));
-        a.push(model::Expression::new(6, 0, &readout));
+        a.push(model::Expression::new(5, 5, &readout));
 
         let mut b = model::ExpressionSet::new();
         b.push(model::Expression::new(15, 15, &readout));
