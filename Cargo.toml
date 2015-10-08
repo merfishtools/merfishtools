@@ -9,6 +9,8 @@ csv = "*"
 nalgebra = "*"
 itertools = "*"
 rand = "*"
+GSL = "*"
+randomkit = "*"
 
 [[bin]]
 name = "merfishtools"

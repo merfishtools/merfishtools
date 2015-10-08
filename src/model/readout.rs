@@ -45,15 +45,15 @@ fn prob_miscall_mismatch(N: u8, m: u8, p0: Prob, p1: Prob) -> Prob {
 
 /// Probability to completely miss a readout because of too many errors.
 fn prob_missed(N: u8, m: u8, p0: Prob, p1: Prob) -> Prob {
+    let mut num = 0.0;
     let mut denom = 0.0;
-    let mut nom = 0.0;
     for k in 3..6 {
         for i in 0..cmp::min(m, k) + 1 {
-            denom += psi(i, k - i, N, m) * xi(i, k - i, N, m, p0, p1);
-            nom += psi(i, k - i, N, m);
+            num += psi(i, k - i, N, m) * xi(i, k - i, N, m, p0, p1);
+            denom += psi(i, k - i, N, m);
         }
     }
-    denom / nom
+    num / denom
 }
 
 

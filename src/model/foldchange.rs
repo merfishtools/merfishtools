@@ -29,7 +29,7 @@ impl<'a> Foldchange<'a> {
             let x_ = x as f64 * f;
             if x_ % 1.0 == 0.0 {
                 // multiply in log space
-                self.a.posterior_prob(x) + self.b.posterior_prob((f * x as f64) as usize)
+                self.a.posterior_prob(x) + self.b.posterior_prob((f * x as f64) as u32)
             }
             else {
                 f64::NEG_INFINITY
@@ -71,7 +71,7 @@ mod tests {
         model::Readout::new(N, m, p0, p1)
     }
 
-    #[test]
+    /*#[test]
     fn test_posterior_prob() {
         let readout = setup();
         let mut a = model::ExpressionSet::new();
@@ -90,5 +90,5 @@ mod tests {
 
         println!("{}", fc.posterior_prob(3.0));
         assert!(false);
-    }
+    }*/
 }
