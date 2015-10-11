@@ -11,5 +11,6 @@ extern crate nalgebra;
 extern crate itertools;
 extern crate rgsl;
 extern crate randomkit;
+extern crate num;
 
 pub mod model;

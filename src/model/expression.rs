@@ -1,19 +1,20 @@
 use std::cmp;
 use std::f64;
+use std::collections;
 
-use rand;
-use randomkit;
-use randomkit::Sample;
-use rand::distributions::IndependentSample;
 use itertools::Itertools;
 use itertools;
-use rgsl::randist::poisson::poisson_pdf;
+use num::rational;
+use nalgebra::ApproxEq;
 
 use bio::stats::combinatorics::combinations;
 use bio::stats::logprobs;
 use bio::stats::logprobs::LogProb;
 
 use model;
+
+
+pub type MeanExpression = rational::Ratio<u32>;
 
 
 fn likelihood(x: u32, count: u32, count_exact: u32, readout_model: &model::Readout) -> LogProb {
@@ -55,11 +56,35 @@ impl Expression {
         let likelihoods = (offset..count + 50).map(|x| likelihood(x, count, count_exact, readout_model)).collect_vec();
         // calculate (marginal / flat_prior)
         let marginal = logprobs::log_prob_sum(&likelihoods);
-        Expression {
+        // TODO trim values such that zero probabilities are not stored
+        let mut expression = Expression {
             offset: offset,
             likelihoods: likelihoods,
             marginal: marginal
+        };
+        expression.refine_interval();
+        expression
+    }
+
+    fn refine_interval(&mut self) {
+        let min_prob = 0.000001f64.ln();
+        let map = self.map();
+        let mut min_x = self.min_x();
+        for x in (self.min_x()..map).rev() {
+            if self.posterior_prob(x) < min_prob {
+                min_x = x;
+                break;
+            }
         }
+        let mut max_x = self.max_x();
+        for x in map..self.max_x() {
+            if self.posterior_prob(x) < min_prob {
+                max_x = x;
+                break;
+            }
+        }
+        self.likelihoods = self.likelihoods[(min_x - self.offset) as usize..(max_x - self.offset) as usize].to_vec();
+        self.offset = min_x;
     }
 
     pub fn posterior_prob(&self, x: u32) -> LogProb {
@@ -70,6 +95,28 @@ impl Expression {
         else {
             self.likelihoods[x - self.offset as usize] - self.marginal
         }
+    }
+
+    /// The maximum a posteriori probability estimate.
+    pub fn map(&self) -> u32 {
+        let mut max = f64::NEG_INFINITY;
+        let mut max_x = 0;
+        for x in self.min_x()..self.max_x() {
+            let p = self.posterior_prob(x);
+            if p >= max {
+                max_x = x;
+                max = p;
+            }
+        }
+        max_x
+    }
+
+    pub fn expected_value(&self) -> f64 {
+        (self.min_x()..self.max_x()).map(|x| x as f64 * self.posterior_prob(x).exp()).sum()
+    }
+
+    pub fn variance(&self) -> f64 {
+        (self.min_x()..self.max_x()).map(|x| (x as f64 - self.expected_value()).powi(2) * self.posterior_prob(x).exp()).sum()
     }
 
     pub fn min_x(&self) -> u32 {
@@ -83,112 +130,54 @@ impl Expression {
 
 
 pub struct ExpressionSet {
-    expressions: Vec<Expression>
+    pmf: collections::HashMap<MeanExpression, LogProb>
 }
 
 
 impl ExpressionSet {
-    pub fn new() -> Self {
+    pub fn new(expressions: &[Expression]) -> Self {
+        let mut pmf = collections::HashMap::new();
+
+        fn dfs(
+            i: usize, expression_sum: u32, posterior_prob: LogProb,
+            pmf: &mut collections::HashMap<MeanExpression, LogProb>,
+            expressions: &[Expression]
+        ) {
+            if i < expressions.len() {
+                let ref expr = expressions[i];
+                for x in expr.min_x()..expr.max_x() {
+                    dfs(i + 1, expression_sum + x, posterior_prob + expr.posterior_prob(x), pmf, expressions);
+                }
+            }
+            else {
+                let mean = rational::Ratio::new(expression_sum, expressions.len() as u32);
+                if pmf.contains_key(&mean) {
+                    let p = pmf.get_mut(&mean).unwrap();
+                    *p = logprobs::log_prob_add(*p, posterior_prob);
+                }
+                else {
+                    pmf.insert(mean, posterior_prob);
+                }
+            }
+        }
+
+        dfs(0, 0, 0.0, &mut pmf, expressions);
+
         ExpressionSet {
-            expressions: Vec::new()
+            pmf: pmf
         }
     }
 
-    pub fn push(&mut self, expression: Expression) {
-        self.expressions.push(expression);
+    /// Unorderered iteration over probability mass function (PMF).
+    pub fn pmf(&self) -> collections::hash_map::Iter<MeanExpression, LogProb> {
+        self.pmf.iter()
     }
 
-    pub fn posterior_prob_window(&self, x_expectation: u32) -> LogProb {
-        if x_expectation == 0 {
-            self.expressions.iter().map(|e| e.posterior_prob(x_expectation)).sum::<f64>()
-        }
-        else {
-            let lambda = x_expectation as f64;
-            let xmin = if x_expectation > 50 { x_expectation - 50 } else { 1 } as u32;
-            let xmax = (x_expectation + 50) as u32;
-
-            self.expressions.iter().map(|e| {
-                let probs = (xmin..xmax + 1).map(|x| {
-                    if x == 4 {
-                        println!("{} {} {}", lambda, poisson_pdf(x, lambda), e.posterior_prob(x).exp());
-                    }
-                    let p = poisson_pdf(x, lambda).ln();
-                    p + e.posterior_prob(x)
-                }).collect_vec();
-
-                logprobs::log_prob_sum(&probs)
-            }).sum()
-        }
-    }
-
-    pub fn posterior_prob_window2(&self, x_expectation: u32) -> LogProb {
-        if x_expectation == 0 {
-            self.expressions.iter().map(|e| e.posterior_prob(x_expectation)).sum::<f64>()
-        }
-        else {
-            let lambda = x_expectation as f64;
-            let xmin = if x_expectation > 50 { x_expectation - 50 } else { 1 } as u32;
-            let xmax = (x_expectation + 50) as u32;
-
-            let probs = (xmin..xmax + 1).map(|x| {
-                let p = poisson_pdf(x, lambda).ln();
-                p + self.expressions.iter().map(|e| e.posterior_prob(x)).sum::<f64>()
-            }).collect_vec();
-
-            logprobs::log_prob_sum(&probs)
-        }
-    }
-
-    pub fn posterior_prob_poisson(&self, x_expectation: u32) -> LogProb {
-        let n = self.expressions.len();
-        if n == 1 {
-            self.expressions[0].posterior_prob(x_expectation)
-        }
-        else if x_expectation == 0 {
-            self.expressions.iter().map(|e| e.posterior_prob(x_expectation)).sum()
-        }
-        else {
-
-            let mut rng = randomkit::Rng::new().unwrap();
-            let pois = randomkit::dist::Poisson::new(x_expectation as f64).unwrap();
-            // bootstrap 500 times
-            let bootstrap_n = 5000;
-            let bootstrap_values = itertools::RepeatCall::new(|| {
-                self.expressions.iter().map(|e| e.posterior_prob(pois.sample(&mut rng) as u32)).sum()
-            }).take(bootstrap_n).collect_vec();
-            // calculate the expected posterior probability over the bootstap
-            logprobs::log_prob_sum(&bootstrap_values) - (bootstrap_n as f64).ln()
-        }
-    }
-
-    pub fn posterior_prob(&self, x_expectation: u32) -> LogProb {
-        if self.expressions.len() == 1 {
-            self.expressions[0].posterior_prob(x_expectation)
-        }
-        else {
-            let posteriors = self.expressions.iter().map(|e| e.posterior_prob(x_expectation)).collect_vec();
-            let n = posteriors.len();
-
-            let mut rng = rand::thread_rng();
-            let idx = rand::distributions::Range::new(0, n);
-            // bootstrap 500 times
-            let bootstrap_n = 500;
-            let bootstrap_values = itertools::RepeatCall::new(|| {
-                itertools::RepeatCall::new(|| posteriors[idx.ind_sample(&mut rng)]).take(n).sum()
-            }).take(bootstrap_n).collect_vec();
-            // calculate the expected posterior probability over the bootstap
-            logprobs::log_prob_sum(&bootstrap_values) - (bootstrap_n as f64).ln()
-        }
-    }
-
-    pub fn min_x(&self) -> u32 {
-        // TODO use something more sophisticated here (e.g. credible intervals)
-        self.expressions.iter().map(|e| e.min_x()).min().unwrap()
-    }
-
-    pub fn max_x(&self) -> u32 {
-        // TODO use something more sophisticated here (e.g. credible intervals)
-        self.expressions.iter().map(|e| e.max_x()).max().unwrap()
+    /// Conditional expectation of mean expression.
+    pub fn expected_value(&self) -> f64 {
+        self.pmf.iter().map(|(mean, prob)| {
+            *mean.numer() as f64 / *mean.denom() as f64 * prob.exp()
+        }).sum()
     }
 }
 
@@ -225,8 +214,8 @@ mod tests {
     #[test]
     fn test_posterior_prob() {
         let readout = setup();
-        let expression = Expression::new(50, 30, &readout);
-        println!("{:?}", (0..51).map(|x| expression.posterior_prob(x).exp()).collect_vec());
+        let expression = Expression::new(50, 10, &readout);
+        //println!("{:?}", (0..55).map(|x| expression.posterior_prob(x).exp()).collect_vec());
         //assert!(false);
         let expression = Expression::new(5, 5, &readout);
         // check if x=5 yields highest probability
@@ -238,30 +227,34 @@ mod tests {
     }
 
     #[test]
-    fn test_set_posterior_prob() {
+    fn test_set_expected_value() {
         let readout = setup();
-        let mut expression_set = ExpressionSet::new();
-        expression_set.push(Expression::new(5, 1, &readout));
-        expression_set.push(Expression::new(5, 1, &readout));
-        expression_set.push(Expression::new(5, 1, &readout));
-        expression_set.push(Expression::new(1, 1, &readout));
-        //println!("{:?}", (0..21).map(|x| expression_set.posterior_prob_bootstrap(x).exp()).collect_vec());
-        //assert!(false);
+        let expressions = [
+            Expression::new(5, 1, &readout),
+            Expression::new(5, 1, &readout),
+            Expression::new(5, 1, &readout),
+            Expression::new(1, 0, &readout)
+        ];
+        let mut expression_set = ExpressionSet::new(&expressions);
+        // calculate expected value directly
+        let expected_value = expressions.iter().map(|e| e.expected_value()).sum::<f64>() / expressions.len() as f64;
+        assert!(expression_set.expected_value().approx_eq(&expected_value));
         // check if x=5 yields highest probability
-        assert_eq!((0..20).sorted_by(|&x, &y| {
-            expression_set.posterior_prob(x).partial_cmp(&expression_set.posterior_prob(y)).unwrap()
-        })[19], 5);
+        //assert_eq!((0..20).sorted_by(|&x, &y| {
+        //    expression_set.posterior_prob(x).partial_cmp(&expression_set.posterior_prob(y)).unwrap()
+        //})[19], 5);
     }
 
     #[bench]
-    fn bench_set_posterior_prob(b: &mut Bencher) {
+    fn bench_set_realizations(b: &mut Bencher) {
         let readout = setup();
-        let mut expression_set = ExpressionSet::new();
-        expression_set.push(Expression::new(5, 5, &readout));
-        expression_set.push(Expression::new(5, 5, &readout));
-        expression_set.push(Expression::new(5, 5, &readout));
-        expression_set.push(Expression::new(1, 0, &readout));
+        let expressions = [
+            Expression::new(5, 5, &readout),
+            Expression::new(5, 5, &readout),
+            Expression::new(5, 5, &readout),
+            Expression::new(1, 0, &readout)
+        ];
 
-        b.iter(|| expression_set.posterior_prob(5));
+        b.iter(|| ExpressionSet::new(&expressions));
     }
 }

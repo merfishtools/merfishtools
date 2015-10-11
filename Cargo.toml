@@ -11,6 +11,7 @@ itertools = "*"
 rand = "*"
 GSL = "*"
 randomkit = "*"
+num = "*"
 
 [[bin]]
 name = "merfishtools"
