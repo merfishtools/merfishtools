@@ -3,9 +3,7 @@ use std::f64;
 use std::collections;
 
 use itertools::Itertools;
-use itertools;
 use num::rational;
-use nalgebra::ApproxEq;
 
 use bio::stats::combinatorics::combinations;
 use bio::stats::logprobs;

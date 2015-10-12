@@ -1,5 +1,4 @@
 use std::collections;
-use std::cmp::Ordering;
 
 use num::rational;
 use itertools::Itertools;

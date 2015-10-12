@@ -12,6 +12,7 @@ rand = "*"
 GSL = "*"
 randomkit = "*"
 num = "*"
+rustc-serialize = "*"
 
 [[bin]]
 name = "merfishtools"

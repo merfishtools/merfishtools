@@ -12,5 +12,7 @@ extern crate itertools;
 extern crate rgsl;
 extern crate randomkit;
 extern crate num;
+extern crate rustc_serialize;
 
 pub mod model;
+pub mod io;
