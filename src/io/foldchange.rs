@@ -10,41 +10,34 @@ use bio::stats::logprobs::{LogProb, Prob};
 
 #[derive(RustcEncodable)]
 pub struct Record {
-    pub rna: String,
-    pub map: f64,
-    pub pep: Prob,
-    pub cdf: Vec<Prob>
+    pub feature: String,
+    pub fc: f64,
+    pub prob: Prob
 }
 
 
 pub struct Writer<W: io::Write> {
-    inner: csv::Writer<W>,
-    min_fs: f64,
-    max_fc: f64
+    inner: csv::Writer<W>
 }
 
 
 impl Writer<fs::File> {
     /// Read from a given file path.
-    pub fn from_file<P: AsRef<Path>>(path: P, max_x: u32) -> io::Result<Self> {
-        fs::File::open(path).map(|f| Writer::from_writer(f, max_x))
+    pub fn from_file<P: AsRef<Path>>(path: P, verbose: bool) -> io::Result<Self> {
+        fs::File::open(path).map(|f| Writer::from_writer(f))
     }
 }
 
 
 impl<W: io::Write> Writer<W> {
-    pub fn from_writer(w: W, min_fc: f64, max_fc: f64) -> Self {
+    pub fn from_writer(w: W, verbose: bool) -> Self {
         Writer {
-            inner: csv::Writer::from_writer(w).delimiter(b'\t'),
-            min_fc: min_fc,
-            max_fc: max_fc
+            inner: csv::Writer::from_writer(w).delimiter(b'\t')
         }
     }
 
     pub fn write_header(&mut self) -> csv::Result<()> {
-        let mut hdr = vec!["RNA".to_string()];
-        hdr.extend(itertools::linspace(self.min_fc, self.max_fc, 10).map(|fc| format!("{}", fc)));
-        self.inner.write(hdr.into_iter())
+        self.inner.write(["RNA", "logFC", "Prob"].into_iter())
     }
 
     pub fn write(&mut self, record: Record) -> csv::Result<()> {

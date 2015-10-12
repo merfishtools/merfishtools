@@ -212,7 +212,7 @@ mod tests {
     #[test]
     fn test_posterior_prob() {
         let readout = setup();
-        let expression = Expression::new(50, 10, &readout);
+        //let expression = Expression::new(50, 10, &readout);
         //println!("{:?}", (0..55).map(|x| expression.posterior_prob(x).exp()).collect_vec());
         //assert!(false);
         let expression = Expression::new(5, 5, &readout);
@@ -233,7 +233,7 @@ mod tests {
             Expression::new(5, 1, &readout),
             Expression::new(1, 0, &readout)
         ];
-        let mut expression_set = ExpressionSet::new(&expressions);
+        let expression_set = ExpressionSet::new(&expressions);
         // calculate expected value directly
         let expected_value = expressions.iter().map(|e| e.expected_value()).sum::<f64>() / expressions.len() as f64;
         assert!(expression_set.expected_value().approx_eq(&expected_value));
