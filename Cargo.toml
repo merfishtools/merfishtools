@@ -13,6 +13,9 @@ GSL = "*"
 randomkit = "*"
 num = "*"
 rustc-serialize = "*"
+argparse = "*"
+log = "*"
+fern = "*"
 
 [[bin]]
 name = "merfishtools"

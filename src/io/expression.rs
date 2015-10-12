@@ -38,7 +38,7 @@ impl<W: io::Write> Writer<W> {
     }
 
     pub fn write_header(&mut self) -> csv::Result<()> {
-        self.inner.write(["Exp", "Cell", "Feat", "Expr", "Prob"].into_iter())
+        self.inner.write(["Expmt", "Cell", "Feat", "Expr", "Prob"].into_iter())
     }
 
     pub fn write(&mut self, record: Record) -> csv::Result<()> {

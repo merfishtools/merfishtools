@@ -30,14 +30,14 @@ impl Writer<fs::File> {
 
 
 impl<W: io::Write> Writer<W> {
-    pub fn from_writer(w: W, verbose: bool) -> Self {
+    pub fn from_writer(w: W) -> Self {
         Writer {
             inner: csv::Writer::from_writer(w).delimiter(b'\t')
         }
     }
 
     pub fn write_header(&mut self) -> csv::Result<()> {
-        self.inner.write(["RNA", "logFC", "Prob"].into_iter())
+        self.inner.write(["Feat", "logFC", "Prob"].into_iter())
     }
 
     pub fn write(&mut self, record: Record) -> csv::Result<()> {
