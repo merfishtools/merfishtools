@@ -89,6 +89,10 @@ fn main() {
 
 
 fn exp(args: Vec<String>) {
+    let mut N = 16;
+    let mut m = 4;
+    let mut p0 = 0.04;
+    let mut p1 = 0.1;
     let mut threads = 1;
 
     {
@@ -99,11 +103,15 @@ Results are provided as PMF (probability mass function) in columns "Experiment, 
 Example: "merfishtools exp < data.txt > expression.txt""#
         );
 
+        ap.refer(&mut N).add_option(&["-N"], Store, "Number of bits in readout (i.e. number of hybridization rounds).");
+        ap.refer(&mut m).add_option(&["-m"], Store, "Number of 1-bits in readout.");
+        ap.refer(&mut p0).add_option(&["--p0"], Store, "Probability of 0->1 error.");
+        ap.refer(&mut p1).add_option(&["--p1"], Store, "Probability of 1->0 error.");
         ap.refer(&mut threads)
           .add_option(&["--threads", "-t"], Store, "Number of threads to use.");
         parse_args_or_exit(&ap, args);
     }
-    cli::expression(threads);
+    cli::expression(N, m, p0, p1, threads);
 }
 
 

@@ -17,7 +17,7 @@ pub struct Record {
     pub experiment: u32,
     pub codebook: u32,
     pub cell_id: u32,
-    pub rna: String,
+    pub feature: String,
     pub exact_match: u8,
     pub corrected_match: u8,
     pub cell_position: Position,
@@ -66,7 +66,7 @@ mod tests {
         for r in reader.records() {
             match r {
                 Ok(rec) => {
-                    assert_eq!(rec.rna, "SCUBE3");
+                    assert_eq!(rec.feature, "SCUBE3");
                     assert_eq!(rec.cell_position.x, 475.5);
                 },
                 Err(e) => panic!("{:?}", e)

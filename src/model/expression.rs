@@ -85,6 +85,10 @@ impl Expression {
         self.offset = min_x;
     }
 
+    pub fn pmf(&self) -> Vec<(u32, LogProb)> {
+        (self.min_x()..self.max_x()).map(|x| (x, self.posterior_prob(x))).collect_vec()
+    }
+
     pub fn posterior_prob(&self, x: u32) -> LogProb {
         let x = x as usize;
         if x < self.offset as usize || x >= self.offset as usize + self.likelihoods.len() {
