@@ -6,14 +6,40 @@ use csv;
 
 use bio::stats::logprobs::Prob;
 
+use io::PMF;
 
-#[derive(RustcEncodable)]
+#[derive(RustcEncodable, RustcDecodable)]
 pub struct Record {
     pub experiment: u32,
     pub cell: u32,
     pub feature: String,
-    pub expr: u32,
-    pub prob: Prob
+    pub pmf: PMF<u32>
+}
+
+
+pub struct Reader<R: io::Read> {
+    inner: csv::Reader<R>
+}
+
+
+impl Reader<fs::File> {
+    /// Read from a given file path.
+    pub fn from_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+        fs::File::open(path).map(|f| Reader::from_reader(f))
+    }
+}
+
+
+impl<R: io::Read> Reader<R> {
+    pub fn from_reader(rdr: R) -> Self {
+        Reader {
+            inner: csv::Reader::from_reader(rdr).delimiter(b'\t')
+        }
+    }
+
+    pub fn records<'a>(&'a mut self) -> csv::DecodedRecords<'a, R, Record> {
+        self.inner.decode()
+    }
 }
 
 

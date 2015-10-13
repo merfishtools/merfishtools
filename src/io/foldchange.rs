@@ -7,12 +7,39 @@ use itertools;
 
 use bio::stats::logprobs::{LogProb, Prob};
 
+use io::PMF;
 
-#[derive(RustcEncodable)]
+
+#[derive(RustcEncodable, RustcDecodable)]
 pub struct Record {
     pub feature: String,
-    pub fc: f64,
-    pub prob: Prob
+    pub pmf: PMF<f64>
+}
+
+
+pub struct Reader<R: io::Read> {
+    inner: csv::Reader<R>
+}
+
+
+impl Reader<fs::File> {
+    /// Read from a given file path.
+    pub fn from_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+        fs::File::open(path).map(|f| Reader::from_reader(f))
+    }
+}
+
+
+impl<R: io::Read> Reader<R> {
+    pub fn from_reader(rdr: R) -> Self {
+        Reader {
+            inner: csv::Reader::from_reader(rdr).delimiter(b'\t')
+        }
+    }
+
+    pub fn records<'a>(&'a mut self) -> csv::DecodedRecords<'a, R, Record> {
+        self.inner.decode()
+    }
 }
 
 
@@ -37,7 +64,7 @@ impl<W: io::Write> Writer<W> {
     }
 
     pub fn write_header(&mut self) -> csv::Result<()> {
-        self.inner.write(["Feat", "logFC", "Prob"].into_iter())
+        self.inner.write(["Feat", "log2FC", "Prob"].into_iter())
     }
 
     pub fn write(&mut self, record: Record) -> csv::Result<()> {
