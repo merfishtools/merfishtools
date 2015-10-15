@@ -54,7 +54,7 @@ impl Foldchange {
     pub fn expected_value(&self) -> f64 {
         self.pmf.iter().map(|(fc, prob)| {
             *fc.numer() as f64 / *fc.denom() as f64 * prob.exp()
-        }).sum()
+        }).fold(0.0, |s, e| s + e)
     }
 
     /// Conditional variance of fold change.
@@ -62,7 +62,7 @@ impl Foldchange {
         let expected_value = self.expected_value();
         self.pmf.iter().map(|(fc, prob)| {
             (*fc.numer() as f64 / *fc.denom() as f64 - expected_value) * prob.exp()
-        }).sum()
+        }).fold(0.0, |s, e| s + e)
     }
 }
 

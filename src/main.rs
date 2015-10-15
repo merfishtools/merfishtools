@@ -1,5 +1,3 @@
-#![feature(iter_arith)]
-
 extern crate merfishtools;
 extern crate argparse;
 
@@ -16,6 +14,8 @@ extern crate csv;
 extern crate itertools;
 extern crate num;
 extern crate rustc_serialize;
+extern crate simple_parallel;
+extern crate crossbeam;
 
 pub mod model;
 pub mod io;

@@ -25,18 +25,19 @@ fn likelihood(x: u32, count: u32, count_exact: u32, readout_model: &model::Reado
 
     let imin = if count_exact + x_c > count { count_exact + x_c - count } else { 0 };
     let imax = cmp::min(count_exact, x) + 1;
-    // work in log-space
+
     let summands = (imin..imax).map(|i| {
-        combinations(count_exact, i).ln() +
-        combinations(count - count_exact, x_c - i).ln() +
-        readout_model.prob_call_exact * i as f64 +
-        readout_model.prob_call_mismatch * (x_c - i) as f64 +
-        readout_model.prob_miscall_exact * (count_exact - i) as f64 +
-        readout_model.prob_miscall_mismatch * (x_m + i - count_exact) as f64
+        let combs = combinations(count_exact, i).ln() +
+                    combinations(count - count_exact, x_c - i).ln();
+        let prob = readout_model.prob_call_exact * i as f64 +
+                   readout_model.prob_call_mismatch * (x_c - i) as f64 +
+                   readout_model.prob_miscall_exact * (count_exact - i) as f64 +
+                   readout_model.prob_miscall_mismatch * (x_m + i - count_exact) as f64;
+        (combs + prob).min(0.0)
     }).collect_vec();
-    // TODO think about the combinations (divide or multiply??)
-    let likelihood = readout_model.prob_missed * (x - x_c) as f64 + combinations(count, x_c).ln() as f64 +
-                     logprobs::log_prob_sum(&summands);
+    // removed (combinations(count, x_c).ln() as f64) since we already sum over all possibilities
+    let likelihood = readout_model.prob_missed * (x - x_c) as f64 + logprobs::log_prob_sum(&summands).min(0.0);
+    assert!(!likelihood.is_nan());
     likelihood
 }
 
@@ -101,9 +102,9 @@ impl Expression {
 
     /// The maximum a posteriori probability estimate.
     pub fn map(&self) -> u32 {
-        let mut max = f64::NEG_INFINITY;
-        let mut max_x = 0;
-        for x in self.min_x()..self.max_x() {
+        let mut max_x = self.min_x();
+        let mut max = self.posterior_prob(max_x);
+        for x in self.min_x() + 1..self.max_x() {
             let p = self.posterior_prob(x);
             if p >= max {
                 max_x = x;
@@ -114,11 +115,11 @@ impl Expression {
     }
 
     pub fn expected_value(&self) -> f64 {
-        (self.min_x()..self.max_x()).map(|x| x as f64 * self.posterior_prob(x).exp()).sum()
+        (self.min_x()..self.max_x()).map(|x| x as f64 * self.posterior_prob(x).exp()).fold(0.0, |s, e| s + e)
     }
 
     pub fn variance(&self) -> f64 {
-        (self.min_x()..self.max_x()).map(|x| (x as f64 - self.expected_value()).powi(2) * self.posterior_prob(x).exp()).sum()
+        (self.min_x()..self.max_x()).map(|x| (x as f64 - self.expected_value()).powi(2) * self.posterior_prob(x).exp()).fold(0.0, |s, e| s + e)
     }
 
     pub fn min_x(&self) -> u32 {
@@ -179,7 +180,7 @@ impl ExpressionSet {
     pub fn expected_value(&self) -> f64 {
         self.pmf.iter().map(|(mean, prob)| {
             *mean.numer() as f64 / *mean.denom() as f64 * prob.exp()
-        }).sum()
+        }).fold(0.0, |s, e| s + e)
     }
 }
 
@@ -187,7 +188,6 @@ impl ExpressionSet {
 #[cfg(test)]
 mod tests {
     #![allow(non_upper_case_globals)]
-    use test::Bencher;
 
     use itertools::Itertools;
     use nalgebra::ApproxEq;
@@ -216,9 +216,9 @@ mod tests {
     #[test]
     fn test_posterior_prob() {
         let readout = setup();
-        //let expression = Expression::new(50, 10, &readout);
-        //println!("{:?}", (0..55).map(|x| expression.posterior_prob(x).exp()).collect_vec());
-        //assert!(false);
+        let expression = Expression::new(50, 10, &readout);
+        println!("{:?}", (0..55).map(|x| expression.posterior_prob(x).exp()).collect_vec());
+        assert!(false);
         let expression = Expression::new(5, 5, &readout);
         // check if x=5 yields highest probability
         assert_eq!((0..21).sorted_by(|&x, &y| {
@@ -239,24 +239,11 @@ mod tests {
         ];
         let expression_set = ExpressionSet::new(&expressions);
         // calculate expected value directly
-        let expected_value = expressions.iter().map(|e| e.expected_value()).sum::<f64>() / expressions.len() as f64;
+        let expected_value = expressions.iter().map(|e| e.expected_value()).fold(0.0, |s, e| s + e) / expressions.len() as f64;
         assert!(expression_set.expected_value().approx_eq(&expected_value));
         // check if x=5 yields highest probability
         //assert_eq!((0..20).sorted_by(|&x, &y| {
         //    expression_set.posterior_prob(x).partial_cmp(&expression_set.posterior_prob(y)).unwrap()
         //})[19], 5);
-    }
-
-    #[bench]
-    fn bench_set_realizations(b: &mut Bencher) {
-        let readout = setup();
-        let expressions = [
-            Expression::new(5, 5, &readout),
-            Expression::new(5, 5, &readout),
-            Expression::new(5, 5, &readout),
-            Expression::new(1, 0, &readout)
-        ];
-
-        b.iter(|| ExpressionSet::new(&expressions));
     }
 }
