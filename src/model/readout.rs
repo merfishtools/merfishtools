@@ -35,35 +35,33 @@ impl Factory {
 
     /// Probability to see a readout with one mismatch given that we have a call.
     fn prob_call_mismatch(&self) -> Prob {
-        (self.m as f64 * self.xi(1, 0) + (self.N - self.m) as f64 * self.xi(0, 1)) / self.N as f64
+        //(self.m as f64 * self.xi(1, 0) + (self.N - self.m) as f64 * self.xi(0, 1)) / self.N as f64
+        (self.m as f64 * self.xi(1, 0) + (self.N - self.m) as f64 * self.xi(0, 1))
     }
 
 
     /// Probability to see an exact readout given that we have a miscall.
     fn prob_miscall_exact(&self) -> Prob {
-        self.xi(2, 2)
+        self.psi(2,2) * self.xi(2, 2)
     }
 
 
     /// Probability to see a readout with one mismatch given that we have a miscall.
     fn prob_miscall_mismatch(&self) -> Prob {
-        (self.psi(2, 1) * self.xi(2, 1) + self.psi(1, 2) * self.xi(1, 2) +
-        self.psi(2, 3) * self.xi(2, 3) + self.psi(3, 2) * self.xi(3, 2)) /
-        (self.psi(2, 1) + self.psi(1, 2) + self.psi(2, 3) + self.psi(3, 2))
+        self.psi(2, 1) * self.xi(2, 1) + self.psi(1, 2) * self.xi(1, 2) +
+        self.psi(2, 3) * self.xi(2, 3) + self.psi(3, 2) * self.xi(3, 2)
     }
 
 
     /// Probability to completely miss a readout because of too many errors.
     fn prob_missed(&self) -> Prob {
-        let mut num = 0.0;
-        let mut denom = 0.0;
+        let mut p = 0.0;
         for k in 3..6 {
             for i in 0..cmp::min(self.m, k) + 1 {
-                num += self.psi(i, k - i) * self.xi(i, k - i);
-                denom += self.psi(i, k - i);
+                p += self.psi(i, k - i) * self.xi(i, k - i);
             }
         }
-        num / denom
+        p
     }
 }
 
@@ -125,21 +123,21 @@ mod tests {
     fn test_prob_miscall_exact() {
         let p = factory.prob_miscall_exact();
         println!("{}", p);
-        assert!(p.approx_eq(&0.000008616230962449854));
+        assert!(p.approx_eq(&0.003412027461130142));
     }
 
     #[test]
     fn test_prob_miscall_mismatch() {
         let p = factory.prob_miscall_mismatch();
         println!("{}", p);
-        assert!(p.approx_eq(&0.00001879564966027473));
+        assert!(p.approx_eq(&0.03608764734772748));
     }
 
     #[test]
     fn test_prob_missed() {
         let p = factory.prob_missed();
         println!("{}", p);
-        assert!(p.approx_eq(&0.000007861209464082392));
+        assert!(p.approx_eq(&0.053047441463627984));
     }
 
     #[test]

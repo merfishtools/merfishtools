@@ -36,8 +36,12 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, threads: usize) {
                 value: 0,
                 prob: 0.0
             };
+            let pmf = expression.pmf();
+            if pmf.iter().any(|&(_, prob)| prob.is_nan()) {
+                warn!("A PMF value for feature {} cannot be estimated because counts are too high. It will be reported as NaN.", feature);
+            }
 
-            for (value, prob) in expression.pmf() {
+            for (value, prob) in pmf {
                 record.value = value;
                 record.prob = prob;
                 writer.write(&record);

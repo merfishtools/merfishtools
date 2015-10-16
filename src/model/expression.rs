@@ -33,10 +33,10 @@ fn likelihood(x: u32, count: u32, count_exact: u32, readout_model: &model::Reado
                    readout_model.prob_call_mismatch * (x_c - i) as f64 +
                    readout_model.prob_miscall_exact * (count_exact - i) as f64 +
                    readout_model.prob_miscall_mismatch * (x_m + i - count_exact) as f64;
-        (combs + prob).min(0.0)
+        combs + prob
     }).collect_vec();
     // removed (combinations(count, x_c).ln() as f64) since we already sum over all possibilities
-    let likelihood = readout_model.prob_missed * (x - x_c) as f64 + logprobs::log_prob_sum(&summands).min(0.0);
+    let likelihood = readout_model.prob_missed * (x - x_c) as f64 + logprobs::log_prob_sum(&summands);
     assert!(!likelihood.is_nan());
     likelihood
 }
@@ -216,8 +216,8 @@ mod tests {
     #[test]
     fn test_posterior_prob() {
         let readout = setup();
-        let expression = Expression::new(500, 10, &readout);
-        println!("{:?}", (490..510).map(|x| expression.posterior_prob(x).exp()).collect_vec());
+        let expression = Expression::new(100, 99, &readout);
+        println!("{:?}", (90..110).map(|x| expression.posterior_prob(x).exp()).collect_vec());
         assert!(false);
         let expression = Expression::new(5, 5, &readout);
         // check if x=5 yields highest probability
