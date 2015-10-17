@@ -35,8 +35,8 @@ impl Factory {
 
     /// Probability to see a readout with one mismatch given that we have a call.
     fn prob_call_mismatch(&self) -> Prob {
-        //(self.m as f64 * self.xi(1, 0) + (self.N - self.m) as f64 * self.xi(0, 1)) / self.N as f64
-        (self.m as f64 * self.xi(1, 0) + (self.N - self.m) as f64 * self.xi(0, 1))
+        (self.m as f64 * self.xi(1, 0) + (self.N - self.m) as f64 * self.xi(0, 1)) / self.N as f64
+        //(self.m as f64 * self.xi(1, 0) + (self.N - self.m) as f64 * self.xi(0, 1))
     }
 
 

@@ -35,7 +35,6 @@ fn likelihood(x: u32, count: u32, count_exact: u32, readout_model: &model::Reado
                    readout_model.prob_miscall_mismatch * (x_m + i - count_exact) as f64;
         combs + prob
     }).collect_vec();
-    // removed (combinations(count, x_c).ln() as f64) since we already sum over all possibilities
     let likelihood = readout_model.prob_missed * (x - x_c) as f64 + logprobs::log_prob_sum(&summands);
     assert!(!likelihood.is_nan());
     likelihood
