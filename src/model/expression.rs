@@ -10,6 +10,7 @@ use bio::stats::logprobs;
 use bio::stats::logprobs::LogProb;
 
 use model;
+use io;
 
 
 pub type MeanExpression = rational::Ratio<u32>;
@@ -137,22 +138,22 @@ pub struct ExpressionSet {
 
 
 impl ExpressionSet {
-    pub fn new(expressions: &[Expression]) -> Self {
+    pub fn new(expression_pmfs: &[io::expression::PMF]) -> Self {
         let mut pmf = collections::HashMap::new();
 
         fn dfs(
             i: usize, expression_sum: u32, posterior_prob: LogProb,
             pmf: &mut collections::HashMap<MeanExpression, LogProb>,
-            expressions: &[Expression]
+            expression_pmfs: &[io::expression::PMF]
         ) {
-            if i < expressions.len() {
-                let ref expr = expressions[i];
-                for x in expr.min_x()..expr.max_x() {
-                    dfs(i + 1, expression_sum + x, posterior_prob + expr.posterior_prob(x), pmf, expressions);
+            if i < expression_pmfs.len() {
+                let ref expr_pmf = expression_pmfs[i];
+                for &(x, prob) in expr_pmf.iter() {
+                    dfs(i + 1, expression_sum + x, posterior_prob + prob, pmf, expression_pmfs);
                 }
             }
             else {
-                let mean = rational::Ratio::new(expression_sum, expressions.len() as u32);
+                let mean = rational::Ratio::new(expression_sum, expression_pmfs.len() as u32);
                 if pmf.contains_key(&mean) {
                     let p = pmf.get_mut(&mean).unwrap();
                     *p = logprobs::log_prob_add(*p, posterior_prob);
@@ -163,7 +164,7 @@ impl ExpressionSet {
             }
         }
 
-        dfs(0, 0, 0.0, &mut pmf, expressions);
+        dfs(0, 0, 0.0, &mut pmf, expression_pmfs);
 
         ExpressionSet {
             pmf: pmf

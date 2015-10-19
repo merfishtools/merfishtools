@@ -12,6 +12,11 @@ pub type LogFC = f64;
 pub type FC = rational::Ratio<u32>;
 
 
+fn ratio_as_f64(v: &rational::Ratio<u32>) -> f64 {
+    *v.numer() as f64 / *v.denom() as f64
+}
+
+
 pub struct Foldchange {
     pmf: collections::HashMap<FC, LogProb>
 }
@@ -39,8 +44,8 @@ impl Foldchange {
     }
 
     /// Unorderered iteration over probability mass function (PMF).
-    pub fn pmf(&self) -> collections::hash_map::Iter<FC, LogProb> {
-        self.pmf.iter()
+    pub fn pmf(&self) -> Vec<(f64, LogProb)> {
+        self.pmf.iter().map(|(fc, prob)| (ratio_as_f64(fc), *prob)).collect_vec()
     }
 
     /// Minimum credible fold change f, i.e. Pr(F >= f | D) >= 0.95.
@@ -53,7 +58,7 @@ impl Foldchange {
     /// Conditional expectation of fold change.
     pub fn expected_value(&self) -> f64 {
         self.pmf.iter().map(|(fc, prob)| {
-            *fc.numer() as f64 / *fc.denom() as f64 * prob.exp()
+            ratio_as_f64(fc) * prob.exp()
         }).fold(0.0, |s, e| s + e)
     }
 
@@ -61,7 +66,7 @@ impl Foldchange {
     pub fn variance(&self) -> f64 {
         let expected_value = self.expected_value();
         self.pmf.iter().map(|(fc, prob)| {
-            (*fc.numer() as f64 / *fc.denom() as f64 - expected_value) * prob.exp()
+            (ratio_as_f64(fc) - expected_value) * prob.exp()
         }).fold(0.0, |s, e| s + e)
     }
 }

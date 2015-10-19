@@ -1,6 +1,8 @@
 use std::io;
 use std::fs;
 use std::path::Path;
+use std::collections::HashMap;
+use std::hash::Hash;
 
 use itertools::Itertools;
 use csv;
@@ -14,12 +16,6 @@ pub struct Record<F: Decodable + Encodable, V: Decodable + Encodable> {
     pub feature: F,
     pub value: V,
     pub prob: LogProb
-}
-
-
-pub struct AggregatedRecord<F, V> {
-    pub feature: F,
-    pub pmf: Vec<(V, LogProb)>
 }
 
 
@@ -47,14 +43,16 @@ impl<R: io::Read> Reader<R> {
         self.inner.decode()
     }
 
-    /*pub fn aggregated_records<'a, F: Decodable + Encodable + Eq + Clone, V: Decodable + Encodable + Clone>(&'a mut self) -> Box<Iterator<Item=AggregatedRecord<F, V>>> {
-        Box::new(self.inner.decode().map(|res| res.ok().expect("Error reading record.")).group_by(|rec: Record<F, V>| rec.feature.clone()).map(|(feature, records): (F, Vec<Record<F, V>>)| {
-            AggregatedRecord {
-                feature: feature,
-                pmf: records.iter().map(|rec: &Record<F, V>| (rec.value.clone(), rec.prob.clone())).collect_vec()
-            }
-        }))
-    }*/
+    pub fn pmf<F: Decodable + Encodable + Eq + Hash + Clone, V: Decodable + Encodable + Clone>(&mut self) -> HashMap<F, Vec<(V, LogProb)>> {
+        let mut pmf = HashMap::new();
+        for (feature, records) in self.records::<F, V>().map(|res| res.ok().expect("Error reading record")).group_by(
+            |rec| rec.feature.clone()
+        ) {
+            let items = records.iter().map(|rec| (rec.value.clone(), rec.prob.clone())).collect_vec();
+            pmf.insert(feature, items);
+        }
+        pmf
+    }
 }
 
 pub struct Writer<W: io::Write> {
