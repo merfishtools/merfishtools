@@ -93,29 +93,29 @@ mod tests {
         model::Readout::new(N, m, p0, p1)
     }
 
-    #[test]
-    fn test_expected_value() {
-        let readout = setup();
-        let a = [
-            model::Expression::new(5, 5, &readout),
-            model::Expression::new(5, 5, &readout),
-            model::Expression::new(5, 5, &readout),
-            model::Expression::new(5, 5, &readout)
-        ];
-
-        let b = [
-            model::Expression::new(15, 15, &readout),
-            model::Expression::new(15, 15, &readout),
-            model::Expression::new(15, 15, &readout),
-            model::Expression::new(15, 15, &readout)
-        ];
-
-        let a = model::ExpressionSet::new(&a);
-        let b = model::ExpressionSet::new(&b);
-
-        let fc = Foldchange::new(&a, &b);
-
-        println!("{}", fc.expected_value());
-        assert!(fc.expected_value().approx_eq(&2.999373414428798));
-    }
+    // #[test]
+    // fn test_expected_value() {
+    //     let readout = setup();
+    //     let a = [
+    //         model::Expression::new(5, 5, &readout),
+    //         model::Expression::new(5, 5, &readout),
+    //         model::Expression::new(5, 5, &readout),
+    //         model::Expression::new(5, 5, &readout)
+    //     ];
+    //
+    //     let b = [
+    //         model::Expression::new(15, 15, &readout),
+    //         model::Expression::new(15, 15, &readout),
+    //         model::Expression::new(15, 15, &readout),
+    //         model::Expression::new(15, 15, &readout)
+    //     ];
+    //
+    //     let a = model::ExpressionSet::new(&a);
+    //     let b = model::ExpressionSet::new(&b);
+    //
+    //     let fc = Foldchange::new(&a, &b);
+    //
+    //     println!("{}", fc.expected_value());
+    //     assert!(fc.expected_value().approx_eq(&2.999373414428798));
+    // }
 }

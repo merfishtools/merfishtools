@@ -1,0 +1,116 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+
+
+configfile: "config.yaml"
+
+
+merfishtools = "../target/release/merfishtools"
+
+
+rule all:
+    input:
+        "diffexp/140genesData.A-vs-B.txt",
+        expand("results/{name}.expr_graph.{ext}", ext=["svg", "pdf"], name=["all", "pruned"])
+
+
+rule plots:
+    input:
+        expand("results/expression_pmf/140genesData/{gene}.svg", gene="AFAP1 COL5A1".split())
+
+
+rule sort:
+    input:
+        "data/140genesData.csv"
+    output:
+        "data/140genesData.sorted.txt"
+    shell:
+        r"bzcat {input} | xsv sort -d '\t' | xsv fmt -t '\t' > {output}"
+
+
+rule expressions:
+    input:
+        "data/{dataset}.sorted.txt"
+    output:
+        "expressions/{dataset}.all.txt"
+    threads: 8
+    shell:
+        "{merfishtools} exp -t {threads} < {input} > {output}"
+
+
+rule select_group:
+    input:
+        "expressions/{dataset}.all.txt"
+    output:
+        "expressions/{dataset}.{group}.txt"
+    params:
+        expmnt=lambda wildcards: str(config["groups"][wildcards.group]["expmnt"]),
+        cells=lambda wildcards: config["groups"][wildcards.group]["cells"]
+    shell:
+        r"xsv search -d'\t' -s expmnt '{params.expmnt}' < {input} | "
+        r"xsv search -s cell '{params.cells}' | xsv fmt -t '\t' > {output}"
+
+
+rule diffexp:
+    input:
+        "expressions/{dataset}.{group1}.txt",
+        "expressions/{dataset}.{group2}.txt"
+    output:
+        "diffexp/{dataset}.{group1}-vs-{group2}.txt"
+    threads: 8
+    shell:
+        "{merfishtools} diffexp -t {threads} {input} > {output}"
+
+
+rule plot_expression_pmf:
+    input:
+        expr="expressions/{dataset}.all.txt",
+        raw="data/{dataset}.sorted.txt"
+    output:
+        "results/expression_pmf/{dataset}/{gene}.svg"
+    run:
+        plt.figure()
+        sns.set_style("ticks")
+        raw = pd.read_table(input.raw, index_col=[0, 2, 3])
+        raw = raw.loc[1, 0, wildcards.gene]
+
+        count_exact = raw["Exact_Match"].sum()
+        count_corrected = raw["Corrected_Match"].sum()
+        count_total = count_exact + count_corrected
+
+        pmf = pd.read_table(input.expr, index_col=[0, 1, 2])
+        pmf = pmf.loc[1, 0, wildcards.gene]
+
+        _, _, baseline = plt.stem(pmf["expr"], np.exp(pmf["prob"]), markerfmt="ko", basefmt="", linefmt="k-")
+        plt.setp(baseline, 'linewidth', 0)
+        ylim = plt.ylim()
+        plt.vlines([count_exact], *ylim, colors="grey", linestyles="--")
+        plt.vlines([count_total], *ylim, colors="grey", linestyles="--")
+        plt.text(count_exact, ylim[1], "exact calls", rotation="vertical", va="top")
+        plt.text(count_total, ylim[1], "total calls", rotation="vertical", va="top")
+        plt.ylim(ylim)
+        plt.xlabel("expression")
+        plt.ylabel("posterior probability")
+
+        sns.despine()
+        plt.savefig(output[0], bbox_inches="tight")
+
+
+rule render_expr_graph:
+    input:
+        "dot/{name}.dot"
+    output:
+        "results/{name}.expr_graph.svg"
+    shell:
+        "dot -Tsvg {input} > {output}"
+
+
+rule svg2pdf:
+    input:
+        "{prefix}.svg"
+    output:
+        "{prefix}.pdf"
+    shell:
+        "rsvg-convert -f pdf {input} > {output}"
