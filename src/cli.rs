@@ -60,19 +60,20 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, threads: us
     let group1 = io::expression::features(reader1);
     let group2 = io::expression::features(reader2);
 
-    let features = group1.features().filter(|f| group2.contains_feature(f));
+    let features = group1.features().filter(|f| group2.contains_feature(f)).cloned().collect_vec();
 
     writer.write_header(&["feat", "log2fc", "prob"]);
 
     let mut pool = simple_parallel::Pool::new(threads);
     crossbeam::scope(|scope| {
         for (feature, foldchange) in pool.map(scope, features, |feature| {
+            let fc = model::Foldchange::new(
+                &model::ExpressionSet::new(&group1.get(&feature).unwrap()),
+                &model::ExpressionSet::new(&group2.get(&feature).unwrap())
+            );
             (
                 feature,
-                model::Foldchange::new(
-                    &model::ExpressionSet::new(&group1.get(feature).unwrap()),
-                    &model::ExpressionSet::new(&group2.get(feature).unwrap())
-                )
+                fc
             )
         }) {
             let mut record = io::pmf::Record { feature: feature.clone(), value: 0.0, prob: 0.0 };

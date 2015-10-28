@@ -9,8 +9,7 @@ use bio::stats::LogProb;
 
 use io::pmf;
 
-
-pub type PMF = Vec<(u32, LogProb)>;
+pub type PMF = pmf::PMF<u32>;
 
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Clone, Hash)]
@@ -56,7 +55,7 @@ pub fn features<R: io::Read>(mut reader: pmf::Reader<R>) -> Features {
     for (record, records) in reader.records::<Record, u32>().map(|res| res.ok().expect("Error reading record")).group_by(
         |rec| rec.feature.clone()
     ) {
-        let pmf = records.iter().map(|rec| (rec.value.clone(), rec.prob.clone())).collect_vec();
+        let pmf = PMF::new(records.iter().map(|rec| (rec.value.clone(), rec.prob.clone())).collect_vec());
         if !features.contains_key(&record.feature) {
             features.insert(record.feature.clone(), Vec::new());
         }

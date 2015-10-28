@@ -146,16 +146,25 @@ impl ExpressionSet {
         fn dfs(
             i: usize, expression_sum: u32, posterior_prob: LogProb,
             pmf: &mut collections::HashMap<MeanExpression, LogProb>,
-            expression_pmfs: &[io::expression::PMF]
+            expression_pmfs: &[io::expression::PMF],
+            min_prob: LogProb
         ) {
-            if posterior_prob < MIN_PROB {
-                // stop is probability becomes too small
+            if posterior_prob < min_prob {
+                // stop if probability becomes too small
                 return;
             }
             else if i < expression_pmfs.len() {
                 let ref expr_pmf = expression_pmfs[i];
+                let map = expr_pmf.map();
                 for &(x, prob) in expr_pmf.iter() {
-                    dfs(i + 1, expression_sum + x, posterior_prob + prob, pmf, expression_pmfs);
+                    dfs(
+                        i + 1,
+                        expression_sum + x,
+                        posterior_prob + prob,
+                        pmf,
+                        expression_pmfs,
+                        if x == map { f64::NEG_INFINITY } else { MIN_PROB }
+                    );
                 }
             }
             else {
@@ -170,7 +179,7 @@ impl ExpressionSet {
             }
         }
 
-        dfs(0, 0, 0.0, &mut pmf, expression_pmfs);
+        dfs(0, 0, 0.0, &mut pmf, expression_pmfs, f64::NEG_INFINITY);
 
         ExpressionSet {
             pmf: pmf
