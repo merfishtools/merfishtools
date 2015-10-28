@@ -13,6 +13,7 @@ merfishtools = "../target/release/merfishtools"
 rule all:
     input:
         "diffexp/140genesData.A-vs-B.txt",
+        expand("results/expression_pmf/140genesData/{gene}.svg", gene=config["genes"]),
         expand("results/{name}.expr_graph.{ext}", ext=["svg", "pdf"], name=["all", "pruned"])
 
 
@@ -23,7 +24,7 @@ rule plots:
 
 rule sort:
     input:
-        "data/140genesData.csv"
+        "data/140genesData.csv.bz2"
     output:
         "data/140genesData.sorted.txt"
     shell:
