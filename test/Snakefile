@@ -60,6 +60,8 @@ rule diffexp:
         "expressions/{dataset}.{group2}.txt"
     output:
         "diffexp/{dataset}.{group1}-vs-{group2}.txt"
+    benchmark:
+        "bench/diffexp/{dataset}.{group1}-vs-{group2}.txt"
     threads: 8
     shell:
         "{merfishtools} diffexp -t {threads} {input} > {output}"

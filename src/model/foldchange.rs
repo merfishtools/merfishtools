@@ -43,17 +43,12 @@ impl Foldchange {
         }
     }
 
-    /// Unorderered iteration over probability mass function (PMF).
+    /// Probability mass function (PMF).
     pub fn pmf(&self) -> Vec<(f64, LogProb)> {
-        self.pmf.iter().map(|(fc, prob)| (ratio_as_f64(fc), *prob)).collect_vec()
+        let mut pmf = self.pmf.iter().map(|(fc, prob)| (ratio_as_f64(fc).log2(), *prob)).collect_vec();
+        pmf.sort_by(|&(a, _), &(b, _)| a.partial_cmp(&b).unwrap());
+        pmf
     }
-
-    /// Minimum credible fold change f, i.e. Pr(F >= f | D) >= 0.95.
-    // pub fn min_credible(&self) -> f64 {
-    //     let sorted = self.pmf.iter().rev().sorted_by(|(a, _), (b, _)| a.partial_cmp(b));
-    //     let cum_probs = logprobs::log_prob_cumsum(&sorted.iter().map(|(fc, prob)| prob).collect_vec());
-    //
-    // }
 
     /// Conditional expectation of fold change.
     pub fn expected_value(&self) -> f64 {

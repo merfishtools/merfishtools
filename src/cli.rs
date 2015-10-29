@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 use std;
 
 use itertools::Itertools;
@@ -14,13 +16,13 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, threads: usize) {
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
     let mut writer = io::pmf::Writer::from_writer(std::io::stdout());
 
-    let mut records = reader.records().map(
+    let records = reader.records().map(
         |res| res.ok().expect("Error reading record.")
     ).group_by(|rec| {
         (rec.experiment, rec.cell_id, rec.feature.clone())
     });
 
-    writer.write_header(&["expmnt", "cell", "feat", "expr", "prob"]);
+    writer.write_header(&["expmnt", "cell", "feat", "expr", "prob"]).ok().expect("Error writing PMF header.");
 
     let mut pool = simple_parallel::Pool::new(threads);
     crossbeam::scope(|scope| {
@@ -45,7 +47,7 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, threads: usize) {
             for (value, prob) in pmf {
                 record.value = value;
                 record.prob = prob;
-                writer.write(&record);
+                writer.write(&record).ok().expect("Error writing PMF record.");
             }
         }
     });
@@ -62,7 +64,7 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, threads: us
 
     let features = group1.features().filter(|f| group2.contains_feature(f)).cloned().collect_vec();
 
-    writer.write_header(&["feat", "log2fc", "prob"]);
+    writer.write_header(&["feat", "log2fc", "prob"]).ok().expect("Error writing PMF header.");
 
     let mut pool = simple_parallel::Pool::new(threads);
     crossbeam::scope(|scope| {
@@ -85,7 +87,7 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, threads: us
             for (value, prob) in pmf {
                 record.value = value;
                 record.prob = prob;
-                writer.write(&record);
+                writer.write(&record).ok().expect("Error writing PMF record.");
             }
         }
     });

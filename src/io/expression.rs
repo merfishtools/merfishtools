@@ -1,11 +1,8 @@
 use std::collections::HashMap;
-use std::hash::Hash;
 use std::collections::hash_map;
 use std::io;
 
 use itertools::Itertools;
-
-use bio::stats::LogProb;
 
 use io::pmf;
 
