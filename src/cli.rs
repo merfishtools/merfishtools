@@ -5,11 +5,13 @@ use std;
 use itertools::Itertools;
 use simple_parallel;
 use crossbeam;
+use csv;
 
 use bio::stats::logprobs::Prob;
 
 use io;
 use model;
+
 
 pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, threads: usize) {
     let readout_model = model::Readout::new(N, m, p0, p1);
@@ -22,7 +24,7 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, threads: usize) {
         (rec.experiment, rec.cell_id, rec.feature.clone())
     });
 
-    writer.write_header(&["expmnt", "cell", "feat", "expr", "prob"]).ok().expect("Error writing PMF header.");
+    writer.write_header(&io::pmf::expression::HEADER).ok().expect("Error writing PMF header.");
 
     let mut pool = simple_parallel::Pool::new(threads);
     crossbeam::scope(|scope| {
@@ -32,8 +34,8 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, threads: usize) {
             ((experiment, cell, feature), model::Expression::new(count as u32, count_exact as u32, &readout_model))
         }) {
             let mut record = io::pmf::Record {
-                feature: io::expression::Record {
-                    cell: io::expression::Cell { experiment: experiment, cell: cell },
+                feature: io::pmf::expression::Record {
+                    cell: io::Cell { experiment: experiment, cell: cell },
                     feature: feature.clone()
                 },
                 value: 0,
@@ -59,12 +61,12 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, threads: us
     let reader2 = io::pmf::Reader::from_file(group2_path).ok().expect("Error reading file.");
     let mut writer = io::pmf::Writer::from_writer(std::io::stdout());
 
-    let group1 = io::expression::features(reader1);
-    let group2 = io::expression::features(reader2);
+    let group1 = io::pmf::expression::pmfs(reader1);
+    let group2 = io::pmf::expression::pmfs(reader2);
 
     let features = group1.features().filter(|f| group2.contains_feature(f)).cloned().collect_vec();
 
-    writer.write_header(&["feat", "log2fc", "prob"]).ok().expect("Error writing PMF header.");
+    writer.write_header(&io::pmf::foldchange::HEADER).ok().expect("Error writing PMF header.");
 
     let mut pool = simple_parallel::Pool::new(threads);
     crossbeam::scope(|scope| {

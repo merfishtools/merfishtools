@@ -1,48 +1,13 @@
-use std::cmp;
 use std::f64;
-use std::collections;
+use std::ops::Range;
 
 use itertools::Itertools;
-use num::rational;
 
-use bio::stats::combinatorics::combinations;
 use bio::stats::logprobs;
 use bio::stats::logprobs::LogProb;
 
+use model::pmf::PMF;
 use model;
-use io;
-
-
-pub type MeanExpression = rational::Ratio<u32>;
-
-
-const MIN_PROB: f64 = -13.815510557964274; // = 0.000001f64.ln();
-
-
-fn likelihood(x: u32, count: u32, count_exact: u32, readout_model: &model::Readout) -> LogProb {
-    let x = x as u64;
-    let count = count as u64;
-    let count_exact = count_exact as u64;
-
-    let x_c = cmp::min(count, x);
-    let x_m = count - x_c;
-
-    let imin = if count_exact + x_c > count { count_exact + x_c - count } else { 0 };
-    let imax = cmp::min(count_exact, x) + 1;
-
-    let summands = (imin..imax).map(|i| {
-        let combs = combinations(count_exact, i).ln() +
-                    combinations(count - count_exact, x_c - i).ln();
-        let prob = readout_model.prob_call_exact * i as f64 +
-                   readout_model.prob_call_mismatch * (x_c - i) as f64 +
-                   readout_model.prob_miscall_exact * (count_exact - i) as f64 +
-                   readout_model.prob_miscall_mismatch * (x_m + i - count_exact) as f64;
-        combs + prob
-    }).collect_vec();
-    let likelihood = readout_model.prob_missed * (x - x_c) as f64 + logprobs::log_prob_sum(&summands);
-    assert!(!likelihood.is_nan());
-    likelihood
-}
 
 
 pub struct Expression {
@@ -52,10 +17,31 @@ pub struct Expression {
 }
 
 
+impl<'a> PMF<'a, u32, Range<u32>> for Expression {
+    fn domain(&'a self) -> Range<u32> {
+        self.min_x()..self.max_x()
+    }
+
+    fn posterior_prob(&'a self, x: u32) -> LogProb {
+        let x = x as usize;
+        if x < self.offset as usize || x >= self.offset as usize + self.likelihoods.len() {
+            f64::NEG_INFINITY
+        }
+        else {
+            self.likelihoods[x - self.offset as usize] - self.marginal
+        }
+    }
+
+    fn cast(value: u32) -> f64 {
+        value as f64
+    }
+}
+
+
 impl Expression {
     pub fn new(count: u32, count_exact: u32, readout_model: &model::Readout) -> Self {
         let offset = if count_exact > 50 { count_exact - 50 } else { 0 };
-        let likelihoods = (offset..count + 50).map(|x| likelihood(x, count, count_exact, readout_model)).collect_vec();
+        let likelihoods = (offset..count + 50).map(|x| readout_model.likelihood(x, count, count_exact)).collect_vec();
         // calculate (marginal / flat_prior)
         let marginal = logprobs::log_prob_sum(&likelihoods);
         // TODO trim values such that zero probabilities are not stored
@@ -72,14 +58,14 @@ impl Expression {
         let map = self.map();
         let mut min_x = self.min_x();
         for x in (self.min_x()..map).rev() {
-            if self.posterior_prob(x) < MIN_PROB {
+            if self.posterior_prob(x) < model::MIN_PROB {
                 min_x = x;
                 break;
             }
         }
         let mut max_x = self.max_x();
         for x in map..self.max_x() {
-            if self.posterior_prob(x) < MIN_PROB {
+            if self.posterior_prob(x) < model::MIN_PROB {
                 max_x = x;
                 break;
             }
@@ -88,20 +74,12 @@ impl Expression {
         self.offset = min_x;
     }
 
-    pub fn pmf(&self) -> Vec<(u32, LogProb)> {
-        (self.min_x()..self.max_x()).map(|x| (x, self.posterior_prob(x))).collect_vec()
-    }
+    /*
+    pub fn pmf(&self) -> PMF {
+        model::pmf::PMF::new((self.min_x()..self.max_x()).map(|x| (x, self.posterior_prob(x))).collect_vec())
+    }*/
 
-    pub fn posterior_prob(&self, x: u32) -> LogProb {
-        let x = x as usize;
-        if x < self.offset as usize || x >= self.offset as usize + self.likelihoods.len() {
-            f64::NEG_INFINITY
-        }
-        else {
-            self.likelihoods[x - self.offset as usize] - self.marginal
-        }
-    }
-
+/*
     /// The maximum a posteriori probability estimate.
     pub fn map(&self) -> u32 {
         let mut max_x = self.min_x();
@@ -114,15 +92,7 @@ impl Expression {
             }
         }
         max_x
-    }
-
-    pub fn expected_value(&self) -> f64 {
-        (self.min_x()..self.max_x()).map(|x| x as f64 * self.posterior_prob(x).exp()).fold(0.0, |s, e| s + e)
-    }
-
-    pub fn variance(&self) -> f64 {
-        (self.min_x()..self.max_x()).map(|x| (x as f64 - self.expected_value()).powi(2) * self.posterior_prob(x).exp()).fold(0.0, |s, e| s + e)
-    }
+    }*/
 
     pub fn min_x(&self) -> u32 {
         self.offset
@@ -133,73 +103,7 @@ impl Expression {
     }
 }
 
-
-pub struct ExpressionSet {
-    pmf: collections::HashMap<MeanExpression, LogProb>
-}
-
-
-impl ExpressionSet {
-    pub fn new(expression_pmfs: &[io::expression::PMF]) -> Self {
-        let mut pmf = collections::HashMap::new();
-
-        fn dfs(
-            i: usize, expression_sum: u32, posterior_prob: LogProb,
-            pmf: &mut collections::HashMap<MeanExpression, LogProb>,
-            expression_pmfs: &[io::expression::PMF],
-            min_prob: LogProb
-        ) {
-            if posterior_prob < min_prob {
-                // stop if probability becomes too small
-                return;
-            }
-            else if i < expression_pmfs.len() {
-                let ref expr_pmf = expression_pmfs[i];
-                let map = expr_pmf.map();
-                for &(x, prob) in expr_pmf.iter() {
-                    dfs(
-                        i + 1,
-                        expression_sum + x,
-                        posterior_prob + prob,
-                        pmf,
-                        expression_pmfs,
-                        if x == map { f64::NEG_INFINITY } else { MIN_PROB }
-                    );
-                }
-            }
-            else {
-                let mean = rational::Ratio::new(expression_sum, expression_pmfs.len() as u32);
-                if pmf.contains_key(&mean) {
-                    let p = pmf.get_mut(&mean).unwrap();
-                    *p = logprobs::log_prob_add(*p, posterior_prob);
-                }
-                else {
-                    pmf.insert(mean, posterior_prob);
-                }
-            }
-        }
-
-        dfs(0, 0, 0.0, &mut pmf, expression_pmfs, f64::NEG_INFINITY);
-
-        ExpressionSet {
-            pmf: pmf
-        }
-    }
-
-    /// Unorderered iteration over probability mass function (PMF).
-    pub fn pmf(&self) -> collections::hash_map::Iter<MeanExpression, LogProb> {
-        self.pmf.iter()
-    }
-
-    /// Conditional expectation of mean expression.
-    pub fn expected_value(&self) -> f64 {
-        self.pmf.iter().map(|(mean, prob)| {
-            *mean.numer() as f64 / *mean.denom() as f64 * prob.exp()
-        }).fold(0.0, |s, e| s + e)
-    }
-}
-
-
+/*
 #[cfg(test)]
 mod tests {
     #![allow(non_upper_case_globals)]
@@ -258,3 +162,4 @@ mod tests {
     //     assert!(expression_set.expected_value().approx_eq(&expected_value));
     // }
 }
+*/

@@ -2,8 +2,11 @@
 
 use std::cmp;
 
+use itertools::Itertools;
+
 use bio::stats::combinatorics::combinations;
 use bio::stats::logprobs::{Prob, LogProb};
+use bio::stats::logprobs;
 
 
 struct Factory {
@@ -68,11 +71,11 @@ impl Factory {
 
 /// Readout probabilities.
 pub struct Readout {
-    pub prob_call_exact: LogProb,
-    pub prob_call_mismatch: LogProb,
-    pub prob_miscall_exact: LogProb,
-    pub prob_miscall_mismatch: LogProb,
-    pub prob_missed: LogProb
+    prob_call_exact: LogProb,
+    prob_call_mismatch: LogProb,
+    prob_miscall_exact: LogProb,
+    prob_miscall_mismatch: LogProb,
+    prob_missed: LogProb
 }
 
 
@@ -86,6 +89,31 @@ impl Readout {
             prob_miscall_mismatch: factory.prob_miscall_mismatch().ln(),
             prob_missed: factory.prob_missed().ln()
         }
+    }
+
+    pub fn likelihood(&self, x: u32, count: u32, count_exact: u32) -> LogProb {
+        let x = x as u64;
+        let count = count as u64;
+        let count_exact = count_exact as u64;
+
+        let x_c = cmp::min(count, x);
+        let x_m = count - x_c;
+
+        let imin = if count_exact + x_c > count { count_exact + x_c - count } else { 0 };
+        let imax = cmp::min(count_exact, x) + 1;
+
+        let summands = (imin..imax).map(|i| {
+            let combs = combinations(count_exact, i).ln() +
+                        combinations(count - count_exact, x_c - i).ln();
+            let prob = self.prob_call_exact * i as f64 +
+                       self.prob_call_mismatch * (x_c - i) as f64 +
+                       self.prob_miscall_exact * (count_exact - i) as f64 +
+                       self.prob_miscall_mismatch * (x_m + i - count_exact) as f64;
+            combs + prob
+        }).collect_vec();
+        let likelihood = self.prob_missed * (x - x_c) as f64 + logprobs::log_prob_sum(&summands);
+        assert!(!likelihood.is_nan());
+        likelihood
     }
 }
 

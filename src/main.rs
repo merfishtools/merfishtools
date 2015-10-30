@@ -21,8 +21,8 @@ extern crate crossbeam;
 
 pub mod model;
 pub mod io;
-pub mod cli;
-
+//pub mod cli;
+/*
 #[derive(Debug)]
 enum Command {
     Exp,
@@ -150,3 +150,4 @@ fn parse_args_or_exit(ap: &ArgumentParser, args: Vec<String>) {
         }
     }
 }
+*/

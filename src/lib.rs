@@ -12,4 +12,4 @@ extern crate nalgebra;
 
 pub mod model;
 pub mod io;
-pub mod cli;
+//pub mod cli;

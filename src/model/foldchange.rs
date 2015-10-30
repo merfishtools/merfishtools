@@ -1,4 +1,5 @@
 use std::collections;
+use std::iter;
 
 use num::rational;
 use itertools::Itertools;
@@ -6,28 +7,39 @@ use bio::stats::logprobs;
 use bio::stats::logprobs::LogProb;
 
 use model;
+use model::pmf::PMF;
 
 
 pub type LogFC = f64;
 pub type FC = rational::Ratio<u32>;
 
 
-fn ratio_as_f64(v: &rational::Ratio<u32>) -> f64 {
-    *v.numer() as f64 / *v.denom() as f64
+pub struct Foldchange {
+    inner: collections::HashMap<FC, LogProb>
 }
 
 
-pub struct Foldchange {
-    pmf: collections::HashMap<FC, LogProb>
+impl<'a> PMF<'a, FC, iter::Cloned<collections::hash_map::Keys<'a, FC, LogProb>>> for Foldchange {
+    fn domain(&'a self) -> iter::Cloned<collections::hash_map::Keys<'a, FC, LogProb>> {
+        self.inner.keys().cloned()
+    }
+
+    fn posterior_prob(&'a self, fc: FC) -> LogProb {
+        *self.inner.get(&fc).unwrap()
+    }
+
+    fn cast(value: FC) -> f64 {
+        *value.numer() as f64 / *value.denom() as f64
+    }
 }
 
 
 impl Foldchange {
     pub fn new(a: &model::ExpressionSet, b: &model::ExpressionSet) -> Self {
         let mut pmf = collections::HashMap::new();
-        for ((a_mean, a_prob), (b_mean, b_prob)) in a.pmf().cartesian_product(b.pmf()) {
+        for (a_mean, b_mean) in a.domain().cartesian_product(b.domain()) {
             let fc = b_mean / a_mean;
-            let posterior_prob = b_prob + a_prob;
+            let posterior_prob = b.posterior_prob(b_mean) + a.posterior_prob(a_mean);
 
             if pmf.contains_key(&fc) {
                 let p = pmf.get_mut(&fc).unwrap();
@@ -39,31 +51,16 @@ impl Foldchange {
         }
 
         Foldchange {
-            pmf: pmf
+            inner: pmf
         }
     }
-
+/*
     /// Probability mass function (PMF).
-    pub fn pmf(&self) -> Vec<(f64, LogProb)> {
+    pub fn pmf(&self) -> PMF {
         let mut pmf = self.pmf.iter().map(|(fc, prob)| (ratio_as_f64(fc).log2(), *prob)).collect_vec();
         pmf.sort_by(|&(a, _), &(b, _)| a.partial_cmp(&b).unwrap());
-        pmf
-    }
-
-    /// Conditional expectation of fold change.
-    pub fn expected_value(&self) -> f64 {
-        self.pmf.iter().map(|(fc, prob)| {
-            ratio_as_f64(fc) * prob.exp()
-        }).fold(0.0, |s, e| s + e)
-    }
-
-    /// Conditional variance of fold change.
-    pub fn variance(&self) -> f64 {
-        let expected_value = self.expected_value();
-        self.pmf.iter().map(|(fc, prob)| {
-            (ratio_as_f64(fc) - expected_value) * prob.exp()
-        }).fold(0.0, |s, e| s + e)
-    }
+        model::pmf::PMF::new(pmf)
+    }*/
 }
 
 
