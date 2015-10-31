@@ -7,60 +7,29 @@ use bio::stats::logprobs;
 use bio::stats::logprobs::LogProb;
 
 use model;
-use model::pmf::PMF;
 
 
 pub type LogFC = f64;
 pub type FC = rational::Ratio<u32>;
+pub type PMF = model::pmf::PMF<LogFC>;
 
 
-pub struct Foldchange {
-    inner: collections::HashMap<FC, LogProb>
-}
+pub fn pmf(a: &model::expressionset::PMF, b: &model::expressionset::PMF) -> PMF {
+    let mut pmf = collections::HashMap::new();
+    for ((a_mean, a_prob), (b_mean, b_prob)) in a.iter().cartesian_product(b.iter()) {
+        let fc = b_mean / a_mean;
+        let posterior_prob = b_prob + a_prob;
 
-
-impl<'a> PMF<'a, FC, iter::Cloned<collections::hash_map::Keys<'a, FC, LogProb>>> for Foldchange {
-    fn domain(&'a self) -> iter::Cloned<collections::hash_map::Keys<'a, FC, LogProb>> {
-        self.inner.keys().cloned()
-    }
-
-    fn posterior_prob(&'a self, fc: FC) -> LogProb {
-        *self.inner.get(&fc).unwrap()
-    }
-
-    fn cast(value: FC) -> f64 {
-        *value.numer() as f64 / *value.denom() as f64
-    }
-}
-
-
-impl Foldchange {
-    pub fn new(a: &model::ExpressionSet, b: &model::ExpressionSet) -> Self {
-        let mut pmf = collections::HashMap::new();
-        for (a_mean, b_mean) in a.domain().cartesian_product(b.domain()) {
-            let fc = b_mean / a_mean;
-            let posterior_prob = b.posterior_prob(b_mean) + a.posterior_prob(a_mean);
-
-            if pmf.contains_key(&fc) {
-                let p = pmf.get_mut(&fc).unwrap();
-                *p = logprobs::log_prob_add(*p, posterior_prob);
-            }
-            else {
-                pmf.insert(fc, posterior_prob);
-            }
+        if pmf.contains_key(&fc) {
+            let p = pmf.get_mut(&fc).unwrap();
+            *p = logprobs::log_prob_add(*p, posterior_prob);
         }
-
-        Foldchange {
-            inner: pmf
+        else {
+            pmf.insert(fc, posterior_prob);
         }
     }
-/*
-    /// Probability mass function (PMF).
-    pub fn pmf(&self) -> PMF {
-        let mut pmf = self.pmf.iter().map(|(fc, prob)| (ratio_as_f64(fc).log2(), *prob)).collect_vec();
-        pmf.sort_by(|&(a, _), &(b, _)| a.partial_cmp(&b).unwrap());
-        model::pmf::PMF::new(pmf)
-    }*/
+
+    PMF::new(pmf.iter().map(|(fc, prob)| (*fc.numer() as f64 / *fc.denom() as f64, *prob)).collect_vec())
 }
 
 

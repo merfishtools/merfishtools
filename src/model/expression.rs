@@ -6,102 +6,24 @@ use itertools::Itertools;
 use bio::stats::logprobs;
 use bio::stats::logprobs::LogProb;
 
-use model::pmf::PMF;
 use model;
 
 
-pub struct Expression {
-    offset: u32,
-    likelihoods: Vec<LogProb>,
-    marginal: LogProb
+pub type PMF = model::pmf::PMF<u32>;
+
+
+pub fn pmf(count: u32, count_exact: u32, readout_model: &model::Readout) -> PMF {
+    let offset = if count_exact > 50 { count_exact - 50 } else { 0 };
+    let likelihoods = (offset..count + 50).map(|x| readout_model.likelihood(x, count, count_exact)).collect_vec();
+    // calculate (marginal / flat_prior)
+    let marginal = logprobs::log_prob_sum(&likelihoods);
+
+    // TODO trim
+    PMF::new(
+        likelihoods.iter().enumerate().map(|(x, lh)| (offset + x as u32, lh - marginal)).collect_vec()
+    )
 }
 
-
-impl<'a> PMF<'a, u32, Range<u32>> for Expression {
-    fn domain(&'a self) -> Range<u32> {
-        self.min_x()..self.max_x()
-    }
-
-    fn posterior_prob(&'a self, x: u32) -> LogProb {
-        let x = x as usize;
-        if x < self.offset as usize || x >= self.offset as usize + self.likelihoods.len() {
-            f64::NEG_INFINITY
-        }
-        else {
-            self.likelihoods[x - self.offset as usize] - self.marginal
-        }
-    }
-
-    fn cast(value: u32) -> f64 {
-        value as f64
-    }
-}
-
-
-impl Expression {
-    pub fn new(count: u32, count_exact: u32, readout_model: &model::Readout) -> Self {
-        let offset = if count_exact > 50 { count_exact - 50 } else { 0 };
-        let likelihoods = (offset..count + 50).map(|x| readout_model.likelihood(x, count, count_exact)).collect_vec();
-        // calculate (marginal / flat_prior)
-        let marginal = logprobs::log_prob_sum(&likelihoods);
-        // TODO trim values such that zero probabilities are not stored
-        let mut expression = Expression {
-            offset: offset,
-            likelihoods: likelihoods,
-            marginal: marginal
-        };
-        expression.refine_interval();
-        expression
-    }
-
-    fn refine_interval(&mut self) {
-        let map = self.map();
-        let mut min_x = self.min_x();
-        for x in (self.min_x()..map).rev() {
-            if self.posterior_prob(x) < model::MIN_PROB {
-                min_x = x;
-                break;
-            }
-        }
-        let mut max_x = self.max_x();
-        for x in map..self.max_x() {
-            if self.posterior_prob(x) < model::MIN_PROB {
-                max_x = x;
-                break;
-            }
-        }
-        self.likelihoods = self.likelihoods[(min_x - self.offset) as usize..(max_x - self.offset) as usize].to_vec();
-        self.offset = min_x;
-    }
-
-    /*
-    pub fn pmf(&self) -> PMF {
-        model::pmf::PMF::new((self.min_x()..self.max_x()).map(|x| (x, self.posterior_prob(x))).collect_vec())
-    }*/
-
-/*
-    /// The maximum a posteriori probability estimate.
-    pub fn map(&self) -> u32 {
-        let mut max_x = self.min_x();
-        let mut max = self.posterior_prob(max_x);
-        for x in self.min_x() + 1..self.max_x() {
-            let p = self.posterior_prob(x);
-            if p >= max {
-                max_x = x;
-                max = p;
-            }
-        }
-        max_x
-    }*/
-
-    pub fn min_x(&self) -> u32 {
-        self.offset
-    }
-
-    pub fn max_x(&self) -> u32 {
-        self.offset + self.likelihoods.len() as u32
-    }
-}
 
 /*
 #[cfg(test)]

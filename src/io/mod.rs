@@ -1,5 +1,5 @@
 pub mod merfishdata;
-//pub mod pmf;
+pub mod pmf;
 //pub mod estimation;
 
 
