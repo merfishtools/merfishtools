@@ -1,5 +1,4 @@
 use std::collections;
-use std::iter;
 
 use num::rational;
 use itertools::Itertools;
@@ -30,6 +29,12 @@ pub fn pmf(a: &model::expressionset::PMF, b: &model::expressionset::PMF) -> PMF 
     }
 
     PMF::new(pmf.iter().map(|(fc, prob)| (*fc.numer() as f64 / *fc.denom() as f64, *prob)).collect_vec())
+}
+
+
+pub fn differential_expression_pep(pmf: &PMF, min_fc: LogFC) -> LogProb {
+    let probs = pmf.iter().filter(|&&(fc, _)| fc >= min_fc).map(|&(_, prob)| prob).collect_vec();
+    logprobs::ln_1m_exp(logprobs::log_prob_sum(&probs))
 }
 
 

@@ -1,6 +1,6 @@
 pub mod merfishdata;
 pub mod pmf;
-//pub mod estimation;
+pub mod estimation;
 
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Clone, Copy, Hash)]

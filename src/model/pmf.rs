@@ -1,6 +1,3 @@
-use std::collections::HashMap;
-use std::collections::hash_map;
-use std::iter;
 use std::slice;
 
 use num::traits::{cast, NumCast};
@@ -45,5 +42,9 @@ impl<T: NumCast + Clone + Copy> PMF<T> {
     pub fn variance(&self) -> f64 {
         let e = self.expected_value();
         self.iter().map(|&(x, prob)| (cast::<T, f64>(x).unwrap() - e).powi(2) * prob.exp()).fold(0.0, |s, e| s + e)
+    }
+
+    pub fn standard_deviation(&self) -> f64 {
+        self.variance().sqrt()
     }
 }

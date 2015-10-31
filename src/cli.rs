@@ -5,18 +5,19 @@ use std;
 use itertools::Itertools;
 use simple_parallel;
 use crossbeam;
-use csv;
 
 use bio::stats::logprobs::Prob;
 
 use io;
 use model;
+use model::foldchange::LogFC;
 
 
-pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, threads: usize) {
+pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, estimate_path: Option<String>, threads: usize) {
     let readout_model = model::Readout::new(N, m, p0, p1);
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
-    let mut writer = io::pmf::expression::Writer::from_writer(std::io::stdout());
+    let mut pmf_writer = io::pmf::expression::Writer::from_writer(std::io::stdout());
+    let mut est_writer = estimate_path.map(|path| io::estimation::expression::Writer::from_file(path));
 
     let records = reader.records().map(
         |res| res.ok().expect("Error reading record.")
@@ -34,16 +35,27 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, threads: usize) {
                 model::expression::pmf(count as u32, count_exact as u32, &readout_model)
             )
         }) {
-            writer.write(experiment, cell, &feature, &pmf);
+            pmf_writer.write(experiment, cell, &feature, &pmf);
+
+            if let Some(ref mut est_writer) = est_writer {
+                est_writer.write(
+                    experiment,
+                    cell,
+                    &feature,
+                    pmf.expected_value(),
+                    pmf.standard_deviation()
+                );
+            }
         }
     });
 }
 
 
-pub fn differential_expression(group1_path: &str, group2_path: &str, threads: usize) {
+pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: Option<String>, min_fc: LogFC, threads: usize) {
     let mut reader1 = io::pmf::expression::Reader::from_file(group1_path);
     let mut reader2 = io::pmf::expression::Reader::from_file(group2_path);
-    let mut writer = io::pmf::foldchange::Writer::from_writer(std::io::stdout());
+    let mut pmf_writer = pmf_path.map(|path| io::pmf::foldchange::Writer::from_file(path));
+    let mut est_writer = io::estimation::differential_expression::Writer::from_writer(std::io::stdout());
 
     let group1 = reader1.pmfs();
     let group2 = reader2.pmfs();
@@ -66,7 +78,16 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, threads: us
                 warn!("A PMF value for feature {} cannot be estimated because counts are too high. It will be reported as NaN.", feature);
             }
 
-            writer.write(&feature, &pmf);
+            est_writer.write(
+                &feature,
+                model::foldchange::differential_expression_pep(&pmf, min_fc),
+                pmf.expected_value(),
+                pmf.standard_deviation()
+            );
+
+            if let Some(ref mut pmf_writer) = pmf_writer {
+                pmf_writer.write(&feature, &pmf);
+            }
         }
     });
 }

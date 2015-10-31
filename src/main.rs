@@ -6,7 +6,7 @@ extern crate argparse;
 
 use std::io::{stdout, stderr};
 use std::str::FromStr;
-use argparse::{ArgumentParser, Store, List, StoreTrue};
+use argparse::{ArgumentParser, Store, List, StoreTrue, StoreOption};
 
 #[macro_use]
 extern crate log;
@@ -97,24 +97,36 @@ fn exp(args: Vec<String>) {
     let mut p0 = 0.04;
     let mut p1 = 0.1;
     let mut threads = 1;
+    let mut estimate_path = None;
 
     {
         let mut ap = ArgumentParser::new();
         ap.set_description(
 r#"For given MERFISH data, calculate expressions for each feature (e.g. gene) in each cell.
-Results are provided as PMF (probability mass function) in columns "Experiment, Cell, Feature, Expression, Posterior Probability".
-Example: "merfishtools exp < data.txt > expression.txt""#
+Results are provided as PMF (probability mass function) in columns:
+
+    experiment
+    cell
+    feature (e.g. gene, rna)
+    expression
+    posterior probability
+
+Example: 'merfishtools exp < data.txt > expression.txt'"#
         );
 
-        ap.refer(&mut N).add_option(&["-N"], Store, "Number of bits in readout (i.e. number of hybridization rounds).");
-        ap.refer(&mut m).add_option(&["-m"], Store, "Number of 1-bits in readout.");
-        ap.refer(&mut p0).add_option(&["--p0"], Store, "Probability of 0->1 error.");
-        ap.refer(&mut p1).add_option(&["--p1"], Store, "Probability of 1->0 error.");
+        ap.refer(&mut estimate_path).add_option(&["--estimate"], StoreOption, r#"
+Path to write expected value and standard deviation estimates of expression to.
+Output is formatted into columns: experiment, cell, feature, expected value, standard deviation
+"#);
+        ap.refer(&mut N).add_option(&["-N"], Store, "Number of bits in readout, i.e., number of hybridization rounds (default: 16).");
+        ap.refer(&mut m).add_option(&["-m"], Store, "Number of 1-bits in readout (default: 4).");
+        ap.refer(&mut p0).add_option(&["--p0"], Store, "Prior probability of 0->1 error (default: 0.04).");
+        ap.refer(&mut p1).add_option(&["--p1"], Store, "Prior probability of 1->0 error (default: 0.1).");
         ap.refer(&mut threads)
           .add_option(&["--threads", "-t"], Store, "Number of threads to use.");
         parse_args_or_exit(&ap, args);
     }
-    cli::expression(N, m, p0, p1, threads);
+    cli::expression(N, m, p0, p1, estimate_path, threads);
 }
 
 
@@ -122,24 +134,38 @@ fn diffexp(args: Vec<String>) {
     let mut threads = 1;
     let mut group1_path = "".to_string();
     let mut group2_path = "".to_string();
+    let mut pmf_path: Option<String> = None;
+    let mut min_fc = 1.5f64.log2();
 
     {
         let mut ap = ArgumentParser::new();
         ap.set_description(
 r#"For given MERFISH data, calculate differentially expressed features (e.g. genes) between groups of cells given as separate input data.
-Results are provided as PMF (probability mass function) in columns "Feature, Foldchange, Posterior Probability".
+Results are provided as columns:
+
+    feature (e.g. gene, rna)
+    posterior error probability (PEP) for differential expression
+    expected log2 fold change
+    standard deviation of log2 fold change
+
 Example: "merfishtools diffexp data1.txt data2.txt > diffexp.txt""#
         );
 
+        ap.refer(&mut pmf_path).add_option(&["--pmf"], StoreOption,
+r#"Path to write PMF (probability mass function) of Log2 fold change to.
+Output is formatted into columns: feature, foldchange, posterior probability"#);
         ap.refer(&mut threads)
-          .add_option(&["--threads", "-t"], Store, "Number of threads to use.");
+          .add_option(&["--threads", "-t"], Store, "Number of threads to use (default: 1).");
+        ap.refer(&mut min_fc)
+          .add_option(&["--min-log2fc"], Store, "Minimum absolute log2 fold change considered as differential expression (default: log2(1.5)).");
         ap.refer(&mut group1_path).required()
-          .add_argument("group1", Store, "Group of cells.");
+          .add_argument("group1", Store, "Path to expression PMFs for group of cells.");
         ap.refer(&mut group2_path).required()
-          .add_argument("group2", Store, "Group of cells.");
+          .add_argument("group2", Store, "Path to expression PMFs for group of cells.");
         parse_args_or_exit(&ap, args);
+
     }
-    cli::differential_expression(&group1_path, &group2_path, threads);
+    cli::differential_expression(&group1_path, &group2_path, pmf_path, min_fc, threads);
 }
 
 

@@ -1,10 +1,6 @@
-use std::f64;
-use std::ops::Range;
-
 use itertools::Itertools;
 
 use bio::stats::logprobs;
-use bio::stats::logprobs::LogProb;
 
 use model;
 
