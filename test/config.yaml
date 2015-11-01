@@ -1,0 +1,11 @@
+groups:
+    A:
+        expmnt: "^1$"
+        cells: ".*"
+    B:
+        expmnt: "^2$"
+        cells: ".*"
+genes:
+    - COL5A1
+    - BRCA2
+    - CKAP5
