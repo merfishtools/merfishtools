@@ -25,7 +25,7 @@ pub struct Writer<W: io::Write> {
 impl Writer<fs::File> {
     /// Write to a given file path.
     pub fn from_file<P: AsRef<Path>>(path: P) -> Self {
-        fs::File::open(path).map(|f| Writer::from_writer(f)).ok().expect("Error opening file.")
+        fs::File::create(path).map(|f| Writer::from_writer(f)).ok().expect("Error opening file.")
     }
 }
 

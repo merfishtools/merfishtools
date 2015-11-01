@@ -17,7 +17,7 @@ pub struct Writer<W: io::Write> {
 impl Writer<fs::File> {
     /// Write to a given file path.
     pub fn from_file<P: AsRef<Path>>(path: P) -> Self {
-        fs::File::open(path).map(|f| Writer::from_writer(f)).ok().expect("Error opening file.")
+        fs::File::create(path).map(|f| Writer::from_writer(f)).unwrap()
     }
 }
 
@@ -27,7 +27,7 @@ impl<W: io::Write> Writer<W> {
         let mut writer = Writer {
             inner: csv::Writer::from_writer(w).delimiter(b'\t')
         };
-        writer.inner.write(["feat", "diff_pep", "log2fc_ev", "log2fc_sd"].iter()).ok().expect("Error writing header.");
+        writer.inner.write(["feat", "diff_pep", "log2fc_ev", "log2fc_sd"].iter()).unwrap();
 
         writer
     }
@@ -38,6 +38,6 @@ impl<W: io::Write> Writer<W> {
             format!("{:e}", differential_expression_pep.exp()),
             format!("{:.*}", 2, expected_value),
             format!("{:.*}", 4, standard_deviation)
-        ].iter()).ok().expect("Error writing record.");
+        ].iter()).unwrap();
     }
 }

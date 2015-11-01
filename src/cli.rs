@@ -20,7 +20,7 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, estimate_path: Option<String
     let mut est_writer = estimate_path.map(|path| io::estimation::expression::Writer::from_file(path));
 
     let records = reader.records().map(
-        |res| res.ok().expect("Error reading record.")
+        |res| res.unwrap()
     ).group_by(|rec| {
         (rec.experiment, rec.cell_id, rec.feature.clone())
     });

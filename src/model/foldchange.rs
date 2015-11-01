@@ -16,7 +16,8 @@ pub type PMF = model::pmf::PMF<LogFC>;
 pub fn pmf(a: &model::expressionset::PMF, b: &model::expressionset::PMF) -> PMF {
     let mut pmf = collections::HashMap::new();
     for ((a_mean, a_prob), (b_mean, b_prob)) in a.iter().cartesian_product(b.iter()) {
-        let fc = b_mean / a_mean;
+        // add pseudocount
+        let fc = (b_mean + rational::Ratio::from_integer(1)) / (a_mean + rational::Ratio::from_integer(1));
         let posterior_prob = b_prob + a_prob;
 
         if pmf.contains_key(&fc) {
@@ -43,8 +44,9 @@ mod tests {
     #![allow(non_upper_case_globals)]
     use super::*;
 
-    use bio::stats::logprobs::Prob;
+    use itertools::Itertools;
     use nalgebra::ApproxEq;
+    use bio::stats::logprobs::{Prob, log_prob_sum};
 
     use model;
 
@@ -57,6 +59,33 @@ mod tests {
 
     fn setup() -> model::Readout {
         model::Readout::new(N, m, p0, p1)
+    }
+
+    #[test]
+    fn test_pmf() {
+        let readout = setup();
+        let pmfs1 = [
+            model::expression::pmf(5, 1, &readout),
+            model::expression::pmf(10, 1, &readout),
+            model::expression::pmf(3, 1, &readout),
+            model::expression::pmf(24, 1, &readout)
+        ];
+        let pmfs2 = [
+            model::expression::pmf(50, 1, &readout),
+            model::expression::pmf(100, 1, &readout),
+            model::expression::pmf(30, 1, &readout),
+            model::expression::pmf(240, 1, &readout)
+        ];
+        let pmf1 = model::expressionset::pmf(&pmfs1);
+        let pmf2 = model::expressionset::pmf(&pmfs2);
+
+        let pmf = pmf(&pmf1, &pmf2);
+
+
+        let total = log_prob_sum(&pmf.iter().map(|&(_, prob)| prob).collect_vec());
+
+        println!("{:?}", total);
+        assert!(total.approx_eq(&0.0));
     }
 
     // #[test]

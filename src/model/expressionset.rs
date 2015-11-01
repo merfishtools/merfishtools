@@ -56,3 +56,44 @@ pub fn pmf(expression_pmfs: &[model::expression::PMF]) -> PMF {
 
     pmf
 }
+
+
+#[cfg(test)]
+mod tests {
+    #![allow(non_upper_case_globals)]
+
+    use itertools::Itertools;
+    use nalgebra::ApproxEq;
+    use bio::stats::logprobs::{Prob, log_prob_sum};
+
+
+    use super::*;
+    use model;
+
+
+    const N: u8 = 16;
+    const m: u8 = 4;
+    const p0: Prob = 0.04;
+    const p1: Prob = 0.1;
+
+    fn setup() -> model::Readout {
+        model::Readout::new(N, m, p0, p1)
+    }
+
+    #[test]
+    fn test_pmf() {
+        let readout = setup();
+        let pmfs = [
+            model::expression::pmf(5, 1, &readout),
+            model::expression::pmf(10, 1, &readout),
+            model::expression::pmf(3, 1, &readout),
+            model::expression::pmf(24, 1, &readout)
+        ];
+        let pmf = pmf(&pmfs);
+
+        let total = log_prob_sum(&pmf.iter().map(|(_, prob)| *prob).collect_vec());
+
+        println!("{:?}", total);
+        assert!(total.approx_eq(&0.0));
+    }
+}

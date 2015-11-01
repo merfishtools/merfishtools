@@ -1,4 +1,6 @@
 import pandas as pd
+import matplotlib
+matplotlib.use("agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
@@ -10,11 +12,15 @@ configfile: "config.yaml"
 merfishtools = "../target/release/merfishtools"
 
 
+plot_ext = ["svg", "pdf"]
+
+
 rule all:
     input:
         "diffexp/140genesData.A-vs-B.txt",
-        expand("results/expression_pmf/140genesData/{gene}.svg", gene=config["genes"]),
-        expand("results/{name}.expr_graph.{ext}", ext=["svg", "pdf"], name=["all", "pruned"])
+        expand("results/foldchange_pmf/140genesData.A-vs-B.{gene}.{ext}", ext=plot_ext, gene=config["genes"]),
+        expand("results/expression_pmf/140genesData.{gene}.{ext}", ext=plot_ext, gene=config["genes"]),
+        expand("results/{name}.expr_graph.{ext}", ext=plot_ext, name=["all", "pruned"])
 
 
 rule plots:
@@ -35,10 +41,12 @@ rule expressions:
     input:
         "data/{dataset}.sorted.txt"
     output:
-        "expressions/{dataset}.all.txt"
+        pmf="expressions/{dataset}.all.txt",
+        est="expressions/{dataset}.all.est.txt",
     threads: 8
     shell:
-        "{merfishtools} exp -t {threads} < {input} > {output}"
+        "{merfishtools} exp --estimate {output.est} -t {threads} < {input} "
+        "> {output.pmf}"
 
 
 rule select_group:
@@ -59,12 +67,23 @@ rule diffexp:
         "expressions/{dataset}.{group1}.txt",
         "expressions/{dataset}.{group2}.txt"
     output:
-        "diffexp/{dataset}.{group1}-vs-{group2}.txt"
+        pmf="diffexp/{dataset}.{group1}-vs-{group2}.txt",
+        est="diffexp/{dataset}.{group1}-vs-{group2}.est.txt"
     benchmark:
         "bench/diffexp/{dataset}.{group1}-vs-{group2}.txt"
     threads: 8
     shell:
-        "{merfishtools} diffexp -t {threads} {input} > {output}"
+        "{merfishtools} diffexp -t {threads} --pmf {output.pmf} {input} "
+        "> {output.est}"
+
+
+def plot_pmf(values, probs):
+    _, _, baseline = plt.stem(values, probs, markerfmt="ko", basefmt="", linefmt="k-")
+    plt.setp(baseline, 'linewidth', 0)
+
+
+def plot_cdf(values, probs):
+    plt.step(values, np.cumsum(probs), "k-")
 
 
 rule plot_expression_pmf:
@@ -72,7 +91,7 @@ rule plot_expression_pmf:
         expr="expressions/{dataset}.all.txt",
         raw="data/{dataset}.sorted.txt"
     output:
-        "results/expression_pmf/{dataset}/{gene}.svg"
+        "results/expression_pmf/{dataset}.{gene}.svg"
     run:
         plt.figure()
         sns.set_style("ticks")
@@ -86,8 +105,7 @@ rule plot_expression_pmf:
         pmf = pd.read_table(input.expr, index_col=[0, 1, 2])
         pmf = pmf.loc[1, 0, wildcards.gene]
 
-        _, _, baseline = plt.stem(pmf["expr"], np.exp(pmf["prob"]), markerfmt="ko", basefmt="", linefmt="k-")
-        plt.setp(baseline, 'linewidth', 0)
+        plot_pmf(pmf["expr"], np.exp(pmf["prob"]))
         ylim = plt.ylim()
         plt.vlines([count_exact], *ylim, colors="grey", linestyles="--")
         plt.vlines([count_total], *ylim, colors="grey", linestyles="--")
@@ -95,6 +113,26 @@ rule plot_expression_pmf:
         plt.text(count_total, ylim[1], "total calls", rotation="vertical", va="top")
         plt.ylim(ylim)
         plt.xlabel("expression")
+        plt.ylabel("posterior probability")
+
+        sns.despine()
+        plt.savefig(output[0], bbox_inches="tight")
+
+
+rule plot_foldchange_pmf:
+    input:
+        "diffexp/{dataset}.{group1}-vs-{group2}.txt"
+    output:
+        "results/foldchange_pmf/{dataset}.{group1}-vs-{group2}.{gene}.svg"
+    run:
+        plt.figure()
+        sns.set_style("ticks")
+        pmf = pd.read_table(input[0], index_col=0)
+        pmf = pmf.loc[wildcards.gene]
+        pmf.sort("log2fc", inplace=True)
+
+        plot_cdf(pmf["log2fc"], np.exp(pmf["prob"]))
+        plt.xlabel("log2 fold change")
         plt.ylabel("posterior probability")
 
         sns.despine()

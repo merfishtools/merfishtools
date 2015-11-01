@@ -16,7 +16,7 @@ pub fn pmf(count: u32, count_exact: u32, readout_model: &model::Readout) -> PMF 
 
     // TODO trim
     PMF::new(
-        likelihoods.iter().enumerate().map(|(x, lh)| (offset + x as u32, lh - marginal)).collect_vec()
+        likelihoods.iter().enumerate().map(|(x, lh)| (offset + x as u32, lh - marginal)).filter(|&(_, p)| p >= model::MIN_PROB).collect_vec()
     )
 }
 
