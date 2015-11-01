@@ -32,10 +32,6 @@ impl<T: Clone + Copy> PMF<T> {
         }
         max_x
     }
-
-    pub fn sort_by_prob_desc(&mut self) {
-        self.inner.sort_by(|&(_, p_a), &(_, p_b)| p_b.partial_cmp(&p_a).unwrap());
-    }
 }
 
 

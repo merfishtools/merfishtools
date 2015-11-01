@@ -15,7 +15,7 @@ pub type PMF = model::pmf::PMF<LogFC>;
 
 pub fn pmf(a: &model::expressionset::PMF, b: &model::expressionset::PMF) -> PMF {
     let mut pmf = collections::HashMap::new();
-    for ((a_mean, a_prob), (b_mean, b_prob)) in a.iter().cartesian_product(b.iter()) {
+    for (&(a_mean, a_prob), &(b_mean, b_prob)) in a.iter().cartesian_product(b.iter()) {
         // add pseudocount
         let fc = (b_mean + rational::Ratio::from_integer(1)) / (a_mean + rational::Ratio::from_integer(1));
         let posterior_prob = b_prob + a_prob;
