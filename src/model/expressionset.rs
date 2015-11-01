@@ -13,46 +13,58 @@ pub type MeanExpression = rational::Ratio<u32>;
 pub type PMF = collections::HashMap<MeanExpression, LogProb>;
 
 
-pub fn pmf(expression_pmfs: &[model::expression::PMF]) -> PMF {
-    let mut pmf = collections::HashMap::new();
+const MIN_TOTAL: LogProb = -0.01;
 
-    fn dfs(
-        i: usize, expression_sum: u32, posterior_prob: LogProb,
-        pmf: &mut collections::HashMap<MeanExpression, LogProb>,
-        expression_pmfs: &[model::expression::PMF],
-        min_prob: LogProb
-    ) {
-        if posterior_prob < min_prob {
-            // stop if probability becomes too small
-            return;
-        }
-        else if i < expression_pmfs.len() {
-            let ref expr_pmf = expression_pmfs[i];
-            let map = expr_pmf.map();
-            for &(x, prob) in expr_pmf.iter() {
-                dfs(
-                    i + 1,
-                    expression_sum + x,
-                    posterior_prob + prob,
-                    pmf,
-                    expression_pmfs,
-                    if x == map { f64::NEG_INFINITY } else { model::MIN_PROB }
-                );
-            }
-        }
-        else {
-            let mean = rational::Ratio::new(expression_sum, expression_pmfs.len() as u32);
-            if pmf.contains_key(&mean) {
-                let p = pmf.get_mut(&mean).unwrap();
-                *p = logprobs::log_prob_add(*p, posterior_prob);
-            }
-            else {
-                pmf.insert(mean, posterior_prob);
+
+fn traverse(
+    i: usize, expression_sum: u32, posterior_prob: LogProb,
+    pmf: &mut collections::HashMap<MeanExpression, LogProb>,
+    expression_pmfs: &[model::expression::PMF],
+    total_prob: &mut LogProb
+) -> bool {
+    if i < expression_pmfs.len() {
+        let ref expr_pmf = expression_pmfs[i];
+
+        for &(x, prob) in expr_pmf.iter() {
+            if !traverse(
+                i + 1,
+                expression_sum + x,
+                posterior_prob + prob,
+                pmf,
+                expression_pmfs,
+                total_prob
+            ) {
+                return false;
             }
         }
     }
+    else {
+        let mean = rational::Ratio::new(expression_sum, expression_pmfs.len() as u32);
+        if pmf.contains_key(&mean) {
+            let p = pmf.get_mut(&mean).unwrap();
+            *p = logprobs::log_prob_add(*p, posterior_prob);
+        }
+        else {
+            pmf.insert(mean, posterior_prob);
+        }
+        *total_prob = logprobs::log_prob_add(*total_prob, posterior_prob);
+        return *total_prob < MIN_TOTAL;
+    }
+    return true;
+}
 
-    dfs(0, 0, 0.0, &mut pmf, expression_pmfs, f64::NEG_INFINITY);
+
+pub fn pmf(expression_pmfs: &[model::expression::PMF]) -> PMF {
+    let mut sorted_pmfs: Vec<model::expression::PMF> = vec![];
+    for pmf in expression_pmfs.iter() {
+        // sort descending by probability
+        let mut pmf = pmf.clone();
+        pmf.sort_by_prob_desc();
+        sorted_pmfs.push(pmf);
+    }
+
+    let mut pmf = collections::HashMap::new();
+    traverse(0, 0, 0.0, &mut pmf, &sorted_pmfs, &mut f64::NEG_INFINITY);
 
     pmf
 }

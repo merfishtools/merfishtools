@@ -65,6 +65,7 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
     let mut pool = simple_parallel::Pool::new(threads);
     crossbeam::scope(|scope| {
         for (feature, pmf) in pool.map(scope, features, |feature| {
+            info!("Calculating {}.", feature);
             let pmf = model::foldchange::pmf(
                 &model::expressionset::pmf(&group1.get(&feature).unwrap()),
                 &model::expressionset::pmf(&group2.get(&feature).unwrap())
