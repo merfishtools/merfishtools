@@ -107,21 +107,22 @@ rule plot_expression_pmf:
 
         plot_pmf(pmf["expr"], np.exp(pmf["prob"]))
         ylim = plt.ylim()
-        plt.vlines([count_exact], *ylim, colors="grey", linestyles="--")
-        plt.vlines([count_total], *ylim, colors="grey", linestyles="--")
-        plt.text(count_exact, ylim[1], "exact calls", rotation="vertical", va="top")
-        plt.text(count_total, ylim[1], "total calls", rotation="vertical", va="top")
+        plt.vlines([count_total], *ylim, colors="red", linestyles="--", label="total count", zorder=5)
+        plt.vlines([count_exact], *ylim, colors="red", linestyles=":", label="exact count", zorder=5)
         plt.ylim(ylim)
         plt.xlabel("expression")
-        plt.ylabel("posterior probability")
+        plt.ylabel("PMF")
+        plt.legend(loc="upper center")
+        plt.xlim([0, plt.xlim()[1]])
 
         sns.despine()
         plt.savefig(output[0], bbox_inches="tight")
 
 
-rule plot_foldchange_pmf:
+rule plot_foldchange_cdf:
     input:
-        "diffexp/{dataset}.{group1}-vs-{group2}.txt"
+        "diffexp/{dataset}.{group1}-vs-{group2}.txt",
+        "diffexp/{dataset}.{group1}-vs-{group2}.est.txt"
     output:
         "results/foldchange_pmf/{dataset}.{group1}-vs-{group2}.{gene}.svg"
     run:
@@ -132,8 +133,17 @@ rule plot_foldchange_pmf:
         pmf.sort("log2fc", inplace=True)
 
         plot_cdf(pmf["log2fc"], np.exp(pmf["prob"]))
+        ylim = plt.ylim()
         plt.xlabel("log2 fold change")
-        plt.ylabel("posterior probability")
+        plt.ylabel("CDF")
+
+        est = pd.read_table(input[1], index_col=0)
+        est = est.loc[wildcards.gene]
+        ev = est["log2fc_ev"]
+        sd = est["log2fc_sd"]
+        plt.vlines([ev], *ylim, colors="red", linestyles="-", label="conditional expectation")
+        plt.vlines([ev - sd, ev + sd], *ylim, colors="black", linestyles="--", label="standard deviation")
+        plt.legend(loc="lower right")
 
         sns.despine()
         plt.savefig(output[0], bbox_inches="tight")

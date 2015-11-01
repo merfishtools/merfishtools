@@ -11,7 +11,7 @@ pub struct PMF<T: Clone + Copy> {
 }
 
 
-impl<T: Clone + Copy> PMF<T> {
+impl<T: Clone + Copy + Sized> PMF<T> {
 
     pub fn new(inner: Vec<(T, LogProb)>) -> Self {
         PMF { inner: inner }

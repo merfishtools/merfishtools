@@ -3,10 +3,12 @@ use std::fs;
 use std::path::Path;
 
 use csv;
+use itertools::Itertools;
 
 use bio::stats::logprobs::LogProb;
 
 use model::foldchange::{LogFC, PMF};
+use model;
 
 
 #[derive(RustcEncodable, RustcDecodable)]
@@ -47,7 +49,10 @@ impl<W: io::Write> Writer<W> {
             prob: 0.0
         };
 
-        for &(fc, prob) in pmf.iter() {
+        let pmf = pmf.iter().filter(|&&(_, p)| p >= model::MIN_PROB)
+                            .sorted_by(|&&(fca, _), &&(fcb, _)| fca.partial_cmp(&fcb).unwrap());
+
+        for &&(fc, prob) in pmf.iter() {
             record.foldchange = fc;
             record.prob = prob;
             self.inner.encode(&record).ok().expect("Error writing record.");

@@ -33,9 +33,11 @@ pub fn pmf(a: &model::expressionset::PMF, b: &model::expressionset::PMF) -> PMF 
 }
 
 
-pub fn differential_expression_pep(pmf: &PMF, min_fc: LogFC) -> LogProb {
-    let probs = pmf.iter().filter(|&&(fc, _)| fc >= min_fc).map(|&(_, prob)| prob).collect_vec();
-    logprobs::ln_1m_exp(logprobs::log_prob_sum(&probs))
+impl PMF {
+    pub fn differential_expression_pep(&self, min_fc: LogFC) -> LogProb {
+        let probs = self.iter().filter(|&&(fc, _)| fc >= min_fc).map(|&(_, prob)| prob).collect_vec();
+        logprobs::ln_1m_exp(logprobs::log_prob_sum(&probs))
+    }
 }
 
 

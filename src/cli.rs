@@ -81,7 +81,7 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
 
             est_writer.write(
                 &feature,
-                model::foldchange::differential_expression_pep(&pmf, min_fc),
+                pmf.differential_expression_pep(min_fc),
                 pmf.expected_value(),
                 pmf.standard_deviation()
             );

@@ -3,7 +3,6 @@ use std::f64;
 use num::rational;
 use itertools::Itertools;
 
-use bio::stats::logprobs::LogProb;
 use bio::stats::logprobs;
 
 use model;

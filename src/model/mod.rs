@@ -6,5 +6,5 @@ pub mod expressionset;
 pub mod foldchange;
 pub mod pmf;
 
-const MIN_PROB: f64 = -13.815510557964274; // = 0.000001f64.ln();
+pub const MIN_PROB: f64 = -13.815510557964274; // = 0.000001f64.ln();
 //const MIN_PROB: f64 = -32.23619130191664;
