@@ -108,7 +108,7 @@ rule plot_expression_pmf:
         plot_pmf(pmf["expr"], np.exp(pmf["prob"]))
         ylim = plt.ylim()
         plt.vlines([count_total], *ylim, colors="red", linestyles="--", label="total count", zorder=5)
-        plt.vlines([count_exact], *ylim, colors="red", linestyles=":", label="exact count", zorder=5)
+        plt.vlines([count_exact], *ylim, colors="black", linestyles="--", label="exact count", zorder=5)
         plt.ylim(ylim)
         plt.xlabel("expression")
         plt.ylabel("PMF")
@@ -144,6 +144,7 @@ rule plot_foldchange_cdf:
         plt.vlines([ev], *ylim, colors="red", linestyles="-", label="conditional expectation")
         plt.vlines([ev - sd, ev + sd], *ylim, colors="black", linestyles="--", label="standard deviation")
         plt.legend(loc="lower right")
+        plt.text(plt.xlim()[0] + 0.001, ylim[1], "PEP = {:.2}".format(est["diff_pep"]), va="top")
 
         sns.despine()
         plt.savefig(output[0], bbox_inches="tight")
