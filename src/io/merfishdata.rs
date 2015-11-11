@@ -14,9 +14,9 @@ pub struct Position {
 
 #[derive(RustcDecodable)]
 pub struct Record {
-    pub experiment: u32,
-    pub codebook: u32,
-    pub cell_id: u32,
+    pub experiment: String,
+    pub codebook: String,
+    pub cell_id: String,
     pub feature: String,
     pub exact_match: u8,
     pub corrected_match: u8,

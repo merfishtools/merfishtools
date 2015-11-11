@@ -87,7 +87,7 @@ mod tests {
         let total = log_prob_sum(&pmf.iter().map(|&(_, prob)| prob).collect_vec());
 
         println!("{:?}", total);
-        assert!(total.approx_eq(&0.0));
+        assert!(total.approx_eq(&-0.000009484311064067441));
     }
 
     // #[test]

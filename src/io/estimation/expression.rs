@@ -28,10 +28,10 @@ impl<W: io::Write> Writer<W> {
         writer
     }
 
-    pub fn write(&mut self, experiment: u32, cell: u32, feature: &str, expected_value: f64, standard_deviation: f64) {
+    pub fn write(&mut self, experiment: &str, cell: &str, feature: &str, expected_value: f64, standard_deviation: f64) {
         self.inner.write([
-            format!("{}", experiment),
-            format!("{}", cell),
+            experiment.to_owned(),
+            cell.to_owned(),
             feature.to_owned(),
             format!("{:.*}", 2, expected_value),
             format!("{:.*}", 4, standard_deviation)

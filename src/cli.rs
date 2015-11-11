@@ -13,6 +13,12 @@ use model;
 use model::foldchange::LogFC;
 
 
+pub struct Selection {
+    pub expmnt: String,
+    pub cell: String
+}
+
+
 pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, estimate_path: Option<String>, threads: usize) {
     let readout_model = model::Readout::new(N, m, p0, p1);
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
@@ -22,7 +28,7 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, estimate_path: Option<String
     let records = reader.records().map(
         |res| res.unwrap()
     ).group_by(|rec| {
-        (rec.experiment, rec.cell_id, rec.feature.clone())
+        (rec.experiment.clone(), rec.cell_id.clone(), rec.feature.clone())
     });
 
     let mut pool = simple_parallel::Pool::new(threads);
@@ -35,12 +41,12 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, estimate_path: Option<String
                 model::expression::pmf(count as u32, count_exact as u32, &readout_model)
             )
         }) {
-            pmf_writer.write(experiment, cell, &feature, &pmf);
+            pmf_writer.write(&experiment, &cell, &feature, &pmf);
 
             if let Some(ref mut est_writer) = est_writer {
                 est_writer.write(
-                    experiment,
-                    cell,
+                    &experiment,
+                    &cell,
                     &feature,
                     pmf.expected_value(),
                     pmf.standard_deviation()

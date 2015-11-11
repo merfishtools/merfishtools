@@ -123,13 +123,9 @@ mod tests {
     #![allow(non_upper_case_globals)]
 
     use super::{Factory};
-    use bio::stats::logprobs::Prob;
     use nalgebra::ApproxEq;
 
-    const N: u8 = 16;
-    const m: u8 = 4;
-    const p0: Prob = 0.04;
-    const p1: Prob = 0.1;
+
     const factory: Factory = Factory { N: 16, m: 4, p0: 0.04, p1: 0.1 };
 
 

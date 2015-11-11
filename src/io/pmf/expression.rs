@@ -37,8 +37,8 @@ impl PMFs {
 
 #[derive(RustcDecodable, RustcEncodable)]
 pub struct Record {
-    pub experiment: u32,
-    pub cell: u32,
+    pub experiment: String,
+    pub cell: String,
     pub feature: String,
     pub expression: u32,
     pub prob: LogProb
@@ -105,10 +105,10 @@ impl<W: io::Write> Writer<W> {
         writer
     }
 
-    pub fn write(&mut self, experiment: u32, cell: u32, feature: &str, pmf: &PMF) {
+    pub fn write(&mut self, experiment: &str, cell: &str, feature: &str, pmf: &PMF) {
         let mut record = Record {
-            experiment: experiment,
-            cell: cell,
+            experiment: experiment.to_owned(),
+            cell: cell.to_owned(),
             feature: feature.to_owned(),
             expression: 0,
             prob: 0.0
