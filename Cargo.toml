@@ -5,6 +5,7 @@ authors = ["Johannes Koester <johannes.koester@tu-dortmund.de>"]
 
 [dependencies]
 bio = ">=0.3.16"
+regex = "0.1.41"
 csv = "*"
 nalgebra = "*"
 itertools = "*"

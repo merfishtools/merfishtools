@@ -1,11 +1,3 @@
-import pandas as pd
-import matplotlib
-matplotlib.use("agg")
-import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
-
-
 configfile: "config.yaml"
 
 
@@ -18,9 +10,9 @@ plot_ext = ["svg", "pdf"]
 rule all:
     input:
         "diffexp/140genesData.A-vs-B.txt",
-        expand("results/foldchange_pmf/140genesData.A-vs-B.{gene}.{ext}", ext=plot_ext, gene=config["genes"]),
-        expand("results/expression_pmf/140genesData.{gene}.{ext}", ext=plot_ext, gene=config["genes"]),
-        expand("results/{name}.expr_graph.{ext}", ext=plot_ext, name=["all", "pruned"])
+        expand("results/foldchange_cdf/140genesData.A-vs-B.{gene}.{ext}", ext=plot_ext, gene=config["genes"]),
+        expand("results/expression_pmf/140genesData.{gene}.X.{ext}", ext=plot_ext, gene=config["genes"]),
+        "results/pca/140genesData.pca.pdf"
 
 
 rule plots:
@@ -41,25 +33,16 @@ rule expressions:
     input:
         "data/{dataset}.sorted.txt"
     output:
-        pmf="expressions/{dataset}.all.txt",
-        est="expressions/{dataset}.all.est.txt",
+        pmf="expressions/{dataset}.{group}.txt",
+        est="expressions/{dataset}.{group}.est.txt",
+    params:
+        expmnts=lambda wildcards: config["groups"][wildcards.group]["expmnts"],
+        cells=lambda wildcards: config["groups"][wildcards.group]["cells"]
     threads: 8
     shell:
-        "{merfishtools} exp --estimate {output.est} -t {threads} < {input} "
+        "{merfishtools} exp --estimate {output.est} -t {threads} "
+        "--expmnts '{params.expmnts}' --cells '{params.cells}' < {input} "
         "> {output.pmf}"
-
-
-rule select_group:
-    input:
-        "expressions/{dataset}.all.txt"
-    output:
-        "expressions/{dataset}.{group}.txt"
-    params:
-        expmnt=lambda wildcards: str(config["groups"][wildcards.group]["expmnt"]),
-        cells=lambda wildcards: config["groups"][wildcards.group]["cells"]
-    shell:
-        r"xsv search -d'\t' -s expmnt '{params.expmnt}' < {input} | "
-        r"xsv search -s cell '{params.cells}' | xsv fmt -t '\t' > {output}"
 
 
 rule diffexp:
@@ -77,86 +60,34 @@ rule diffexp:
         "> {output.est}"
 
 
-def plot_pmf(values, probs):
-    _, _, baseline = plt.stem(values, probs, markerfmt="ko", basefmt="", linefmt="k-")
-    plt.setp(baseline, 'linewidth', 0)
-
-
-def plot_cdf(values, probs):
-    plt.step(values, np.cumsum(probs), "k-")
-
-
 rule plot_expression_pmf:
     input:
-        expr="expressions/{dataset}.all.txt",
+        expr="expressions/{dataset}.{group}.txt",
         raw="data/{dataset}.sorted.txt"
     output:
-        "results/expression_pmf/{dataset}.{gene}.svg"
-    run:
-        plt.figure()
-        sns.set_style("ticks")
-        raw = pd.read_table(input.raw, index_col=[0, 2, 3])
-        raw = raw.loc[1, 0, wildcards.gene]
-
-        count_exact = raw["Exact_Match"].sum()
-        count_corrected = raw["Corrected_Match"].sum()
-        count_total = count_exact + count_corrected
-
-        pmf = pd.read_table(input.expr, index_col=[0, 1, 2])
-        pmf = pmf.loc[1, 0, wildcards.gene]
-
-        plot_pmf(pmf["expr"], np.exp(pmf["prob"]))
-        ylim = plt.ylim()
-        plt.vlines([count_total], *ylim, colors="red", linestyles="--", label="total count", zorder=5)
-        plt.vlines([count_exact], *ylim, colors="black", linestyles="--", label="exact count", zorder=5)
-        plt.ylim(ylim)
-        plt.xlabel("expression")
-        plt.ylabel("PMF")
-        plt.legend(loc="upper center")
-        plt.xlim([0, plt.xlim()[1]])
-
-        sns.despine()
-        plt.savefig(output[0], bbox_inches="tight")
+        "results/expression_pmf/{dataset}.{gene}.{group}.svg"
+    script:
+        "scripts/expression_pmf.py"
 
 
 rule plot_foldchange_cdf:
     input:
-        "diffexp/{dataset}.{group1}-vs-{group2}.txt",
-        "diffexp/{dataset}.{group1}-vs-{group2}.est.txt"
+        pmf="diffexp/{dataset}.{group1}-vs-{group2}.txt",
+        est="diffexp/{dataset}.{group1}-vs-{group2}.est.txt"
     output:
-        "results/foldchange_pmf/{dataset}.{group1}-vs-{group2}.{gene}.svg"
-    run:
-        plt.figure()
-        sns.set_style("ticks")
-        pmf = pd.read_table(input[0], index_col=0)
-        pmf = pmf.loc[wildcards.gene]
-        pmf.sort("log2fc", inplace=True)
-
-        plot_cdf(pmf["log2fc"], np.exp(pmf["prob"]))
-        ylim = plt.ylim()
-        plt.xlabel("log2 fold change")
-        plt.ylabel("CDF")
-
-        est = pd.read_table(input[1], index_col=0)
-        est = est.loc[wildcards.gene]
-        ev = est["log2fc_ev"]
-        sd = est["log2fc_sd"]
-        plt.vlines([ev], *ylim, colors="red", linestyles="-", label="conditional expectation")
-        plt.vlines([ev - sd, ev + sd], *ylim, colors="black", linestyles="--", label="standard deviation")
-        plt.legend(loc="lower right")
-        plt.text(plt.xlim()[0] + 0.001, ylim[1], "PEP = {:.2}".format(est["diff_pep"]), va="top")
-
-        sns.despine()
-        plt.savefig(output[0], bbox_inches="tight")
+        "results/foldchange_cdf/{dataset}.{group1}-vs-{group2}.{gene}.svg"
+    script:
+        "scripts/foldchange_cdf.py"
 
 
-rule render_expr_graph:
+rule sparse_pca:
     input:
-        "dot/{name}.dot"
+        est="expressions/{dataset}.all.est.txt"
     output:
-        "results/{name}.expr_graph.svg"
-    shell:
-        "dot -Tsvg {input} > {output}"
+        "results/pca/{dataset}.pca.svg"
+    script:
+        "scripts/sparse_pca.py"
+
 
 
 rule svg2pdf:

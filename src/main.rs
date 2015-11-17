@@ -18,6 +18,7 @@ extern crate num;
 extern crate rustc_serialize;
 extern crate simple_parallel;
 extern crate crossbeam;
+extern crate regex;
 
 pub mod model;
 pub mod io;
@@ -98,6 +99,8 @@ fn exp(args: Vec<String>) {
     let mut p1 = 0.1;
     let mut threads = 1;
     let mut estimate_path = None;
+    let mut experiments = ".*".to_owned();
+    let mut cells = ".*".to_owned();
 
     {
         let mut ap = ArgumentParser::new();
@@ -124,16 +127,18 @@ Output is formatted into columns: experiment, cell, feature, expected value, sta
         ap.refer(&mut p1).add_option(&["--p1"], Store, "Prior probability of 1->0 error (default: 0.1).");
         ap.refer(&mut threads)
           .add_option(&["--threads", "-t"], Store, "Number of threads to use.");
+        ap.refer(&mut experiments).add_option(&["--experiments", "--expmnts"], Store, "Regular expression for experiments to select (default: all).");
+        ap.refer(&mut cells).add_option(&["--cells"], Store, "Regular expression for cells to select (default: all).");
         parse_args_or_exit(&ap, args);
     }
-    cli::expression(N, m, p0, p1, estimate_path, threads);
+    cli::expression(N, m, p0, p1, estimate_path, threads, &experiments, &cells);
 }
 
 
 fn diffexp(args: Vec<String>) {
     let mut threads = 1;
-    let mut group1_path = "".to_string();
-    let mut group2_path = "".to_string();
+    let mut group1_path = "".to_owned();
+    let mut group2_path = "".to_owned();
     let mut pmf_path: Option<String> = None;
     let mut min_fc = 1.5f64.log2();
 

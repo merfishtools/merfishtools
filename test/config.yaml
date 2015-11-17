@@ -1,13 +1,20 @@
 groups:
-    A:
-        expmnt: "^1$"
-        cells: ".*"
-    B:
-        expmnt: "^2$"
-        cells: ".*"
+  A:
+    expmnts: "^1$"
+    cells: ".*"
+  B:
+    expmnts: "^2$"
+    cells: ".*"
+  X:
+    expmnts: "^1$"
+    cells: "^0$"
+  all:
+    expmnts: ".*"
+    cells: ".*"
+
 genes:
-    - COL5A1
-    - BRCA2
-    - CKAP5
-    - GTF3C1
-    - ATP11A
+  - COL5A1
+  - BRCA2
+  - CKAP5
+  - GTF3C1
+  - ATP11A

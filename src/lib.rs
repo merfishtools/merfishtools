@@ -6,10 +6,8 @@ extern crate csv;
 extern crate itertools;
 extern crate num;
 extern crate rustc_serialize;
-extern crate simple_parallel;
-extern crate crossbeam;
 extern crate nalgebra;
+extern crate regex;
 
 pub mod model;
 pub mod io;
-//pub mod cli;
