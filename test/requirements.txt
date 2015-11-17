@@ -1,0 +1,5 @@
+matplotlib
+snakemake
+scikit-learn
+pandas
+seaborn
