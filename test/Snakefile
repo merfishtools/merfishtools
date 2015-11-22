@@ -14,7 +14,8 @@ rule all:
         expand("results/expression_pmf/140genesData.{gene}.X.{ext}", ext=plot_ext, gene=config["genes"]),
         "results/pca/140genesData.pca.pdf",
         "results/140genesData.all.expression_dist.pdf",
-        "results/140genesData.all.overdispersion.pdf"
+        "results/140genesData.all.overdispersion.pdf",
+        "results/140genesData.all.correlation.pdf",
 
 
 rule plots:
@@ -69,7 +70,7 @@ rule plot_expression_pmf:
     output:
         "results/expression_pmf/{dataset}.{gene}.{group}.svg"
     script:
-        "scripts/expression_pmf.py"
+        "scripts/plot-expression-pmf.py"
 
 
 rule plot_foldchange_cdf:
@@ -79,7 +80,7 @@ rule plot_foldchange_cdf:
     output:
         "results/foldchange_cdf/{dataset}.{group1}-vs-{group2}.{gene}.svg"
     script:
-        "scripts/foldchange_cdf.py"
+        "scripts/plot-foldchange-cdf.py"
 
 
 rule expression_matrix:
@@ -88,7 +89,7 @@ rule expression_matrix:
     output:
         "expressions/{dataset}.{group}.matrix.txt"
     script:
-        "scripts/expression_matrix.py"
+        "scripts/expression-matrix.py"
 
 
 rule plot_expression_dist:
@@ -97,7 +98,7 @@ rule plot_expression_dist:
     output:
         "results/{dataset}.{group}.expression_dist.svg"
     script:
-        "scripts/expression_dist.py"
+        "scripts/plot-expression-dist.py"
 
 
 rule plot_overdispersion:
@@ -106,7 +107,16 @@ rule plot_overdispersion:
     output:
         "results/{dataset}.{group}.overdispersion.svg"
     script:
-        "scripts/overdispersion.py"
+        "scripts/plot-overdispersion.py"
+
+
+rule plot_correlation:
+    input:
+        "expressions/{dataset}.{group}.matrix.txt"
+    output:
+        "results/{dataset}.{group}.correlation.svg"
+    script:
+        "scripts/plot-correlation.py"
 
 
 rule pca:
@@ -115,7 +125,7 @@ rule pca:
     output:
         "results/pca/{dataset}.pca.svg"
     script:
-        "scripts/pca.py"
+        "scripts/plot-pca.py"
 
 
 rule svg2pdf:
