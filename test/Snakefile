@@ -12,7 +12,9 @@ rule all:
         "diffexp/140genesData.A-vs-B.txt",
         expand("results/foldchange_cdf/140genesData.A-vs-B.{gene}.{ext}", ext=plot_ext, gene=config["genes"]),
         expand("results/expression_pmf/140genesData.{gene}.X.{ext}", ext=plot_ext, gene=config["genes"]),
-        "results/pca/140genesData.pca.pdf"
+        "results/pca/140genesData.pca.pdf",
+        "results/140genesData.all.expression_dist.pdf",
+        "results/140genesData.all.overdispersion.pdf"
 
 
 rule plots:
@@ -80,14 +82,40 @@ rule plot_foldchange_cdf:
         "scripts/foldchange_cdf.py"
 
 
-rule sparse_pca:
+rule expression_matrix:
     input:
-        est="expressions/{dataset}.all.est.txt"
+        "expressions/{dataset}.{group}.est.txt"
+    output:
+        "expressions/{dataset}.{group}.matrix.txt"
+    script:
+        "scripts/expression_matrix.py"
+
+
+rule plot_expression_dist:
+    input:
+        "expressions/{dataset}.{group}.matrix.txt"
+    output:
+        "results/{dataset}.{group}.expression_dist.svg"
+    script:
+        "scripts/expression_dist.py"
+
+
+rule plot_overdispersion:
+    input:
+        "expressions/{dataset}.{group}.matrix.txt"
+    output:
+        "results/{dataset}.{group}.overdispersion.svg"
+    script:
+        "scripts/overdispersion.py"
+
+
+rule pca:
+    input:
+        "expressions/{dataset}.all.matrix.txt"
     output:
         "results/pca/{dataset}.pca.svg"
     script:
-        "scripts/sparse_pca.py"
-
+        "scripts/pca.py"
 
 
 rule svg2pdf:

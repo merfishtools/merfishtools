@@ -10,19 +10,17 @@ from matplotlib import gridspec
 
 
 # load data
-exprs = np.log2(1 + pd.read_table(snakemake.input.est, index_col=[0, 1, 2])["expr_ev"].unstack(1).fillna(0))
+exprs = np.log10(1 + pd.read_table(snakemake.input[0], index_col=0, header=[0, 1]).transpose())
 
 # calculate PCA
 spca = decomposition.PCA(n_components=3)
-X = preprocessing.scale(exprs.transpose())
+X = preprocessing.scale(exprs)
 scores = pd.DataFrame(spca.fit_transform(X))
 scores.columns = [
     "PC{} ({:.2%})".format(i + 1, expl_var)
     for i, expl_var in enumerate(spca.explained_variance_ratio_)
 ]
-print(scores)
-print(exprs)
-scores.index = exprs.columns
+scores.index = exprs.index
 pcs = list(combinations(scores.columns, 2))
 
 # plot
@@ -31,13 +29,10 @@ fig = plt.figure(figsize=(9, 3))
 gs = gridspec.GridSpec(1, 3)
 for i, (a, b) in enumerate(pcs):
     ax = plt.subplot(gs[0, i])
-    ax.plot(scores.loc[:, a], scores.loc[:, b], ".")
-    #for group, df in annotation.groupby(annotation_column):
-    #    ax.plot(scores.loc[df.index.values, a],
-    #            scores.loc[df.index.values, b], ".",
-    #            label=group)
-    if i == 2:
-        ax.legend(bbox_to_anchor=(1.6, 1))
+    for expmnt, _scores in scores.groupby(level="expmnt"):
+        ax.plot(_scores.loc[:, a], _scores.loc[:, b], ".", label=expmnt, markersize=4, alpha=0.9)
+    #if i == 2:
+    #    ax.legend(bbox_to_anchor=(1.6, 1), title="experiment")
     plt.xlabel(a)
     plt.ylabel(b)
 
