@@ -22,11 +22,14 @@ for expmnt, expr in exprs.groupby(level="expmnt", axis=1):
         for a, b in combinations(expr.columns, 2):
             expr_a = expr_a.append(expr[a])
             expr_b = expr_b.append(expr[b])
+
 expr_a = np.log10(1 + expr_a)
 expr_b = np.log10(1 + expr_b)
 dropout = np.logical_or(np.logical_and(expr_a > 0.2, expr_b == 0), np.logical_and(expr_a == 0, expr_b > 0.2))
+high = np.logical_or(expr_a >= 10, expr_b >= 10)
 sns.kdeplot(expr_a[~dropout], expr_b[~dropout], shade=True, cmap="Greys", shade_lowest=False, ax=ax, clip=[0, 1.5])
 sns.kdeplot(expr_a[dropout], expr_b[dropout], shade=True, cmap="Reds", shade_lowest=False, ax=ax, clip=[0, 1.5])
+#sns.kdeplot(expr_a, expr_b, shade=True, cmap="Greys", shade_lowest=False, ax=ax, clip=[0, 20])
 
 plt.xlabel("log10 expression")
 plt.ylabel("log10 expression")
