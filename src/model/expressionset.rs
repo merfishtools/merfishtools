@@ -91,10 +91,10 @@ mod tests {
     fn test_pmf() {
         let readout = setup();
         let pmfs = [
-            model::expression::pmf(5, 5, &readout),
-            model::expression::pmf(10, 10, &readout),
-            model::expression::pmf(3, 3, &readout),
-            model::expression::pmf(24, 24, &readout)
+            model::expression::pmf(5, 1, &readout),
+            model::expression::pmf(10, 1, &readout),
+            model::expression::pmf(3, 1, &readout),
+            model::expression::pmf(24, 1, &readout)
         ];
         let pmf = pmf(&pmfs, &[1.0, 1.0, 1.0, 1.0]);
 
@@ -103,7 +103,6 @@ mod tests {
 
         println!("{:?}", values);
         println!("{:?}", total);
-        assert!(false);
         assert!(total.approx_eq(&-0.000003372325827477596));
     }
 }
