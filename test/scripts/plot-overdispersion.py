@@ -6,8 +6,10 @@ import seaborn as sns
 import numpy as np
 import math
 
-plt.figure()
-sns.set_style("ticks")
+
+sns.set(style="ticks", palette="colorblind", context=snakemake.wildcards.context)
+plt.figure(figsize=snakemake.config["plots"]["figsize"])
+
 exprs = pd.read_table(snakemake.input[0], index_col=0, header=[0, 1])
 
 for expmnt, expr in exprs.groupby(level="expmnt", axis=1):

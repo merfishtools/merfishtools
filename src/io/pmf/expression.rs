@@ -40,7 +40,7 @@ pub struct Record {
     pub experiment: String,
     pub cell: String,
     pub feature: String,
-    pub expression: u32,
+    pub expression: f64,
     pub prob: LogProb
 }
 
@@ -110,7 +110,7 @@ impl<W: io::Write> Writer<W> {
             experiment: experiment.to_owned(),
             cell: cell.to_owned(),
             feature: feature.to_owned(),
-            expression: 0,
+            expression: 0.0,
             prob: 0.0
         };
 

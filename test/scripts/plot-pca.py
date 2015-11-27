@@ -24,8 +24,10 @@ scores.index = exprs.index
 pcs = list(combinations(scores.columns, 2))
 
 # plot
-sns.set_style("ticks")
-fig = plt.figure(figsize=(9, 3))
+sns.set(style="ticks", palette="colorblind", context=snakemake.wildcards.context)
+width, height = snakemake.config["plots"]["figsize"]
+plt.figure(figsize=(width * 3, height))
+
 gs = gridspec.GridSpec(1, 3)
 for i, (a, b) in enumerate(pcs):
     ax = plt.subplot(gs[0, i])
@@ -39,4 +41,4 @@ for i, (a, b) in enumerate(pcs):
 # save the figure
 sns.despine()
 plt.tight_layout()
-fig.savefig(snakemake.output[0], bbox_inches="tight")
+plt.savefig(snakemake.output[0], bbox_inches="tight")

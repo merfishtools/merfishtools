@@ -9,9 +9,9 @@ import seaborn as sns
 def plot_cdf(values, probs):
     plt.step(values, np.cumsum(probs), "k-")
 
+sns.set(style="ticks", palette="colorblind", context=snakemake.wildcards.context)
+plt.figure(figsize=snakemake.config["plots"]["figsize"])
 
-plt.figure()
-sns.set_style("ticks")
 pmf = pd.read_table(snakemake.input.pmf, index_col=0)
 pmf = pmf.loc[snakemake.wildcards.gene]
 pmf.sort("log2fc", inplace=True)

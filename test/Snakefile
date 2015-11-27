@@ -4,18 +4,22 @@ configfile: "config.yaml"
 merfishtools = "../target/release/merfishtools"
 
 
-plot_ext = ["svg", "pdf"]
+contexts = ["paper"]
 
 
 rule all:
     input:
         "diffexp/140genesData.A-vs-B.txt",
-        expand("results/foldchange_cdf/140genesData.A-vs-B.{gene}.{ext}", ext=plot_ext, gene=config["genes"]),
-        expand("results/expression_pmf/140genesData.{gene}.X.{ext}", ext=plot_ext, gene=config["genes"]),
-        "results/pca/140genesData.pca.pdf",
-        "results/140genesData.all.expression_dist.pdf",
-        "results/140genesData.all.overdispersion.pdf",
-        "results/140genesData.all.correlation.pdf",
+        expand("results/{context}/foldchange_cdf/140genesData.A-vs-B.{gene}.pdf", gene=config["genes"], context=contexts),
+        expand("results/{context}/expression_pmf/140genesData.{gene}.X.pdf", gene=config["genes"], context=contexts),
+        expand([
+            "results/{context}/140genesData.pca.pdf",
+            "results/{context}/140genesData.all.expression_dist.pdf",
+            "results/{context}/140genesData.all.overdispersion.pdf",
+            "results/{context}/140genesData.all.correlation.pdf"
+        ], context=contexts),
+        expand("results/{context}/140genesData.expmnt{expmnt}.expression_dist.pdf", context=contexts, expmnt=[1, 2])
+
 
 
 rule plots:
@@ -68,7 +72,7 @@ rule plot_expression_pmf:
         expr="expressions/{dataset}.{group}.txt",
         raw="data/{dataset}.sorted.txt"
     output:
-        "results/expression_pmf/{dataset}.{gene}.{group}.svg"
+        "results/{context}/expression_pmf/{dataset}.{gene}.{group}.svg"
     script:
         "scripts/plot-expression-pmf.py"
 
@@ -78,7 +82,7 @@ rule plot_foldchange_cdf:
         pmf="diffexp/{dataset}.{group1}-vs-{group2}.txt",
         est="diffexp/{dataset}.{group1}-vs-{group2}.est.txt"
     output:
-        "results/foldchange_cdf/{dataset}.{group1}-vs-{group2}.{gene}.svg"
+        "results/{context}/foldchange_cdf/{dataset}.{group1}-vs-{group2}.{gene}.svg"
     script:
         "scripts/plot-foldchange-cdf.py"
 
@@ -96,7 +100,7 @@ rule plot_expression_dist:
     input:
         "expressions/{dataset}.{group}.matrix.txt"
     output:
-        "results/{dataset}.{group}.expression_dist.svg"
+        "results/{context}/{dataset}.{group}.expression_dist.svg"
     script:
         "scripts/plot-expression-dist.py"
 
@@ -105,7 +109,7 @@ rule plot_overdispersion:
     input:
         "expressions/{dataset}.{group}.matrix.txt"
     output:
-        "results/{dataset}.{group}.overdispersion.svg"
+        "results/{context}/{dataset}.{group}.overdispersion.svg"
     script:
         "scripts/plot-overdispersion.py"
 
@@ -114,16 +118,16 @@ rule plot_correlation:
     input:
         "expressions/{dataset}.{group}.matrix.txt"
     output:
-        "results/{dataset}.{group}.correlation.svg"
+        "results/{context}/{dataset}.{group}.correlation.svg"
     script:
         "scripts/plot-correlation.py"
 
 
-rule pca:
+rule plot_pca:
     input:
         "expressions/{dataset}.all.matrix.txt"
     output:
-        "results/pca/{dataset}.pca.svg"
+        "results/{context}/{dataset}.pca.svg"
     script:
         "scripts/plot-pca.py"
 

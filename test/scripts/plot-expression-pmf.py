@@ -11,8 +11,9 @@ def plot_pmf(values, probs):
     plt.setp(baseline, 'linewidth', 0)
 
 
-plt.figure()
-sns.set_style("ticks")
+sns.set(style="ticks", palette="colorblind", context=snakemake.wildcards.context)
+plt.figure(figsize=snakemake.config["plots"]["figsize"])
+
 pmf = pd.read_table(snakemake.input.expr, index_col=2)
 pmf = pmf.loc[snakemake.wildcards.gene]
 expmnt, cell = map(int, pmf.iloc[0][["expmnt", "cell"]])

@@ -9,8 +9,10 @@ import random
 
 random.seed(2139)
 
-fig = plt.figure()
-sns.set_style("ticks")
+
+sns.set(style="ticks", palette="colorblind", context=snakemake.wildcards.context)
+fig = plt.figure(figsize=snakemake.config["plots"]["figsize"])
+
 ax = fig.add_subplot(111, aspect='equal')
 exprs = pd.read_table(snakemake.input[0], index_col=0, header=[0, 1])
 

@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-plt.figure()
-sns.set_style("ticks")
+sns.set(style="ticks", palette="colorblind", context=snakemake.wildcards.context)
+plt.figure(figsize=snakemake.config["plots"]["figsize"])
 exprs = pd.read_table(snakemake.input[0], index_col=0, header=[0, 1])
 
 for cell in exprs:
