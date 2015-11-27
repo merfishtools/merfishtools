@@ -99,7 +99,7 @@ mod tests {
         let pmf = pmf(&pmfs, &[1.0, 1.0, 1.0, 1.0]);
 
         let total = log_prob_sum(&pmf.iter().map(|&(_, prob)| prob).collect_vec());
-        let values = pmf.iter().map(|e| *e.0.numer() as f64 / *e.0.denom() as f64).collect_vec();
+        let values = pmf.iter().map(|e| (*e.0.numer() as f64 / *e.0.denom() as f64, e.1)).collect_vec();
 
         println!("{:?}", values);
         println!("{:?}", total);
