@@ -5,7 +5,7 @@ use num::traits::{cast, NumCast};
 use bio::stats::logprobs::LogProb;
 
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PMF<T: Clone + Copy> {
     inner: Vec<(T, LogProb)>
 }

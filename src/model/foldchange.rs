@@ -78,8 +78,9 @@ mod tests {
             model::expression::pmf(30, 1, &readout),
             model::expression::pmf(240, 1, &readout)
         ];
-        let pmf1 = model::expressionset::pmf(&pmfs1);
-        let pmf2 = model::expressionset::pmf(&pmfs2);
+        let scales = [1.0, 1.0, 1.0, 1.0];
+        let pmf1 = model::expressionset::pmf(&pmfs1, &scales);
+        let pmf2 = model::expressionset::pmf(&pmfs2, &scales);
 
         let pmf = pmf(&pmf1, &pmf2);
 
@@ -87,32 +88,7 @@ mod tests {
         let total = log_prob_sum(&pmf.iter().map(|&(_, prob)| prob).collect_vec());
 
         println!("{:?}", total);
-        assert!(total.approx_eq(&-0.000009484311064067441));
+        println!("ev={}", pmf.expected_value());
+        assert!(total.approx_eq(&-0.00000948431106451153));
     }
-
-    // #[test]
-    // fn test_expected_value() {
-    //     let readout = setup();
-    //     let a = [
-    //         model::Expression::new(5, 5, &readout),
-    //         model::Expression::new(5, 5, &readout),
-    //         model::Expression::new(5, 5, &readout),
-    //         model::Expression::new(5, 5, &readout)
-    //     ];
-    //
-    //     let b = [
-    //         model::Expression::new(15, 15, &readout),
-    //         model::Expression::new(15, 15, &readout),
-    //         model::Expression::new(15, 15, &readout),
-    //         model::Expression::new(15, 15, &readout)
-    //     ];
-    //
-    //     let a = model::ExpressionSet::new(&a);
-    //     let b = model::ExpressionSet::new(&b);
-    //
-    //     let fc = Foldchange::new(&a, &b);
-    //
-    //     println!("{}", fc.expected_value());
-    //     assert!(fc.expected_value().approx_eq(&2.999373414428798));
-    // }
 }
