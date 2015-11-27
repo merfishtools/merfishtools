@@ -83,9 +83,11 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
     crossbeam::scope(|scope| {
         for (feature, pmf) in pool.map(scope, features, |feature| {
             info!("Calculating {}.", feature);
+            let g1 = group1.get(&feature).unwrap();
+            let g2 = group2.get(&feature).unwrap();
             let pmf = model::foldchange::pmf(
-                &model::expressionset::pmf(&group1.get(&feature).unwrap()),
-                &model::expressionset::pmf(&group2.get(&feature).unwrap())
+                &model::expressionset::pmf(&g1, &vec![1.0; g1.len()]),
+                &model::expressionset::pmf(&g2, &vec![1.0; g1.len()])
             );
             (
                 feature,

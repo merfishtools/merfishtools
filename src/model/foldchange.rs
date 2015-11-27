@@ -78,8 +78,9 @@ mod tests {
             model::expression::pmf(30, 1, &readout),
             model::expression::pmf(240, 1, &readout)
         ];
-        let pmf1 = model::expressionset::pmf(&pmfs1);
-        let pmf2 = model::expressionset::pmf(&pmfs2);
+        let scales = [1.0, 1.0, 1.0, 1.0];
+        let pmf1 = model::expressionset::pmf(&pmfs1, &scales);
+        let pmf2 = model::expressionset::pmf(&pmfs2, &scales);
 
         let pmf = pmf(&pmf1, &pmf2);
 
@@ -87,7 +88,7 @@ mod tests {
         let total = log_prob_sum(&pmf.iter().map(|&(_, prob)| prob).collect_vec());
 
         println!("{:?}", total);
-        assert!(total.approx_eq(&-0.000009484311064067441));
+        assert!(total.approx_eq(&-0.00000948431106451153));
     }
 
     // #[test]

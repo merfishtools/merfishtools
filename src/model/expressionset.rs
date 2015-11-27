@@ -1,4 +1,6 @@
-use std::f64;
+use std::collections;
+use std::collections::hash_map::Entry::{Occupied, Vacant};
+use std::mem;
 
 use num::rational;
 use itertools::Itertools;
@@ -12,40 +14,50 @@ pub type MeanExpression = rational::Ratio<u32>;
 pub type PMF = model::pmf::PMF<MeanExpression>;
 
 
-pub fn pmf(expression_pmfs: &[model::expression::PMF]) -> PMF {
-    let max_sum = expression_pmfs.iter()
-                                 .map(|pmf| pmf.iter().last().unwrap().0)
-                                 .fold(0, |s, e| s + e) as usize;
+fn norm_scale_factors(scale_factors: &[f64]) -> Vec<rational::Ratio<u32>> {
+    let mut factors = Vec::new();
+    let min = scale_factors.iter().fold(1.0, |m, &e| if e < m { e } else { m });
+    for &s in scale_factors.iter() {
+        let s = ((s / min) * 100.0).round() / 100.0;
+        factors.push(rational::Ratio::new(s.trunc() as u32 * 100 + s.fract() as u32, 100))
+    }
 
-    let mut probs = [vec![f64::NEG_INFINITY; max_sum + 1], vec![f64::NEG_INFINITY; max_sum + 1]];
-    probs[1][0] = 0.0;
-    let mut curr = 0;
+    factors
+}
 
-    for (i, pmf) in expression_pmfs.iter().enumerate() {
-        curr = i % 2;
-        let prev = 1 - curr;
 
-        for p in probs[curr].iter_mut() {
-            *p = f64::NEG_INFINITY;
-        }
+pub fn pmf(expression_pmfs: &[model::expression::PMF], scale_factors: &[f64]) -> PMF {
+    let scale_factors = norm_scale_factors(scale_factors);
+    println!("{:?}", scale_factors);
 
-        for s in 0..max_sum {
-            let p = probs[prev][s];
-            if p != f64::NEG_INFINITY {
-                for &(x, x_prob) in pmf.iter() {
-                    let s = s + x as usize;
-                    if s <= max_sum {
-                        let prob = &mut probs[curr][s];
-                        *prob = logprobs::log_prob_add(*prob, p + x_prob);
+    let mut curr = collections::HashMap::new();
+    let mut prev = collections::HashMap::new();
+    curr.insert(rational::Ratio::from_integer(0), 0.0);
+
+    for (pmf, scale) in expression_pmfs.iter().zip(scale_factors) {
+        mem::swap(&mut curr, &mut prev); // TODO does this really swap curr and prev?
+
+        curr.clear();
+
+        for (s, p) in prev.iter() {
+            for &(x, x_prob) in pmf.iter() {
+                let s = s + rational::Ratio::from_integer(x) * scale;
+                match curr.entry(s) {
+                    Occupied(mut entry) => {
+                        let prob = logprobs::log_prob_add(*entry.get(), p + x_prob);
+                        entry.insert(prob);
+                    },
+                    Vacant(entry)   => {
+                        entry.insert(p + x_prob);
                     }
                 }
             }
         }
     }
 
-    PMF::new(probs[curr].iter().enumerate().filter_map(|(s, p)| {
+    PMF::new(curr.iter().filter_map(|(s, p)| {
         if *p >= model::MIN_PROB {
-            Some((rational::Ratio::new(s as u32, expression_pmfs.len() as u32), *p))
+            Some((s / rational::Ratio::from_integer(expression_pmfs.len() as u32), *p))
         }
         else {
             None
@@ -79,16 +91,19 @@ mod tests {
     fn test_pmf() {
         let readout = setup();
         let pmfs = [
-            model::expression::pmf(5, 1, &readout),
-            model::expression::pmf(10, 1, &readout),
-            model::expression::pmf(3, 1, &readout),
-            model::expression::pmf(24, 1, &readout)
+            model::expression::pmf(5, 5, &readout),
+            model::expression::pmf(10, 10, &readout),
+            model::expression::pmf(3, 3, &readout),
+            model::expression::pmf(24, 24, &readout)
         ];
-        let pmf = pmf(&pmfs);
+        let pmf = pmf(&pmfs, &[1.0, 1.0, 1.0, 1.0]);
 
         let total = log_prob_sum(&pmf.iter().map(|&(_, prob)| prob).collect_vec());
+        let values = pmf.iter().map(|e| *e.0.numer() as f64 / *e.0.denom() as f64).collect_vec();
 
+        println!("{:?}", values);
         println!("{:?}", total);
+        assert!(false);
         assert!(total.approx_eq(&-0.000003372325827477596));
     }
 }
