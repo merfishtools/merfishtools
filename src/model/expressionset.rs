@@ -15,7 +15,7 @@ pub type PMF = model::pmf::PMF<MeanExpression>;
 pub fn pmf(expression_pmfs: &[model::expression::PMF]) -> PMF {
     let max_sum = expression_pmfs.iter()
                                  .map(|pmf| pmf.iter().last().unwrap().0)
-                                 .fold(0.0, |s, e| s + e) as usize;
+                                 .fold(0, |s, e| s + e) as usize;
 
     let mut probs = [vec![f64::NEG_INFINITY; max_sum + 1], vec![f64::NEG_INFINITY; max_sum + 1]];
     probs[1][0] = 0.0;
@@ -61,7 +61,6 @@ mod tests {
     use itertools::Itertools;
     use nalgebra::ApproxEq;
     use bio::stats::logprobs::{Prob, log_prob_sum};
-
 
     use super::*;
     use model;
