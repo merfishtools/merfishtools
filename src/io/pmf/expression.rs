@@ -9,6 +9,7 @@ use csv;
 use bio::stats::logprobs::LogProb;
 
 use model::expression::PMF;
+use model;
 
 
 pub struct PMFs {
@@ -23,6 +24,10 @@ impl PMFs {
 
     pub fn get(&self, feature: &str) -> Option<&Vec<PMF>> {
         self.inner.get(feature)
+    }
+
+    pub fn get_mut(&mut self, feature: &str) -> Option<&mut Vec<PMF>> {
+        self.inner.get_mut(feature)
     }
 
     pub fn features(&self) -> collections::hash_map::Keys<String, Vec<PMF>>  {
@@ -40,7 +45,7 @@ pub struct Record {
     pub experiment: String,
     pub cell: String,
     pub feature: String,
-    pub expression: u32,
+    pub expression: f64,
     pub prob: LogProb
 }
 
@@ -70,7 +75,12 @@ impl<R: io::Read> Reader<R> {
         for (feature, records) in self.inner.decode().map(|res| res.ok().expect("Error reading record")).group_by(
             |rec: &Record| rec.feature.clone()
         ) {
-            let pmf = PMF::new(records.iter().map(|rec| (rec.expression.clone(), rec.prob.clone())).collect_vec());
+            let pmf = PMF::new(records.iter().map(|rec| {
+                model::pmf::Entry {
+                    value: rec.expression.clone(),
+                    prob: rec.prob.clone()
+                }
+            }).collect_vec());
             if !features.contains_key(&feature) {
                 features.insert(feature.clone(), Vec::new());
             }
@@ -110,13 +120,13 @@ impl<W: io::Write> Writer<W> {
             experiment: experiment.to_owned(),
             cell: cell.to_owned(),
             feature: feature.to_owned(),
-            expression: 0,
+            expression: 0.0,
             prob: 0.0
         };
 
-        for &(x, prob) in pmf.iter() {
-            record.expression = x;
-            record.prob = prob;
+        for x in pmf.iter() {
+            record.expression = x.value;
+            record.prob = x.prob;
             self.inner.encode(&record).unwrap();
         }
     }

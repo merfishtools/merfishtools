@@ -5,18 +5,25 @@ use bio::stats::logprobs;
 use model;
 
 
-pub type PMF = model::pmf::PMF<u32>;
+pub type PMF = model::pmf::PMF<f64>;
 
 
 pub fn pmf(count: u32, count_exact: u32, readout_model: &model::Readout) -> PMF {
     let offset = if count_exact > 50 { count_exact - 50 } else { 0 };
-    let likelihoods = (offset..count + 50).map(|x| readout_model.likelihood(x, count, count_exact)).collect_vec();
+    let likelihoods = (offset..count + 50).map(|x| {
+        readout_model.likelihood(x, count, count_exact)
+    }).collect_vec();
     // calculate (marginal / flat_prior)
     let marginal = logprobs::log_prob_sum(&likelihoods);
 
     // TODO trim
     PMF::new(
-        likelihoods.iter().enumerate().map(|(x, lh)| (offset + x as u32, lh - marginal)).filter(|&(_, p)| p >= model::MIN_PROB).collect_vec()
+        likelihoods.iter().enumerate().map(|(x, lh)| {
+            model::pmf::Entry{
+                value: (offset + x as u32) as f64,
+                prob: lh - marginal
+            }
+        }).filter(|e| e.prob >= model::MIN_PROB).collect_vec()
     )
 }
 

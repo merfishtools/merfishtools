@@ -1,6 +1,5 @@
-use std::collections;
-use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::mem;
+use std::f64;
 
 use num::rational;
 use itertools::Itertools;
@@ -13,51 +12,44 @@ use model;
 pub type MeanExpression = rational::Ratio<u32>;
 pub type PMF = model::pmf::PMF<MeanExpression>;
 
+const SCALE: f64 = 10.0;
 
-fn norm_scale_factors(scale_factors: &[f64]) -> Vec<rational::Ratio<u32>> {
-    let mut factors = Vec::new();
-    let min = scale_factors.iter().fold(1.0, |m, &e| if e < m { e } else { m });
-    for &s in scale_factors.iter() {
-        let s = ((s / min) * 100.0).round() / 100.0;
-        factors.push(rational::Ratio::new(s.trunc() as u32 * 100 + s.fract() as u32, 100))
-    }
+pub fn pmf(expression_pmfs: &[model::expression::PMF]) -> PMF {
+    let max_sum = expression_pmfs.iter()
+                                 .map(|pmf| pmf.iter().last().unwrap().value)
+                                 .fold(0, |s, e| s + (e * SCALE).round() as usize);
 
-    factors
-}
+    let mut curr = vec![f64::NEG_INFINITY; max_sum + 1];
+    let mut prev = vec![f64::NEG_INFINITY; max_sum + 1];
+    curr[0] = 0.0;
 
+    for pmf in expression_pmfs.iter() {
+        mem::swap(&mut curr, &mut prev);
 
-pub fn pmf(expression_pmfs: &[model::expression::PMF], scale_factors: &[f64]) -> PMF {
-    let scale_factors = norm_scale_factors(scale_factors);
-    println!("{:?}", scale_factors);
+        for p in curr.iter_mut() {
+            *p = f64::NEG_INFINITY;
+        }
 
-    let mut curr = collections::HashMap::new();
-    let mut prev = collections::HashMap::new();
-    curr.insert(rational::Ratio::from_integer(0), 0.0);
-
-    for (pmf, scale) in expression_pmfs.iter().zip(scale_factors) {
-        mem::swap(&mut curr, &mut prev); // TODO does this really swap curr and prev?
-
-        curr.clear();
-
-        for (s, p) in prev.iter() {
-            for &(x, x_prob) in pmf.iter() {
-                let s = s + rational::Ratio::from_integer(x) * scale;
-                match curr.entry(s) {
-                    Occupied(mut entry) => {
-                        let prob = logprobs::log_prob_add(*entry.get(), p + x_prob);
-                        entry.insert(prob);
-                    },
-                    Vacant(entry)   => {
-                        entry.insert(p + x_prob);
+        for s in 0..max_sum {
+            let p = prev[s];
+            if p != f64::NEG_INFINITY {
+                for x in pmf.iter() {
+                    let s = s + (x.value * SCALE) as usize;
+                    if s <= max_sum {
+                        let prob = &mut curr[s];
+                        *prob = logprobs::log_prob_add(*prob, p + x.prob);
                     }
                 }
             }
         }
     }
 
-    PMF::new(curr.iter().filter_map(|(s, p)| {
+    PMF::new(curr.iter().enumerate().filter_map(|(s, p)| {
         if *p >= model::MIN_PROB {
-            Some((s / rational::Ratio::from_integer(expression_pmfs.len() as u32), *p))
+            Some(model::pmf::Entry{
+                value: rational::Ratio::new(s as u32, SCALE as u32 * expression_pmfs.len() as u32),
+                prob: *p
+            })
         }
         else {
             None
@@ -96,10 +88,10 @@ mod tests {
             model::expression::pmf(3, 1, &readout),
             model::expression::pmf(24, 1, &readout)
         ];
-        let pmf = pmf(&pmfs, &[1.0, 1.0, 1.0, 1.0]);
+        let pmf = pmf(&pmfs);
 
-        let total = log_prob_sum(&pmf.iter().map(|&(_, prob)| prob).collect_vec());
-        let values = pmf.iter().map(|e| (*e.0.numer() as f64 / *e.0.denom() as f64, e.1)).collect_vec();
+        let total = log_prob_sum(&pmf.iter().map(|e| e.prob).collect_vec());
+        let values = pmf.iter().map(|e| (*e.value.numer() as f64 / *e.value.denom() as f64, e.prob)).collect_vec();
 
         println!("{:?}", values);
         println!("{:?}", total);

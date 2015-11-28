@@ -49,12 +49,12 @@ impl<W: io::Write> Writer<W> {
             prob: 0.0
         };
 
-        let pmf = pmf.iter().filter(|&&(_, p)| p >= model::MIN_PROB)
-                            .sorted_by(|&&(fca, _), &&(fcb, _)| fca.partial_cmp(&fcb).unwrap());
+        let pmf = pmf.iter().filter(|e| e.prob >= model::MIN_PROB)
+                            .sorted_by(|a, b| a.value.partial_cmp(&b.value).unwrap());
 
-        for &&(fc, prob) in pmf.iter() {
-            record.foldchange = fc;
-            record.prob = prob;
+        for e in pmf.iter() {
+            record.foldchange = e.value;
+            record.prob = e.prob;
             self.inner.encode(&record).ok().expect("Error writing record.");
         }
     }

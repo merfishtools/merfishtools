@@ -15,10 +15,10 @@ pub type PMF = model::pmf::PMF<LogFC>;
 
 pub fn pmf(a: &model::expressionset::PMF, b: &model::expressionset::PMF) -> PMF {
     let mut pmf = collections::HashMap::new();
-    for (&(a_mean, a_prob), &(b_mean, b_prob)) in a.iter().cartesian_product(b.iter()) {
+    for (a, b) in a.iter().cartesian_product(b.iter()) {
         // add pseudocount
-        let fc = (b_mean + rational::Ratio::from_integer(1)) / (a_mean + rational::Ratio::from_integer(1));
-        let posterior_prob = b_prob + a_prob;
+        let fc = (b.value + rational::Ratio::from_integer(1)) / (a.value + rational::Ratio::from_integer(1));
+        let posterior_prob = b.prob + a.prob;
 
         if pmf.contains_key(&fc) {
             let p = pmf.get_mut(&fc).unwrap();
@@ -29,13 +29,15 @@ pub fn pmf(a: &model::expressionset::PMF, b: &model::expressionset::PMF) -> PMF 
         }
     }
 
-    PMF::new(pmf.iter().map(|(fc, prob)| (*fc.numer() as f64 / *fc.denom() as f64, *prob)).collect_vec())
+    PMF::new(pmf.iter().map(|(fc, prob)| {
+        model::pmf::Entry { value: *fc.numer() as f64 / *fc.denom() as f64, prob: *prob }
+    }).collect_vec())
 }
 
 
 impl PMF {
     pub fn differential_expression_pep(&self, min_fc: LogFC) -> LogProb {
-        let probs = self.iter().filter(|&&(fc, _)| fc >= min_fc).map(|&(_, prob)| prob).collect_vec();
+        let probs = self.iter().filter(|e| e.value >= min_fc).map(|e| e.prob).collect_vec();
         logprobs::ln_1m_exp(logprobs::log_prob_sum(&probs))
     }
 }
@@ -78,17 +80,17 @@ mod tests {
             model::expression::pmf(30, 1, &readout),
             model::expression::pmf(240, 1, &readout)
         ];
-        let scales = [1.0, 1.0, 1.0, 1.0];
-        let pmf1 = model::expressionset::pmf(&pmfs1, &scales);
-        let pmf2 = model::expressionset::pmf(&pmfs2, &scales);
+        let pmf1 = model::expressionset::pmf(&pmfs1);
+        let pmf2 = model::expressionset::pmf(&pmfs2);
 
         let pmf = pmf(&pmf1, &pmf2);
 
 
-        let total = log_prob_sum(&pmf.iter().map(|&(_, prob)| prob).collect_vec());
+        let total = log_prob_sum(&pmf.iter().map(|fc| fc.prob).collect_vec());
 
         println!("{:?}", total);
         println!("ev={}", pmf.expected_value());
+        assert!(pmf.expected_value().approx_eq(&9.070430066772333));
         assert!(total.approx_eq(&-0.00000948431106451153));
     }
 }

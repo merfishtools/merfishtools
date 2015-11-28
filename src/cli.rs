@@ -109,15 +109,15 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
             let g1 = group1.get(&feature).unwrap();
             let g2 = group2.get(&feature).unwrap();
             let pmf = model::foldchange::pmf(
-                &model::expressionset::pmf(&g1, &vec![1.0; g1.len()]),
-                &model::expressionset::pmf(&g2, &vec![1.0; g1.len()])
+                &model::expressionset::pmf(&g1),
+                &model::expressionset::pmf(&g2)
             );
             (
                 feature,
                 pmf
             )
         }) {
-            if pmf.iter().any(|&(_, prob)| prob.is_nan()) {
+            if pmf.iter().any(|fc| fc.prob.is_nan()) {
                 warn!("A PMF value for feature {} cannot be estimated because counts are too high. It will be reported as NaN.", feature);
             }
 
