@@ -103,7 +103,6 @@ mod tests {
 
         println!("{:?}", values);
         println!("{:?}", total);
-        assert!(false);
         assert!(total.approx_eq(&-0.000003372325827477596));
     }
 }

@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 
 use std;
+use std::collections;
 
 use itertools::Itertools;
 use simple_parallel;
@@ -20,6 +21,12 @@ pub struct Selection {
 }
 
 
+struct Counts {
+    exact: u32,
+    corrected: u32
+}
+
+
 pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, estimate_path: Option<String>, threads: usize, experiments: &str, cells: &str) {
     let readout_model = model::Readout::new(N, m, p0, p1);
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
@@ -29,7 +36,9 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, estimate_path: Option<String
     let experiments = Regex::new(experiments).ok().expect("Invalid regular expression for experiments.");
     let cells = Regex::new(cells).ok().expect("Invalid regular expression for cells.");
 
-    let records = reader.records().filter_map(|res| {
+    let mut counts = collections::HashMap::new();
+    let mut features = collections::HashSet::new();
+    for record in reader.records().filter_map(|res| {
             let rec = res.unwrap();
             if experiments.is_match(&rec.experiment) && cells.is_match(&rec.cell_id) {
                 Some(rec)
@@ -38,30 +47,44 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, estimate_path: Option<String
                 None
             }
         }
-    ).group_by(|rec| {
-        (rec.experiment.clone(), rec.cell_id.clone(), rec.feature.clone())
-    });
+    ) {
+        features.insert(record.feature.clone());
+        let cell_counts = counts.entry((record.experiment, record.cell_id)).or_insert_with(collections::HashMap::new);
+        let feature_counts = cell_counts.entry(record.feature).or_insert(Counts{ exact: 0, corrected: 0});
+        if record.exact_match == 1 {
+            feature_counts.exact += 1;
+        }
+        else {
+            feature_counts.corrected += 1;
+        }
+    }
+    for (_, cell_counts) in counts.iter_mut() {
+        for feature in features.iter() {
+            cell_counts.entry(feature.clone()).or_insert(Counts{ exact: 0, corrected: 0});
+        }
+    }
+
 
     let mut pool = simple_parallel::Pool::new(threads);
     crossbeam::scope(|scope| {
-        for ((experiment, cell, feature), pmf) in pool.map(scope, records, |((experiment, cell, feature), readouts)| {
-            let count = readouts.len();
-            let count_exact = readouts.iter().filter(|r| r.exact_match == 1).count();
-            (
-                (experiment, cell, feature),
-                model::expression::pmf(count as u32, count_exact as u32, &readout_model)
-            )
+        for (experiment, cell, pmfs) in pool.map(scope, counts.into_iter(), |((experiment, cell), counts)| {
+            let pmfs = counts.into_iter().map(|(feature, count)| {
+                (feature, model::expression::pmf(count.exact, count.corrected, &readout_model))
+            }).collect_vec();
+            (experiment, cell, pmfs)
         }) {
-            pmf_writer.write(&experiment, &cell, &feature, &pmf);
+            for (feature, pmf) in pmfs {
+                pmf_writer.write(&experiment, &cell, &feature, &pmf);
 
-            if let Some(ref mut est_writer) = est_writer {
-                est_writer.write(
-                    &experiment,
-                    &cell,
-                    &feature,
-                    pmf.expected_value(),
-                    pmf.standard_deviation()
-                );
+                if let Some(ref mut est_writer) = est_writer {
+                    est_writer.write(
+                        &experiment,
+                        &cell,
+                        &feature,
+                        pmf.expected_value(),
+                        pmf.standard_deviation()
+                    );
+                }
             }
         }
     });
