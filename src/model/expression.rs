@@ -5,7 +5,7 @@ use bio::stats::logprobs;
 use model;
 
 
-pub type PMF = model::pmf::PMF<f64>;
+pub type PMF = model::pmf::PMF<f32>;
 
 
 pub fn pmf(count: u32, count_exact: u32, readout_model: &model::Readout) -> PMF {
@@ -20,7 +20,7 @@ pub fn pmf(count: u32, count_exact: u32, readout_model: &model::Readout) -> PMF 
     PMF::new(
         likelihoods.iter().enumerate().map(|(x, lh)| {
             model::pmf::Entry{
-                value: (offset + x as u32) as f64,
+                value: (offset + x as u32) as f32,
                 prob: lh - marginal
             }
         }).filter(|e| e.prob >= model::MIN_PROB).collect_vec()
@@ -28,7 +28,7 @@ pub fn pmf(count: u32, count_exact: u32, readout_model: &model::Readout) -> PMF 
 }
 
 
-/*
+
 #[cfg(test)]
 mod tests {
     #![allow(non_upper_case_globals)]
@@ -37,7 +37,7 @@ mod tests {
     use nalgebra::ApproxEq;
     use bio::stats::logprobs::Prob;
 
-    use super::{likelihood, Expression, ExpressionSet};
+    use super::*;
     use model;
 
 
@@ -50,6 +50,16 @@ mod tests {
         model::Readout::new(N, m, p0, p1)
     }
 
+    #[test]
+    fn test_pmf() {
+        let readout = setup();
+        let pmf = pmf(0, 0, &readout);
+
+        println!("{:?}", pmf);
+        assert!(false);
+    }
+}
+/*
     #[test]
     fn test_likelihood() {
         let readout = setup();

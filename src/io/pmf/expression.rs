@@ -45,7 +45,7 @@ pub struct Record {
     pub experiment: String,
     pub cell: String,
     pub feature: String,
-    pub expression: f64,
+    pub expression: f32,
     pub prob: LogProb
 }
 

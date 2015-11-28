@@ -12,7 +12,7 @@ use model;
 pub type MeanExpression = rational::Ratio<u32>;
 pub type PMF = model::pmf::PMF<MeanExpression>;
 
-const SCALE: f64 = 10.0;
+const SCALE: f32 = 1.0;
 
 pub fn pmf(expression_pmfs: &[model::expression::PMF]) -> PMF {
     let max_sum = expression_pmfs.iter()

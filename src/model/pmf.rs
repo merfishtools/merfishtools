@@ -61,8 +61,8 @@ impl<T: NumCast + Clone + Copy> PMF<T> {
 }
 
 
-impl PMF<f64> {
-    pub fn scale(&mut self, scale: f64) {
+impl PMF<f32> {
+    pub fn scale(&mut self, scale: f32) {
         for e in self.inner.iter_mut() {
             e.value *= scale;
         }

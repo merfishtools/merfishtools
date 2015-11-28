@@ -40,6 +40,7 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, estimate_path: Option<String
     let mut features = collections::HashSet::new();
     for record in reader.records().filter_map(|res| {
             let rec = res.unwrap();
+            features.insert(rec.feature.clone());
             if experiments.is_match(&rec.experiment) && cells.is_match(&rec.cell_id) {
                 Some(rec)
             }
@@ -48,7 +49,6 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, estimate_path: Option<String
             }
         }
     ) {
-        features.insert(record.feature.clone());
         let cell_counts = counts.entry((record.experiment, record.cell_id)).or_insert_with(collections::HashMap::new);
         let feature_counts = cell_counts.entry(record.feature).or_insert(Counts{ exact: 0, corrected: 0});
         if record.exact_match == 1 {
@@ -67,9 +67,9 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, estimate_path: Option<String
 
     let mut pool = simple_parallel::Pool::new(threads);
     crossbeam::scope(|scope| {
-        for (experiment, cell, pmfs) in pool.map(scope, counts.into_iter(), |((experiment, cell), counts)| {
+        for (_, (experiment, cell, pmfs)) in pool.unordered_map(scope, counts.into_iter(), |((experiment, cell), counts)| {
             let pmfs = counts.into_iter().map(|(feature, count)| {
-                (feature, model::expression::pmf(count.exact, count.corrected, &readout_model))
+                (feature, model::expression::pmf(count.exact + count.corrected, count.corrected, &readout_model))
             }).collect_vec();
             (experiment, cell, pmfs)
         }) {
@@ -104,7 +104,7 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
 
     let mut pool = simple_parallel::Pool::new(threads);
     crossbeam::scope(|scope| {
-        for (feature, pmf) in pool.map(scope, features, |feature| {
+        for (_, (feature, pmf)) in pool.unordered_map(scope, features, |feature| {
             info!("Calculating {}.", feature);
             let g1 = group1.get(&feature).unwrap();
             let g2 = group2.get(&feature).unwrap();
