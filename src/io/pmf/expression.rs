@@ -116,18 +116,14 @@ impl<W: io::Write> Writer<W> {
     }
 
     pub fn write(&mut self, experiment: &str, cell: &str, feature: &str, pmf: &PMF) {
-        let mut record = Record {
-            experiment: experiment.to_owned(),
-            cell: cell.to_owned(),
-            feature: feature.to_owned(),
-            expression: 0.0,
-            prob: 0.0
-        };
-
         for x in pmf.iter() {
-            record.expression = x.value;
-            record.prob = x.prob;
-            self.inner.encode(&record).unwrap();
+            self.inner.write([
+                experiment,
+                cell,
+                feature,
+                &format!("{:.0}", x.value)[..],
+                &format!("{}", x.prob)[..]
+            ].iter()).unwrap();
         }
     }
 }

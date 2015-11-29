@@ -12,12 +12,12 @@ use model;
 pub type MeanExpression = rational::Ratio<u32>;
 pub type PMF = model::pmf::PMF<MeanExpression>;
 
-const SCALE: f32 = 1.0;
+const SCALE: u32 = 10;
 
 pub fn pmf(expression_pmfs: &[model::expression::PMF]) -> PMF {
     let max_sum = expression_pmfs.iter()
                                  .map(|pmf| pmf.iter().last().unwrap().value)
-                                 .fold(0, |s, e| s + (e * SCALE).round() as usize);
+                                 .fold(0, |s, e| s + (e * SCALE as f32).round() as usize);
 
     let mut curr = vec![f64::NEG_INFINITY; max_sum + 1];
     let mut prev = vec![f64::NEG_INFINITY; max_sum + 1];
@@ -34,7 +34,7 @@ pub fn pmf(expression_pmfs: &[model::expression::PMF]) -> PMF {
             let p = prev[s];
             if p != f64::NEG_INFINITY {
                 for x in pmf.iter() {
-                    let s = s + (x.value * SCALE) as usize;
+                    let s = s + (x.value * SCALE as f32) as usize;
                     if s <= max_sum {
                         let prob = &mut curr[s];
                         *prob = logprobs::log_prob_add(*prob, p + x.prob);
@@ -47,7 +47,7 @@ pub fn pmf(expression_pmfs: &[model::expression::PMF]) -> PMF {
     PMF::new(curr.iter().enumerate().filter_map(|(s, p)| {
         if *p >= model::MIN_PROB {
             Some(model::pmf::Entry{
-                value: rational::Ratio::new(s as u32, SCALE as u32 * expression_pmfs.len() as u32),
+                value: rational::Ratio::new(s as u32, SCALE * expression_pmfs.len() as u32),
                 prob: *p
             })
         }
