@@ -59,7 +59,7 @@ impl Factory {
     /// Probability to completely miss a readout because of too many errors.
     fn prob_missed(&self) -> Prob {
         let mut p = 0.0;
-        for k in 3..6 {
+        for k in 2..6 {
             for i in 0..cmp::min(self.m, k) + 1 {
                 p += self.psi(i, k - i) * self.xi(i, k - i);
             }
@@ -75,19 +75,21 @@ pub struct Readout {
     prob_call_mismatch: LogProb,
     prob_miscall_exact: LogProb,
     prob_miscall_mismatch: LogProb,
-    prob_missed: LogProb
+    prob_missed: LogProb,
+    prob_dropout: LogProb
 }
 
 
 impl Readout {
-    pub fn new(N: u8, m: u8, p0: Prob, p1: Prob) -> Self {
-        let factory = Factory { N: N, m: m, p0: p0, p1: p1 };
+    pub fn new(N: u8, m: u8, p0: Prob, p1: Prob, dropout_rate: Prob) -> Self {
+        let factory = Factory { N: N, m: m, p0: p0, p1: p1};
         Readout {
             prob_call_exact: factory.prob_call_exact().ln(),
             prob_call_mismatch: factory.prob_call_mismatch().ln(),
             prob_miscall_exact: factory.prob_miscall_exact().ln(),
             prob_miscall_mismatch: factory.prob_miscall_mismatch().ln(),
-            prob_missed: factory.prob_missed().ln()
+            prob_missed: factory.prob_missed().ln(),
+            prob_dropout: dropout_rate.ln()
         }
     }
 
@@ -111,7 +113,7 @@ impl Readout {
                        self.prob_miscall_mismatch * (x_m + i - count_exact) as f64;
             combs + prob
         }).collect_vec();
-        let likelihood = self.prob_missed * (x - x_c) as f64 + logprobs::log_prob_sum(&summands);
+        let likelihood = (self.prob_missed + self.prob_dropout) * (x - x_c) as f64 + logprobs::log_prob_sum(&summands);
         assert!(!likelihood.is_nan());
         likelihood
     }
@@ -161,7 +163,7 @@ mod tests {
     fn test_prob_missed() {
         let p = factory.prob_missed();
         println!("{}", p);
-        assert!(p.approx_eq(&0.053047441463627984));
+        assert!(p.approx_eq(&0.21822058901379174));
     }
 
     #[test]

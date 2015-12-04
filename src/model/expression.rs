@@ -45,9 +45,10 @@ mod tests {
     const m: u8 = 4;
     const p0: Prob = 0.04;
     const p1: Prob = 0.1;
+    const dropout_rate: Prob = 0.15;
 
     fn setup() -> model::Readout {
-        model::Readout::new(N, m, p0, p1)
+        model::Readout::new(N, m, p0, p1, dropout_rate)
     }
 
     #[test]
@@ -56,7 +57,7 @@ mod tests {
         let pmf = pmf(0, 0, &readout);
 
         println!("{:?}", pmf);
-        assert!(false);
+        assert_eq!(pmf.map(), 0.0);
     }
 }
 /*

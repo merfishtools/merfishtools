@@ -9,16 +9,19 @@ contexts = ["paper"]
 
 rule all:
     input:
-        "diffexp/140genesData.A-vs-B.txt",
-        expand("results/{context}/foldchange_cdf/140genesData.A-vs-B.{gene}.pdf", gene=config["genes"], context=contexts),
-        expand("results/{context}/expression_pmf/140genesData.{gene}.X.pdf", gene=config["genes"], context=contexts),
         expand([
-            "results/{context}/140genesData.pca.pdf",
-            "results/{context}/140genesData.all.expression_dist.pdf",
-            "results/{context}/140genesData.all.overdispersion.pdf",
-            "results/{context}/140genesData.all.correlation.pdf"
-        ], context=contexts),
-        expand("results/{context}/140genesData.expmnt{expmnt}.expression_dist.pdf", context=contexts, expmnt=[1, 2])
+            "results/{context}/foldchange_cdf/140genesData.A-vs-B.{gene}.{settings}.foldchange_cdf.pdf",
+            "results/{context}/expression_pmf/140genesData.{gene}.X.{settings}.expression_pmf.pdf"
+        ], gene=config["genes"], context=contexts, settings=config["settings"]),
+        expand([
+            "results/{context}/140genesData.{settings}.pca.pdf",
+            "results/{context}/140genesData.all.{settings}.expression_dist.pdf",
+            "results/{context}/140genesData.all.{settings}.overdispersion.pdf",
+            "results/{context}/140genesData.all.{settings}.correlation.pdf"
+        ], context=contexts, settings=config["settings"]),
+        expand(
+            "results/{context}/140genesData.expmnt{expmnt}.{settings}.expression_dist.pdf",
+            context=contexts, expmnt=[1, 2], settings=config["settings"])
 
 
 
@@ -40,27 +43,31 @@ rule expressions:
     input:
         "data/{dataset}.sorted.txt"
     output:
-        pmf="expressions/{dataset}.{group}.txt",
-        est="expressions/{dataset}.{group}.est.txt",
+        pmf="expressions/{dataset}.{group}.{settings}.txt",
+        est="expressions/{dataset}.{group}.{settings}.est.txt",
     params:
         expmnts=lambda wildcards: config["groups"][wildcards.group]["expmnts"],
-        cells=lambda wildcards: config["groups"][wildcards.group]["cells"]
+        cells=lambda wildcards: config["groups"][wildcards.group]["cells"],
+        dropout_rate=lambda wildcards: config["settings"][wildcards.settings]["dropout_rate"]
+    benchmark:
+        "bench/exp/{dataset}.{group}.{settings}.txt"
     threads: 8
     shell:
-        "{merfishtools} exp --estimate {output.est} -t {threads} "
+        "{merfishtools} exp --dropout-rate {params.dropout_rate} "
+        "--estimate {output.est} -t {threads} "
         "--expmnts '{params.expmnts}' --cells '{params.cells}' < {input} "
         "> {output.pmf}"
 
 
 rule diffexp:
     input:
-        "expressions/{dataset}.{group1}.txt",
-        "expressions/{dataset}.{group2}.txt"
+        "expressions/{dataset}.{group1}.{settings}.txt",
+        "expressions/{dataset}.{group2}.{settings}.txt"
     output:
-        pmf="diffexp/{dataset}.{group1}-vs-{group2}.txt",
-        est="diffexp/{dataset}.{group1}-vs-{group2}.est.txt"
+        pmf="diffexp/{dataset}.{group1}-vs-{group2}.{settings}.txt",
+        est="diffexp/{dataset}.{group1}-vs-{group2}.{settings}.est.txt"
     benchmark:
-        "bench/diffexp/{dataset}.{group1}-vs-{group2}.txt"
+        "bench/diffexp/{dataset}.{group1}-vs-{group2}.{settings}.txt"
     threads: 8
     shell:
         "{merfishtools} diffexp -t {threads} --pmf {output.pmf} {input} "
@@ -69,65 +76,65 @@ rule diffexp:
 
 rule plot_expression_pmf:
     input:
-        expr="expressions/{dataset}.{group}.txt",
+        expr="expressions/{dataset}.{group}.{settings}.txt",
         raw="data/{dataset}.sorted.txt"
     output:
-        "results/{context}/expression_pmf/{dataset}.{gene}.{group}.svg"
+        "results/{context}/expression_pmf/{dataset}.{gene}.{group}.{settings}.expression_pmf.svg"
     script:
         "scripts/plot-expression-pmf.py"
 
 
 rule plot_foldchange_cdf:
     input:
-        pmf="diffexp/{dataset}.{group1}-vs-{group2}.txt",
-        est="diffexp/{dataset}.{group1}-vs-{group2}.est.txt"
+        pmf="diffexp/{dataset}.{group1}-vs-{group2}.{settings}.txt",
+        est="diffexp/{dataset}.{group1}-vs-{group2}.{settings}.est.txt"
     output:
-        "results/{context}/foldchange_cdf/{dataset}.{group1}-vs-{group2}.{gene}.svg"
+        "results/{context}/foldchange_cdf/{dataset}.{group1}-vs-{group2}.{gene}.{settings}.foldchange_cdf.svg"
     script:
         "scripts/plot-foldchange-cdf.py"
 
 
 rule expression_matrix:
     input:
-        "expressions/{dataset}.{group}.est.txt"
+        "expressions/{dataset}.{group}.{settings}.est.txt"
     output:
-        "expressions/{dataset}.{group}.matrix.txt"
+        "expressions/{dataset}.{group}.{settings}.matrix.txt"
     script:
         "scripts/expression-matrix.py"
 
 
 rule plot_expression_dist:
     input:
-        "expressions/{dataset}.{group}.matrix.txt"
+        "expressions/{dataset}.{group}.{settings}.matrix.txt"
     output:
-        "results/{context}/{dataset}.{group}.expression_dist.svg"
+        "results/{context}/{dataset}.{group}.{settings}.expression_dist.svg"
     script:
         "scripts/plot-expression-dist.py"
 
 
 rule plot_overdispersion:
     input:
-        "expressions/{dataset}.{group}.matrix.txt"
+        "expressions/{dataset}.{group}.{settings}.matrix.txt"
     output:
-        "results/{context}/{dataset}.{group}.overdispersion.svg"
+        "results/{context}/{dataset}.{group}.{settings}.overdispersion.svg"
     script:
         "scripts/plot-overdispersion.py"
 
 
 rule plot_correlation:
     input:
-        "expressions/{dataset}.{group}.matrix.txt"
+        "expressions/{dataset}.{group}.{settings}.matrix.txt"
     output:
-        "results/{context}/{dataset}.{group}.correlation.svg"
+        "results/{context}/{dataset}.{group}.{settings}.correlation.svg"
     script:
         "scripts/plot-correlation.py"
 
 
 rule plot_pca:
     input:
-        "expressions/{dataset}.all.matrix.txt"
+        "expressions/{dataset}.all.{settings}.matrix.txt"
     output:
-        "results/{context}/{dataset}.pca.svg"
+        "results/{context}/{dataset}.{settings}.pca.svg"
     script:
         "scripts/plot-pca.py"
 

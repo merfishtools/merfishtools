@@ -58,11 +58,11 @@ mod tests {
     const m: u8 = 4;
     const p0: Prob = 0.04;
     const p1: Prob = 0.1;
-
+    const dropout_rate: Prob = 0.15;
 
 
     fn setup() -> model::Readout {
-        model::Readout::new(N, m, p0, p1)
+        model::Readout::new(N, m, p0, p1, dropout_rate)
     }
 
     #[test]
@@ -90,7 +90,7 @@ mod tests {
 
         println!("{:?}", total);
         println!("ev={}", pmf.expected_value());
-        assert!(pmf.expected_value().approx_eq(&9.070430066772333));
+        assert!(pmf.expected_value().approx_eq(&9.084365947078265));
         assert!(total.approx_eq(&-0.00000948431106451153));
     }
 }

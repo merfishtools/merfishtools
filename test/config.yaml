@@ -18,6 +18,12 @@ groups:
     expmnts: "^2$"
     cells: ".*"
 
+settings:
+  drop:
+    dropout_rate: 0.15
+  nodrop:
+    dropout_rate: 0.0
+
 genes:
   - COL5A1
   - BRCA2
