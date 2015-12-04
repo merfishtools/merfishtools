@@ -3,3 +3,4 @@ snakemake
 scikit-learn
 pandas
 seaborn
+bitarray

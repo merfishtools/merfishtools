@@ -21,7 +21,10 @@ rule all:
         ], context=contexts, settings=config["settings"]),
         expand(
             "results/{context}/140genesData.expmnt{expmnt}.{settings}.expression_dist.pdf",
-            context=contexts, expmnt=[1, 2], settings=config["settings"])
+            context=contexts, expmnt=[1, 2], settings=config["settings"]),
+        expand(
+            "results/{context}/simulation/{codebook}.count_accuracy.pdf",
+            context=contexts, codebook="140genes.1")
 
 
 
@@ -137,6 +140,39 @@ rule plot_pca:
         "results/{context}/{dataset}.{settings}.pca.svg"
     script:
         "scripts/plot-pca.py"
+
+
+rule plot_codebook:
+    input:
+        "data/{codebook}.codebook.txt"
+    output:
+        "results/{context}/codebook/{codebook}.neighbors.svg"
+    params:
+        neighbor_dist=4
+    script:
+        "scripts/plot-codebook-neighbors.py"
+
+
+rule simulate:
+    input:
+        "data/{codebook}.codebook.txt"
+    output:
+        sim_counts="simulated/{codebook}.counts.sim.txt",
+        known_counts="simulated/{codebook}.counts.known.txt"
+    params:
+        cell_count=10
+    script:
+        "scripts/simulate-counts.py"
+
+
+rule plot_simulation:
+    input:
+        sim_counts="simulated/{codebook}.counts.sim.txt",
+        known_counts="simulated/{codebook}.counts.known.txt"
+    output:
+        "results/{context}/simulation/{codebook}.count_accuracy.svg"
+    script:
+        "scripts/plot-simulation.py"
 
 
 rule svg2pdf:

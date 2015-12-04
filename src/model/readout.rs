@@ -75,8 +75,7 @@ pub struct Readout {
     prob_call_mismatch: LogProb,
     prob_miscall_exact: LogProb,
     prob_miscall_mismatch: LogProb,
-    prob_missed: LogProb,
-    prob_dropout: LogProb
+    prob_missed: LogProb
 }
 
 
@@ -88,8 +87,7 @@ impl Readout {
             prob_call_mismatch: factory.prob_call_mismatch().ln(),
             prob_miscall_exact: factory.prob_miscall_exact().ln(),
             prob_miscall_mismatch: factory.prob_miscall_mismatch().ln(),
-            prob_missed: factory.prob_missed().ln(),
-            prob_dropout: dropout_rate.ln()
+            prob_missed: (factory.prob_missed() + dropout_rate).ln()
         }
     }
 
@@ -113,7 +111,7 @@ impl Readout {
                        self.prob_miscall_mismatch * (x_m + i - count_exact) as f64;
             combs + prob
         }).collect_vec();
-        let likelihood = (self.prob_missed + self.prob_dropout) * (x - x_c) as f64 + logprobs::log_prob_sum(&summands);
+        let likelihood = self.prob_missed * (x - x_c) as f64 + logprobs::log_prob_sum(&summands);
         assert!(!likelihood.is_nan());
         likelihood
     }

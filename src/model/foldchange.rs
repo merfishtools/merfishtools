@@ -90,7 +90,7 @@ mod tests {
 
         println!("{:?}", total);
         println!("ev={}", pmf.expected_value());
-        assert!(pmf.expected_value().approx_eq(&9.084365947078265));
-        assert!(total.approx_eq(&-0.00000948431106451153));
+        assert!(pmf.expected_value().approx_eq(&8.745319628714537));
+        assert!(total.approx_eq(&-0.000015509492362397737));
     }
 }
