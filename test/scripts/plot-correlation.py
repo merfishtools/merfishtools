@@ -14,16 +14,14 @@ sns.set(style="ticks", palette="colorblind", context=snakemake.wildcards.context
 fig = plt.figure(figsize=snakemake.config["plots"]["figsize"])
 
 ax = fig.add_subplot(111, aspect='equal')
-exprs = pd.read_table(snakemake.input[0], index_col=0, header=[0, 1])
 
 expr_a = pd.Series()
 expr_b = pd.Series()
-
-for expmnt, expr in exprs.groupby(level="expmnt", axis=1):
-    if int(expmnt) == 1:
-        for a, b in combinations(expr.columns, 2):
-            expr_a = expr_a.append(expr[a])
-            expr_b = expr_b.append(expr[b])
+for f in snakemake.input[:1]:
+    exprs = pd.read_table(f, index_col=0)
+    for a, b in combinations(exprs.columns, 2):
+        expr_a = expr_a.append(exprs[a])
+        expr_b = expr_b.append(exprs[b])
 
 expr_a = np.log10(1 + expr_a)
 expr_b = np.log10(1 + expr_b)

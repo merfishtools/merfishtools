@@ -14,15 +14,14 @@ def plot_pmf(values, probs):
 sns.set(style="ticks", palette="colorblind", context=snakemake.wildcards.context)
 plt.figure(figsize=snakemake.config["plots"]["figsize"])
 
-pmf = pd.read_table(snakemake.input.expr, index_col=2)
+pmf = pd.read_table(snakemake.input.expr, index_col=1)
 pmf = pmf.loc[snakemake.wildcards.gene]
-expmnt, cell = map(int, pmf.iloc[0][["expmnt", "cell"]])
 
-raw = pd.read_table(snakemake.input.raw, index_col=[0, 2, 3])
-raw = raw.loc[expmnt, cell, snakemake.wildcards.gene]
+raw_counts = pd.read_table(snakemake.input.raw_counts, index_col=1)
+raw_counts = raw_counts.loc[snakemake.wildcards.gene]
 
-count_exact = raw["Exact_Match"].sum()
-count_corrected = raw["Corrected_Match"].sum()
+count_exact = raw_counts["exact"]
+count_corrected = raw_counts["corrected"]
 count_total = count_exact + count_corrected
 
 plot_pmf(pmf["expr"], np.exp(pmf["prob"]))

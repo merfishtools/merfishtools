@@ -100,7 +100,6 @@ fn exp(args: Vec<String>) {
     let mut dropout_rate = 0.15;
     let mut threads = 1;
     let mut estimate_path = None;
-    let mut experiments = ".*".to_owned();
     let mut cells = ".*".to_owned();
 
     {
@@ -129,11 +128,10 @@ Output is formatted into columns: experiment, cell, feature, expected value, sta
         ap.refer(&mut dropout_rate).add_option(&["--dropout-rate"], Store, "Expected dropout rate (e.g. molecules outside the focal plane).");
         ap.refer(&mut threads)
           .add_option(&["--threads", "-t"], Store, "Number of threads to use.");
-        ap.refer(&mut experiments).add_option(&["--experiments", "--expmnts"], Store, "Regular expression for experiments to select (default: all).");
         ap.refer(&mut cells).add_option(&["--cells"], Store, "Regular expression for cells to select (default: all).");
         parse_args_or_exit(&ap, args);
     }
-    cli::expression(N, m, p0, p1, dropout_rate, estimate_path, threads, &experiments, &cells);
+    cli::expression(N, m, p0, p1, dropout_rate, estimate_path, threads, &cells);
 }
 
 

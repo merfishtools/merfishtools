@@ -11,11 +11,10 @@ sns.set(style="ticks", palette="colorblind", context=snakemake.wildcards.context
 plt.figure(figsize=snakemake.config["plots"]["figsize"])
 ax = plt.subplot(111, aspect="equal")
 
-exprs = pd.read_table(snakemake.input[0], index_col=0, header=[0, 1])
-
-for expmnt, expr in exprs.groupby(level="expmnt", axis=1):
-    mean = expr.mean(axis="columns")
-    var = expr.var(axis="columns")
+for f in snakemake.input:
+    exprs = pd.read_table(f, index_col=0)
+    mean = exprs.mean(axis="columns")
+    var = exprs.var(axis="columns")
     plt.loglog(mean, var, "k.", alpha=0.5)
 max_val = max(plt.xlim()[1], plt.ylim()[1])
 min_val = min(plt.xlim()[0], plt.ylim()[0])

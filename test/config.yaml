@@ -1,22 +1,8 @@
 groups:
-  A:
-    expmnts: "^1$"
-    cells: ".*"
-  B:
-    expmnts: "^2$"
-    cells: ".*"
-  X:
-    expmnts: "^1$"
-    cells: "^0$"
-  all:
-    expmnts: ".*"
-    cells: ".*"
-  expmnt1:
-    expmnts: "^1$"
-    cells: ".*"
-  expmnt2:
-    expmnts: "^2$"
-    cells: ".*"
+  A: "^[0-9]$"
+  B: "^1[0-9]$"
+  cell0: "^0$"
+  all: ".*"
 
 settings:
   drop:
@@ -30,6 +16,8 @@ genes:
   - CKAP5
   - GTF3C1
   - ATP11A
+
+experiment_count: 7
 
 plots:
   figsize: [4.224, 2.904]

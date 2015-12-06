@@ -10,7 +10,9 @@ from matplotlib import gridspec
 
 
 # load data
-exprs = np.log10(1 + pd.read_table(snakemake.input[0], index_col=0, header=[0, 1]).transpose())
+exprs = [pd.read_table(snakemake.input[0], index_col=0) for f in snakemake.input]
+exprs = pd.concat(exprs, axis="columns", keys=range(1, len(snakemake.input) + 1))
+exprs = np.log10(1 + exprs.transpose())
 
 # calculate PCA
 spca = decomposition.PCA(n_components=3)
@@ -31,7 +33,7 @@ plt.figure(figsize=(width * 3, height))
 gs = gridspec.GridSpec(1, 3)
 for i, (a, b) in enumerate(pcs):
     ax = plt.subplot(gs[0, i])
-    for expmnt, _scores in scores.groupby(level="expmnt"):
+    for expmnt, _scores in scores.groupby(level=0):
         ax.plot(_scores.loc[:, a], _scores.loc[:, b], ".", label=expmnt, markersize=4, alpha=0.9)
     #if i == 2:
     #    ax.legend(bbox_to_anchor=(1.6, 1), title="experiment")

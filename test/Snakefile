@@ -10,67 +10,64 @@ contexts = ["paper"]
 rule all:
     input:
         expand([
-            "results/{context}/foldchange_cdf/140genesData.A-vs-B.{gene}.{settings}.foldchange_cdf.pdf",
-            "results/{context}/expression_pmf/140genesData.{gene}.X.{settings}.expression_pmf.pdf"
+            "results/{context}/foldchange_cdf/140genesData.1.A-vs-B.{gene}.{settings}.foldchange_cdf.pdf",
+            "results/{context}/expression_pmf/140genesData.1.cell0.{gene}.{settings}.expression_pmf.pdf"
         ], gene=config["genes"], context=contexts, settings=config["settings"]),
         expand([
             "results/{context}/140genesData.{settings}.pca.pdf",
-            "results/{context}/140genesData.all.{settings}.expression_dist.pdf",
-            "results/{context}/140genesData.all.{settings}.overdispersion.pdf",
-            "results/{context}/140genesData.all.{settings}.correlation.pdf"
-        ], context=contexts, settings=config["settings"]),
-        expand(
-            "results/{context}/140genesData.expmnt{expmnt}.{settings}.expression_dist.pdf",
-            context=contexts, expmnt=[1, 2], settings=config["settings"]),
-        expand(
-            "results/{context}/simulation/{codebook}.count_accuracy.pdf",
-            context=contexts, codebook="140genes.1")
+            "results/{context}/140genesData.{settings}.expression_dist.pdf",
+            "results/{context}/140genesData.{settings}.overdispersion.pdf",
+            "results/{context}/140genesData.{settings}.correlation.pdf"
+        ], context=contexts, settings=config["settings"])
+        #expand(
+        #    "results/{context}/simulation/{codebook}.count_accuracy.pdf",
+        #    context=contexts, codebook="140genes.1")
 
 
-
-rule plots:
+rule format:
     input:
-        expand("results/expression_pmf/140genesData/{gene}.svg", gene="AFAP1 COL5A1".split())
-
-
-rule sort:
-    input:
-        "data/140genesData.csv.bz2"
+        "data/{dataset}.csv.bz2"
     output:
-        "data/140genesData.sorted.txt"
-    shell:
-        r"bzcat {input} | xsv sort -d '\t' | xsv fmt -t '\t' > {output}"
+        "data/{dataset}.{experiment}.{group}.txt"
+    script:
+        "scripts/format-dataset.py"
+
+
+
+rule raw_counts:
+    input:
+        "data/{dataset}.{experiment}.{group}.txt"
+    output:
+        "counts/{dataset}.{experiment}.{group}.txt"
+    script:
+        "scripts/raw-counts.py"
 
 
 rule expressions:
     input:
-        "data/{dataset}.sorted.txt"
+        "data/{dataset}.{experiment}.{group}.txt"
     output:
-        pmf="expressions/{dataset}.{group}.{settings}.txt",
-        est="expressions/{dataset}.{group}.{settings}.est.txt",
+        pmf="expressions/{dataset,[^\.]+}.{experiment}.{group}.{settings}.txt",
+        est="expressions/{dataset}.{experiment}.{group}.{settings}.est.txt",
     params:
-        expmnts=lambda wildcards: config["groups"][wildcards.group]["expmnts"],
-        cells=lambda wildcards: config["groups"][wildcards.group]["cells"],
         dropout_rate=lambda wildcards: config["settings"][wildcards.settings]["dropout_rate"]
     benchmark:
-        "bench/exp/{dataset}.{group}.{settings}.txt"
+        "bench/exp/{dataset}.{experiment}.{group}.{settings}.txt"
     threads: 8
     shell:
         "{merfishtools} exp --dropout-rate {params.dropout_rate} "
-        "--estimate {output.est} -t {threads} "
-        "--expmnts '{params.expmnts}' --cells '{params.cells}' < {input} "
-        "> {output.pmf}"
+        "--estimate {output.est} -t {threads} < {input} > {output.pmf}"
 
 
 rule diffexp:
     input:
-        "expressions/{dataset}.{group1}.{settings}.txt",
-        "expressions/{dataset}.{group2}.{settings}.txt"
+        "expressions/{dataset}.{experiment}.{group1}.{settings}.txt",
+        "expressions/{dataset}.{experiment}.{group2}.{settings}.txt"
     output:
-        pmf="diffexp/{dataset}.{group1}-vs-{group2}.{settings}.txt",
-        est="diffexp/{dataset}.{group1}-vs-{group2}.{settings}.est.txt"
+        pmf="diffexp/{dataset}.{experiment}.{group1}-vs-{group2}.{settings}.txt",
+        est="diffexp/{dataset}.{experiment}.{group1}-vs-{group2}.{settings}.est.txt"
     benchmark:
-        "bench/diffexp/{dataset}.{group1}-vs-{group2}.{settings}.txt"
+        "bench/diffexp/{dataset}.{experiment}.{group1}-vs-{group2}.{settings}.txt"
     threads: 8
     shell:
         "{merfishtools} diffexp -t {threads} --pmf {output.pmf} {input} "
@@ -79,63 +76,66 @@ rule diffexp:
 
 rule plot_expression_pmf:
     input:
-        expr="expressions/{dataset}.{group}.{settings}.txt",
-        raw="data/{dataset}.sorted.txt"
+        expr="expressions/{dataset}.{experiment}.{group}.{settings}.txt",
+        raw_counts="counts/{dataset}.{experiment}.{group}.txt"
     output:
-        "results/{context}/expression_pmf/{dataset}.{gene}.{group}.{settings}.expression_pmf.svg"
+        "results/{context}/expression_pmf/{dataset}.{experiment}.{group}.{gene}.{settings}.expression_pmf.svg"
     script:
         "scripts/plot-expression-pmf.py"
 
 
 rule plot_foldchange_cdf:
     input:
-        pmf="diffexp/{dataset}.{group1}-vs-{group2}.{settings}.txt",
-        est="diffexp/{dataset}.{group1}-vs-{group2}.{settings}.est.txt"
+        pmf="diffexp/{dataset}.{experiment}.{group1}-vs-{group2}.{settings}.txt",
+        est="diffexp/{dataset}.{experiment}.{group1}-vs-{group2}.{settings}.est.txt"
     output:
-        "results/{context}/foldchange_cdf/{dataset}.{group1}-vs-{group2}.{gene}.{settings}.foldchange_cdf.svg"
+        "results/{context}/foldchange_cdf/{dataset}.{experiment}.{group1}-vs-{group2}.{gene}.{settings}.foldchange_cdf.svg"
     script:
         "scripts/plot-foldchange-cdf.py"
 
 
 rule expression_matrix:
     input:
-        "expressions/{dataset}.{group}.{settings}.est.txt"
+        "expressions/{dataset}.{experiment}.{group}.{settings}.est.txt"
     output:
-        "expressions/{dataset}.{group}.{settings}.matrix.txt"
+        "expressions/{dataset}.{experiment}.{group}.{settings}.matrix.txt"
     script:
         "scripts/expression-matrix.py"
 
 
+matrices = expand("expressions/{{dataset}}.{experiment}.all.{{settings}}.matrix.txt", experiment=range(1, config["experiment_count"] + 1))
+
+
 rule plot_expression_dist:
     input:
-        "expressions/{dataset}.{group}.{settings}.matrix.txt"
+        matrices
     output:
-        "results/{context}/{dataset}.{group}.{settings}.expression_dist.svg"
+        "results/{context}/{dataset}.{settings}.expression_dist.svg"
     script:
         "scripts/plot-expression-dist.py"
 
 
 rule plot_overdispersion:
     input:
-        "expressions/{dataset}.{group}.{settings}.matrix.txt"
+        matrices
     output:
-        "results/{context}/{dataset}.{group}.{settings}.overdispersion.svg"
+        "results/{context}/{dataset}.{settings}.overdispersion.svg"
     script:
         "scripts/plot-overdispersion.py"
 
 
 rule plot_correlation:
     input:
-        "expressions/{dataset}.{group}.{settings}.matrix.txt"
+        matrices
     output:
-        "results/{context}/{dataset}.{group}.{settings}.correlation.svg"
+        "results/{context}/{dataset}.{settings}.correlation.svg"
     script:
         "scripts/plot-correlation.py"
 
 
 rule plot_pca:
     input:
-        "expressions/{dataset}.all.{settings}.matrix.txt"
+        matrices
     output:
         "results/{context}/{dataset}.{settings}.pca.svg"
     script:

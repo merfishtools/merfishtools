@@ -29,10 +29,10 @@ lookup_corrected = {w.tobytes(): gene for gene, word in codebook.items() for w i
 
 with open(snakemake.output.known_counts, "w") as known_out, open(snakemake.output.sim_counts, "w") as sim_out:
     known_out = csv.writer(known_out, delimiter="\t")
-    known_out.writerow(["cell", "gene", "known_count"])
+    known_out.writerow(["expmnt", "cell", "gene", "known_count"])
 
     sim_out = csv.writer(sim_out, delimiter="\t")
-    sim_out.writerow(["cell", "gene", "exact", "corrected"])
+    sim_out.writerow(["expmnt", "cell", "gene", "dist", "cell_pos_x", "cell_pos_y", "rna_pos_x", "rna_pos_y"])
 
     for cell in range(snakemake.params.cell_count):
         readouts = []
@@ -43,7 +43,7 @@ with open(snakemake.output.known_counts, "w") as known_out, open(snakemake.outpu
                 readouts.extend(sim_errors(word) for _ in range(count))
             else:
                 count = 0
-            known_out.writerow([cell, gene, count])
+            known_out.writerow([1, cell, gene, count])
 
         exact_counts = Counter()
         corrected_counts = Counter()
@@ -58,4 +58,7 @@ with open(snakemake.output.known_counts, "w") as known_out, open(snakemake.outpu
                     pass
 
         for gene in set(chain(exact_counts, corrected_counts)):
-            sim_out.writerow([cell, gene, exact_counts[gene], corrected_counts[gene]])
+            for _ in exact_counts[gene]:
+                sim_out.writerow([1, cell, gene, 0, 0, 0, 0, 0])
+            for _ in corrected_counts[gene]:
+                sim_out.writerow([1, cell, gene, 1, 0, 0, 0, 0])

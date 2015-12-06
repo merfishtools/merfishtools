@@ -14,12 +14,9 @@ pub struct Position {
 
 #[derive(RustcDecodable)]
 pub struct Record {
-    pub experiment: String,
-    pub codebook: String,
     pub cell_id: String,
     pub feature: String,
-    pub exact_match: u8,
-    pub corrected_match: u8,
+    pub hamming_dist: u8,
     pub cell_position: Position,
     pub rna_position: Position
 }
@@ -58,9 +55,9 @@ mod tests {
 
     #[test]
     fn test_records() {
-        let data = b"Experiment	Codebook	Cell_ID	Gene_Name	Exact_Match	Corrected_Match	Cell_Position_X	Cell_Position_Y	RNA_Position_X	RNA_Position_Y
-1	1	0	SCUBE3	0	1	475.5	630.6	13146.86026973	25793.5656964
-1	1	0	SCUBE3	0	1	475.5	630.6	13576.7356895	38396.4273422
+        let data = b"Cell_ID	Gene_Name	Hamming_Distance	Cell_Position_X	Cell_Position_Y	RNA_Position_X	RNA_Position_Y
+0	SCUBE3	1	475.5	630.6	13146.86026973	25793.5656964
+0	SCUBE3	1	475.5	630.6	13576.7356895	38396.4273422
 ";
         let mut reader = Reader::from_reader(io::Cursor::new(&data[..]));
         for r in reader.records() {

@@ -23,14 +23,13 @@ impl<W: io::Write> Writer<W> {
         let mut writer = Writer {
             inner: csv::Writer::from_writer(w).delimiter(b'\t')
         };
-        writer.inner.write(["expmnt", "cell", "feat", "expr_ev", "expr_sd"].iter()).unwrap();
+        writer.inner.write(["cell", "feat", "expr_ev", "expr_sd"].iter()).unwrap();
 
         writer
     }
 
-    pub fn write(&mut self, experiment: &str, cell: &str, feature: &str, expected_value: f64, standard_deviation: f64) {
+    pub fn write(&mut self, cell: &str, feature: &str, expected_value: f64, standard_deviation: f64) {
         self.inner.write([
-            experiment,
             cell,
             feature,
             &format!("{:.*}", 2, expected_value)[..],

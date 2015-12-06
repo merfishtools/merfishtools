@@ -27,13 +27,12 @@ struct Counts {
 }
 
 
-pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dropout_rate: Prob, estimate_path: Option<String>, threads: usize, experiments: &str, cells: &str) {
+pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dropout_rate: Prob, estimate_path: Option<String>, threads: usize, cells: &str) {
     let readout_model = model::Readout::new(N, m, p0, p1, dropout_rate);
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
     let mut pmf_writer = io::pmf::expression::Writer::from_writer(std::io::stdout());
     let mut est_writer = estimate_path.map(|path| io::estimation::expression::Writer::from_file(path));
 
-    let experiments = Regex::new(experiments).ok().expect("Invalid regular expression for experiments.");
     let cells = Regex::new(cells).ok().expect("Invalid regular expression for cells.");
 
     let mut counts = collections::HashMap::new();
@@ -41,7 +40,7 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dropout_rate: Prob, estimate
     for record in reader.records().filter_map(|res| {
             let rec = res.unwrap();
             features.insert(rec.feature.clone());
-            if experiments.is_match(&rec.experiment) && cells.is_match(&rec.cell_id) {
+            if cells.is_match(&rec.cell_id) {
                 Some(rec)
             }
             else {
@@ -49,13 +48,16 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dropout_rate: Prob, estimate
             }
         }
     ) {
-        let cell_counts = counts.entry((record.experiment, record.cell_id)).or_insert_with(collections::HashMap::new);
+        let cell_counts = counts.entry(record.cell_id).or_insert_with(collections::HashMap::new);
         let feature_counts = cell_counts.entry(record.feature).or_insert(Counts{ exact: 0, corrected: 0});
-        if record.exact_match == 1 {
+        if record.hamming_dist == 0 {
             feature_counts.exact += 1;
         }
-        else {
+        else if record.hamming_dist == 1 {
             feature_counts.corrected += 1;
+        }
+        else {
+            panic!("Hamming distance of greater than 1 is unsupported at the moment.")
         }
     }
     for (_, cell_counts) in counts.iter_mut() {
@@ -67,18 +69,17 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dropout_rate: Prob, estimate
 
     let mut pool = simple_parallel::Pool::new(threads);
     crossbeam::scope(|scope| {
-        for (_, (experiment, cell, pmfs)) in pool.unordered_map(scope, counts.into_iter(), |((experiment, cell), counts)| {
+        for (_, (cell, pmfs)) in pool.unordered_map(scope, counts.into_iter(), |(cell, counts)| {
             let pmfs = counts.into_iter().map(|(feature, count)| {
                 (feature, model::expression::pmf(count.exact + count.corrected, count.corrected, &readout_model))
             }).collect_vec();
-            (experiment, cell, pmfs)
+            (cell, pmfs)
         }) {
             for (feature, pmf) in pmfs {
-                pmf_writer.write(&experiment, &cell, &feature, &pmf);
+                pmf_writer.write(&cell, &feature, &pmf);
 
                 if let Some(ref mut est_writer) = est_writer {
                     est_writer.write(
-                        &experiment,
                         &cell,
                         &feature,
                         pmf.expected_value(),

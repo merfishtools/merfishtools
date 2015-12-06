@@ -42,7 +42,6 @@ impl PMFs {
 
 #[derive(RustcDecodable, RustcEncodable)]
 pub struct Record {
-    pub experiment: String,
     pub cell: String,
     pub feature: String,
     pub expression: f32,
@@ -110,15 +109,14 @@ impl<W: io::Write> Writer<W> {
         let mut writer = Writer {
             inner: csv::Writer::from_writer(w).delimiter(b'\t')
         };
-        writer.inner.write(["expmnt", "cell", "feat", "expr", "prob"].iter()).unwrap();
+        writer.inner.write(["cell", "feat", "expr", "prob"].iter()).unwrap();
 
         writer
     }
 
-    pub fn write(&mut self, experiment: &str, cell: &str, feature: &str, pmf: &PMF) {
+    pub fn write(&mut self, cell: &str, feature: &str, pmf: &PMF) {
         for x in pmf.iter() {
             self.inner.write([
-                experiment,
                 cell,
                 feature,
                 &format!("{:.0}", x.value)[..],
