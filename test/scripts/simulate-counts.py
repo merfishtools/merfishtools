@@ -15,7 +15,7 @@ def sim_errors(word):
     p = np.random.uniform(0, 1, len(word))
     err10 = bitarray(list(p <= p1)) & word
     err01 = bitarray(list(p <= p0)) & ~word
-    return (word ^ err10) ^ err01
+    return (word ^ err10) ^ err01, err10.count(True) + err01.count(True)
 
 def hamming1_env(word):
     for i in range(len(word)):
@@ -29,21 +29,25 @@ lookup_corrected = {w.tobytes(): gene for gene, word in codebook.items() for w i
 
 with open(snakemake.output.known_counts, "w") as known_out, open(snakemake.output.sim_counts, "w") as sim_out:
     known_out = csv.writer(known_out, delimiter="\t")
-    known_out.writerow(["expmnt", "cell", "gene", "known_count"])
+    known_out.writerow(["cell", "feat", "known_count"])
 
     sim_out = csv.writer(sim_out, delimiter="\t")
-    sim_out.writerow(["expmnt", "cell", "gene", "dist", "cell_pos_x", "cell_pos_y", "rna_pos_x", "rna_pos_y"])
+    sim_out.writerow(["cell", "feat", "dist", "cell_x", "cell_y", "x", "y"])
 
+    errors = []
     for cell in range(snakemake.params.cell_count):
         readouts = []
-        random_counts = np.random.poisson(15, len(codebook))
+        random_counts = np.random.poisson(50, len(codebook))
 
         for (gene, word), count in zip(codebook.items(), random_counts):
             if not gene.startswith("notarget") and not gene.startswith("blank"):
-                readouts.extend(sim_errors(word) for _ in range(count))
+                for _ in range(count):
+                    readout, errs = sim_errors(word)
+                    errors.append(errs)
+                    readouts.append(readout)
             else:
                 count = 0
-            known_out.writerow([1, cell, gene, count])
+            known_out.writerow([cell, gene, count])
 
         exact_counts = Counter()
         corrected_counts = Counter()
@@ -58,7 +62,10 @@ with open(snakemake.output.known_counts, "w") as known_out, open(snakemake.outpu
                     pass
 
         for gene in set(chain(exact_counts, corrected_counts)):
-            for _ in exact_counts[gene]:
-                sim_out.writerow([1, cell, gene, 0, 0, 0, 0, 0])
-            for _ in corrected_counts[gene]:
-                sim_out.writerow([1, cell, gene, 1, 0, 0, 0, 0])
+            for _ in range(exact_counts[gene]):
+                sim_out.writerow([cell, gene, 0, 0, 0, 0, 0])
+            for _ in range(corrected_counts[gene]):
+                sim_out.writerow([cell, gene, 1, 0, 0, 0, 0])
+    errors = pd.Series(errors)
+    print(errors.value_counts())
+    print(errors.value_counts() / errors.sum())

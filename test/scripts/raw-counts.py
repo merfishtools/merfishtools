@@ -10,7 +10,7 @@ def corrected(d):
     return d.sum()
 
 genes = raw.groupby(level=[0, 1])
-counts = pd.DataFrame({"exact": genes["Corrected_Match"].aggregate(exact),
-                       "corrected": genes["Corrected_Match"].aggregate(corrected)})
+counts = pd.DataFrame({"exact": genes["dist"].aggregate(exact),
+                       "corrected": genes["dist"].aggregate(corrected)})
 
 counts.to_csv(snakemake.output[0], sep="\t")

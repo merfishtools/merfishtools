@@ -45,14 +45,14 @@ rule raw_counts:
 
 rule expressions:
     input:
-        "data/{dataset}.{experiment}.{group}.txt"
+        "data/{dataset}.txt"
     output:
-        pmf="expressions/{dataset,[^\.]+}.{experiment}.{group}.{settings}.txt",
-        est="expressions/{dataset}.{experiment}.{group}.{settings}.est.txt",
+        pmf="expressions/{dataset}.{settings}.txt",
+        est="expressions/{dataset}.{settings}.est.txt",
     params:
         dropout_rate=lambda wildcards: config["settings"][wildcards.settings]["dropout_rate"]
     benchmark:
-        "bench/exp/{dataset}.{experiment}.{group}.{settings}.txt"
+        "bench/exp/{dataset}.{settings}.txt"
     threads: 8
     shell:
         "{merfishtools} exp --dropout-rate {params.dropout_rate} "
@@ -155,10 +155,10 @@ rule plot_codebook:
 
 rule simulate:
     input:
-        "data/{codebook}.codebook.txt"
+        "data/140genes.1.codebook.txt"
     output:
-        sim_counts="simulated/{codebook}.counts.sim.txt",
-        known_counts="simulated/{codebook}.counts.known.txt"
+        sim_counts="data/simulated.1.all.txt",
+        known_counts="data/simulated.1.known.txt"
     params:
         cell_count=10
     script:
@@ -167,10 +167,11 @@ rule simulate:
 
 rule plot_simulation:
     input:
-        sim_counts="simulated/{codebook}.counts.sim.txt",
-        known_counts="simulated/{codebook}.counts.known.txt"
+        posterior_counts="expressions/simulated.1.all.{settings}.est.txt",
+        raw_counts="counts/simulated.1.all.txt",
+        known_counts="data/simulated.1.known.txt"
     output:
-        "results/{context}/simulation/{codebook}.count_accuracy.svg"
+        "results/{context}/simulation/squared_error.{settings}.svg"
     script:
         "scripts/plot-simulation.py"
 

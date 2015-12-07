@@ -9,4 +9,5 @@ group = snakemake.config["groups"][snakemake.wildcards.group]
 dataset = dataset[dataset["Cell_ID"].astype(np.str).str.match(group)]
 
 dataset = dataset.loc[:, ["Cell_ID", "Gene_Name", "Corrected_Match", "Cell_Position_X", "Cell_Position_Y", "RNA_Position_X", "RNA_Position_Y"]]
+dataset.columns = ["cell", "feat", "dist", "cell_x", "cell_y", "x", "y"]
 dataset.to_csv(snakemake.output[0], sep="\t", index=False)
