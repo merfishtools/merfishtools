@@ -93,11 +93,11 @@ impl Readout {
     }
 
     pub fn window(&self, count: u32, count_exact: u32) -> (u32, u32) {
-        if count < 10 {
-            (0, 20)
+        if count <= 10 {
+            (0, 25)
         }
         else {
-            (count_exact, count + (count as f64 * self.prob_missed * 3.0) as u32)
+            (cmp::max(0, count as i32 - 10) as u32, count + (count as f64 * self.prob_missed * 4.0) as u32)
         }
     }
 
