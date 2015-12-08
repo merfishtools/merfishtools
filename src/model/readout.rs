@@ -1,8 +1,9 @@
 #![allow(non_snake_case)]
 
 use std::cmp;
+use std::collections::HashMap;
 
-use itertools::Itertools;
+use rgsl::randist::multinomial::multinomial_pdf;
 
 use bio::stats::combinatorics::combinations;
 use bio::stats::logprobs::{Prob, LogProb};
@@ -71,11 +72,11 @@ impl Factory {
 
 /// Readout probabilities.
 pub struct Readout {
-    prob_call_exact: LogProb,
-    prob_call_mismatch: LogProb,
+    prob_call_exact: Prob,
+    prob_call_mismatch: Prob,
     prob_miscall_exact: LogProb,
     prob_miscall_mismatch: LogProb,
-    prob_missed: LogProb
+    prob_missed: Prob
 }
 
 
@@ -83,35 +84,45 @@ impl Readout {
     pub fn new(N: u8, m: u8, p0: Prob, p1: Prob, dropout_rate: Prob) -> Self {
         let factory = Factory { N: N, m: m, p0: p0, p1: p1};
         Readout {
-            prob_call_exact: factory.prob_call_exact().ln(),
-            prob_call_mismatch: factory.prob_call_mismatch().ln(),
+            prob_call_exact: factory.prob_call_exact(),
+            prob_call_mismatch: factory.prob_call_mismatch(),
             prob_miscall_exact: factory.prob_miscall_exact().ln(),
             prob_miscall_mismatch: factory.prob_miscall_mismatch().ln(),
-            prob_missed: (factory.prob_missed() + dropout_rate).ln()
+            prob_missed: factory.prob_missed()
+        }
+    }
+
+    pub fn window(&self, count: u32, count_exact: u32) -> (u32, u32) {
+        if count < 10 {
+            (0, 20)
+        }
+        else {
+            (count_exact, count + (count as f64 * self.prob_missed * 3.0) as u32)
         }
     }
 
     pub fn likelihood(&self, x: u32, count: u32, count_exact: u32) -> LogProb {
-        let x = x as u64;
-        let count = count as u64;
-        let count_exact = count_exact as u64;
+        let x = x;
+        let count = count;
+        let count_exact = count_exact;
+        assert!(count >= count_exact);
 
-        let x_c = cmp::min(count, x);
-        let x_m = count - x_c;
-
-        let imin = if count_exact + x_c > count { count_exact + x_c - count } else { 0 };
-        let imax = cmp::min(count_exact, x) + 1;
-
-        let summands = (imin..imax).map(|i| {
-            let combs = combinations(count_exact, i).ln() +
-                        combinations(count - count_exact, x_c - i).ln();
-            let prob = self.prob_call_exact * i as f64 +
-                       self.prob_call_mismatch * (x_c - i) as f64 +
-                       self.prob_miscall_exact * (count_exact - i) as f64 +
-                       self.prob_miscall_mismatch * (x_m + i - count_exact) as f64;
-            combs + prob
-        }).collect_vec();
-        let likelihood = self.prob_missed * (x - x_c) as f64 + logprobs::log_prob_sum(&summands);
+        // TODO move to expression.rs and implement as dynamic programming over all x
+        let mut summands = Vec::new();
+        let probs = [self.prob_call_exact, self.prob_call_mismatch, self.prob_missed];
+        for i in 0..(cmp::min(x, count) + 1) {
+            let jmax = cmp::min(count_exact, i);
+            let jmin = if count_exact + i > count { count_exact + i - count } else { 0 };
+            for j in jmin..(jmax + 1) {
+                let k = x - i;
+                let p = multinomial_pdf(&probs, &[j, i - j, k]).ln() +
+                        self.prob_miscall_exact *  (count_exact - j) as f64 +
+                        self.prob_miscall_mismatch * (count - count_exact - (i - j)) as f64;
+                summands.push(p);
+            }
+        }
+        //println!("{:?}", summands);
+        let likelihood = logprobs::log_prob_sum(&summands);
         assert!(!likelihood.is_nan());
         likelihood
     }
@@ -122,7 +133,7 @@ impl Readout {
 mod tests {
     #![allow(non_upper_case_globals)]
 
-    use super::{Factory};
+    use super::Factory;
     use nalgebra::ApproxEq;
 
 

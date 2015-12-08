@@ -18,6 +18,7 @@ log = "*"
 fern = "*"
 simple_parallel = "*"
 crossbeam = "*"
+GSL = "*"
 
 [[bin]]
 name = "merfishtools"

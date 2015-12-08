@@ -66,7 +66,6 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dropout_rate: Prob, estimate
         }
     }
 
-
     let mut pool = simple_parallel::Pool::new(threads);
     crossbeam::scope(|scope| {
         for (_, (cell, pmfs)) in pool.unordered_map(scope, counts.into_iter(), |(cell, counts)| {

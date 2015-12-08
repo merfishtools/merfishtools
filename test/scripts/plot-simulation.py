@@ -20,10 +20,15 @@ raw_se = (raw_counts - known_counts) ** 2
 posterior_se = (posterior_counts - known_counts) ** 2
 
 print(raw_se.mean(), posterior_se.mean())
+max_se = max(raw_se.max(), posterior_se.max())
 
 sns.distplot(raw_se, kde=True, hist=False, color="black", label="raw counts")
 sns.distplot(posterior_se, kde=True, hist=False, color="red", label="conditional expectation")
 
+plt.xlim([0, max_se])
+plt.xlabel("squared error")
+plt.ylabel("density")
+plt.legend()
 sns.despine()
 
 plt.savefig(snakemake.output[0], bbox_inches="tight")

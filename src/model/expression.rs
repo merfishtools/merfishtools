@@ -9,8 +9,8 @@ pub type PMF = model::pmf::PMF<f32>;
 
 
 pub fn pmf(count: u32, count_exact: u32, readout_model: &model::Readout) -> PMF {
-    let offset = if count_exact > 50 { count_exact - 50 } else { 0 };
-    let likelihoods = (offset..count + 50).map(|x| {
+    let (offset, xmax) = readout_model.window(count, count_exact);
+    let likelihoods = (offset..xmax).map(|x| {
         readout_model.likelihood(x, count, count_exact)
     }).collect_vec();
     // calculate (marginal / flat_prior)
@@ -33,8 +33,6 @@ pub fn pmf(count: u32, count_exact: u32, readout_model: &model::Readout) -> PMF 
 mod tests {
     #![allow(non_upper_case_globals)]
 
-    use itertools::Itertools;
-    use nalgebra::ApproxEq;
     use bio::stats::logprobs::Prob;
 
     use super::*;

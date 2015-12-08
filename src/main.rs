@@ -19,6 +19,7 @@ extern crate rustc_serialize;
 extern crate simple_parallel;
 extern crate crossbeam;
 extern crate regex;
+extern crate rgsl;
 
 pub mod model;
 pub mod io;
