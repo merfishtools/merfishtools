@@ -6,9 +6,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-def plot_pmf(values, probs):
-    _, _, baseline = plt.stem(values, probs, markerfmt="ko", basefmt="", linefmt="k-")
-    plt.setp(baseline, 'linewidth', 0)
+def plot_pmf(values, probs, stem=False):
+    if stem:
+        _, _, baseline = plt.stem(values, probs, markerfmt="ko", basefmt="", linefmt="k-")
+        plt.setp(baseline, 'linewidth', 0)
+    else:
+        plt.plot(values, probs, "ko", label="")
 
 
 sns.set(style="ticks", palette="colorblind", context=snakemake.wildcards.context)
@@ -24,10 +27,11 @@ count_exact = raw_counts["exact"]
 count_corrected = raw_counts["corrected"]
 count_total = count_exact + count_corrected
 
-plot_pmf(pmf["expr"], np.exp(pmf["prob"]))
-ylim = plt.ylim()
+ylim = (0, np.exp(pmf["prob"]).max())
+
 plt.vlines([count_total], *ylim, colors="red", linestyles="--", label="total count", zorder=5)
 plt.vlines([count_exact], *ylim, colors="black", linestyles="--", label="exact count", zorder=5)
+plot_pmf(pmf["expr"], np.exp(pmf["prob"]))
 plt.ylim(ylim)
 plt.xlabel("expression")
 plt.ylabel("PMF")
