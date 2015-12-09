@@ -9,8 +9,8 @@ pub type PMF = model::pmf::PMF<f32>;
 
 
 pub fn pmf(count: u32, count_exact: u32, readout_model: &model::Readout) -> PMF {
-    let (offset, xmax) = readout_model.window(count, count_exact);
-    let likelihoods = (offset..xmax).map(|x| {
+    let (xmin, xmax) = readout_model.window(count);
+    let likelihoods = (xmin..xmax + 1).map(|x| {
         readout_model.likelihood(x, count, count_exact)
     }).collect_vec();
     // calculate (marginal / flat_prior)
@@ -20,7 +20,7 @@ pub fn pmf(count: u32, count_exact: u32, readout_model: &model::Readout) -> PMF 
     PMF::new(
         likelihoods.iter().enumerate().map(|(x, lh)| {
             model::pmf::Entry{
-                value: (offset + x as u32) as f32,
+                value: (xmin + x as u32) as f32,
                 prob: lh - marginal
             }
         }).filter(|e| e.prob >= model::MIN_PROB).collect_vec()

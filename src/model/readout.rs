@@ -1,7 +1,6 @@
 #![allow(non_snake_case)]
 
 use std::cmp;
-use std::collections::HashMap;
 
 use rgsl::randist::multinomial::multinomial_pdf;
 
@@ -92,13 +91,17 @@ impl Readout {
         }
     }
 
-    pub fn window(&self, count: u32, count_exact: u32) -> (u32, u32) {
-        if count <= 10 {
-            (0, 25)
-        }
-        else {
-            (cmp::max(0, count as i32 - 10) as u32, count + (count as f64 * self.prob_missed * 4.0) as u32)
-        }
+    pub fn window(&self, count: u32) -> (u32, u32) {
+        // i = count and j = count_exact maximize the inner probability of the likelihood because
+        // we have no miscalls then.
+        // Hence we can estimate a good center using the expected value of the multinomial distribution.
+        // E(j) = x * Pr(H=0 | E=e)
+        // E(i - j) = x * Pr(H=1 | E=e)
+        // x * Pr(H=1) = i - x * Pr(H=0)
+        // x = i / (Pr(H=1) + Pr(H=0))
+
+        let center = (count as f64 / (self.prob_call_exact + self.prob_call_mismatch)).round() as i32;
+        (cmp::max(center - 20, 0) as u32, center as u32 + 20)
     }
 
     pub fn likelihood(&self, x: u32, count: u32, count_exact: u32) -> LogProb {
@@ -107,7 +110,6 @@ impl Readout {
         let count_exact = count_exact;
         assert!(count >= count_exact);
 
-        // TODO move to expression.rs and implement as dynamic programming over all x
         let mut summands = Vec::new();
         let probs = [self.prob_call_exact, self.prob_call_mismatch, self.prob_missed];
         for i in 0..(cmp::min(x, count) + 1) {
