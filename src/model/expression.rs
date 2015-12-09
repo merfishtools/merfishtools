@@ -33,7 +33,9 @@ pub fn pmf(count: u32, count_exact: u32, readout_model: &model::Readout) -> PMF 
 mod tests {
     #![allow(non_upper_case_globals)]
 
-    use bio::stats::logprobs::Prob;
+    use itertools::Itertools;
+    use nalgebra::ApproxEq;
+    use bio::stats::logprobs::{Prob, log_prob_sum};
 
     use super::*;
     use model;
@@ -52,10 +54,12 @@ mod tests {
     #[test]
     fn test_pmf() {
         let readout = setup();
-        let pmf = pmf(0, 0, &readout);
+        let pmf = pmf(25, 10, &readout);
 
+        let total = log_prob_sum(&pmf.iter().map(|e| e.prob).collect_vec());
         println!("{:?}", pmf);
-        assert_eq!(pmf.map(), 0.0);
+        println!("{}", total);
+        assert!(total.approx_eq(&-0.0000011368907495423741));
     }
 }
 /*
