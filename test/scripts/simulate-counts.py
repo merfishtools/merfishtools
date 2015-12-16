@@ -17,11 +17,13 @@ def sim_errors(word):
     err01 = bitarray(list(p <= p0)) & ~word
     return (word ^ err10) ^ err01, err10.count(True) + err01.count(True)
 
+
 def hamming1_env(word):
     for i in range(len(word)):
         w = word.copy()
         w[i] ^= 1
         yield w
+
 
 codebook = pd.read_table(snakemake.input[0], index_col=0, dtype=np.dtype(str), squeeze=True).apply(bitarray)
 lookup_exact = {word.tobytes(): gene for gene, word in codebook.items()}
@@ -37,7 +39,7 @@ with open(snakemake.output.known_counts, "w") as known_out, open(snakemake.outpu
     errors = []
     for cell in range(snakemake.params.cell_count):
         readouts = []
-        random_counts = np.random.poisson(50, len(codebook))
+        random_counts = np.random.poisson(int(snakemake.wildcards.mean), len(codebook))
 
         for (gene, word), count in zip(codebook.items(), random_counts):
             if not gene.startswith("notarget") and not gene.startswith("blank"):

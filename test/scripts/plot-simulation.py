@@ -8,27 +8,34 @@ import seaborn as sns
 sns.set(style="ticks", palette="colorblind", context=snakemake.wildcards.context)
 plt.figure(figsize=snakemake.config["plots"]["figsize"])
 
-posterior_counts = pd.read_table(snakemake.input.posterior_counts, index_col=[0, 1])["expr_ev"]
-raw_counts = pd.read_table(snakemake.input.raw_counts, index_col=[0, 1])
-raw_counts = raw_counts["exact"] + raw_counts["corrected"]
-known_counts = pd.read_table(snakemake.input.known_counts, index_col=[0, 1], squeeze=True)
+raw_rmse = []
+posterior_rmse = []
+for posterior_counts, raw_counts, known_counts in zip(
+    snakemake.input.posterior_counts,
+    snakemake.input.raw_counts,
+    snakemake.input.known_counts):
 
-raw_counts = raw_counts.reindex(known_counts.index, fill_value=0)
-posterior_counts = posterior_counts.reindex(known_counts.index, fill_value=0)
+    posterior_counts = pd.read_table(posterior_counts, index_col=[0, 1])["expr_ev"]
+    print(raw_counts)
+    raw_counts = pd.read_table(raw_counts, index_col=[0, 1])
+    raw_counts = raw_counts["exact"] + raw_counts["corrected"]
+    known_counts = pd.read_table(known_counts, index_col=[0, 1], squeeze=True)
 
-raw_se = (raw_counts - known_counts) ** 2
-posterior_se = (posterior_counts - known_counts) ** 2
+    raw_counts = raw_counts.reindex(known_counts.index, fill_value=0)
+    posterior_counts = posterior_counts.reindex(known_counts.index, fill_value=0)
 
-print(raw_se.mean(), posterior_se.mean())
-max_se = max(raw_se.max(), posterior_se.max())
+    raw_se = (raw_counts - known_counts) ** 2
+    posterior_se = (posterior_counts - known_counts) ** 2
 
-sns.distplot(raw_se, kde=True, hist=False, color="black", label="raw counts")
-sns.distplot(posterior_se, kde=True, hist=False, color="red", label="conditional expectation")
+    raw_rmse.append(np.sqrt(raw_se.mean()))
+    posterior_rmse.append(np.sqrt(posterior_se.mean()))
 
-plt.xlim([0, max_se])
-plt.xlabel("squared error")
-plt.ylabel("density")
-plt.legend()
+plt.plot(snakemake.params.means, raw_rmse, "-ko", label="raw counts")
+plt.plot(snakemake.params.means, posterior_rmse, "-ro", label="conditional expectation")
+
+plt.xlabel("mean expression")
+plt.ylabel("RMSE")
+plt.legend(loc="upper left")
 sns.despine()
 
 plt.savefig(snakemake.output[0], bbox_inches="tight")

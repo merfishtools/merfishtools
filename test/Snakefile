@@ -18,10 +18,8 @@ rule all:
             "results/{context}/140genesData.{settings}.expression_dist.pdf",
             "results/{context}/140genesData.{settings}.overdispersion.pdf",
             "results/{context}/140genesData.{settings}.correlation.pdf"
-        ], context=contexts, settings=config["settings"])
-        #expand(
-        #    "results/{context}/simulation/{codebook}.count_accuracy.pdf",
-        #    context=contexts, codebook="140genes.1")
+        ], context=contexts, settings=config["settings"]),
+        expand("results/{context}/simulation/squared_error.nodrop.svg", context=contexts)
 
 
 rule format:
@@ -157,21 +155,26 @@ rule simulate:
     input:
         "data/140genes.1.codebook.txt"
     output:
-        sim_counts="data/simulated.1.all.txt",
-        known_counts="data/simulated.1.known.txt"
+        sim_counts="data/simulated.{mean}.all.txt",
+        known_counts="data/simulated.{mean}.known.txt"
     params:
         cell_count=10
     script:
         "scripts/simulate-counts.py"
 
 
+means = list(range(5, 40, 5))
+
+
 rule plot_simulation:
     input:
-        posterior_counts="expressions/simulated.1.all.{settings}.est.txt",
-        raw_counts="counts/simulated.1.all.txt",
-        known_counts="data/simulated.1.known.txt"
+        posterior_counts=expand("expressions/simulated.{mean}.all.{{settings}}.est.txt", mean=means),
+        raw_counts=expand("counts/simulated.{mean}.all.txt", mean=means),
+        known_counts=expand("data/simulated.{mean}.known.txt", mean=means)
     output:
         "results/{context}/simulation/squared_error.{settings}.svg"
+    params:
+        means=means
     script:
         "scripts/plot-simulation.py"
 
