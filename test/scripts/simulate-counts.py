@@ -9,6 +9,7 @@ from bitarray import bitarray
 
 p0 = 0.04
 p1 = 0.1
+dist = int(snakemake.wildcards.dist)
 
 
 def sim_errors(word):
@@ -27,7 +28,10 @@ def hamming1_env(word):
 
 codebook = pd.read_table(snakemake.input[0], index_col=0, dtype=np.dtype(str), squeeze=True).apply(bitarray)
 lookup_exact = {word.tobytes(): gene for gene, word in codebook.items()}
-lookup_corrected = {w.tobytes(): gene for gene, word in codebook.items() for w in hamming1_env(word)}
+if dist == 4:
+    lookup_corrected = {w.tobytes(): gene for gene, word in codebook.items() for w in hamming1_env(word)}
+else:
+    lookup_corrected = {}
 
 with open(snakemake.output.known_counts, "w") as known_out, open(snakemake.output.sim_counts, "w") as sim_out:
     known_out = csv.writer(known_out, delimiter="\t")

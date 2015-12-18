@@ -153,10 +153,10 @@ rule plot_codebook:
 
 rule simulate:
     input:
-        "data/140genes.1.codebook.txt"
+        lambda wildcards: "data/140genes.1.codebook.txt" if dist == "4" else "data/1001genes.1.codebook.txt"
     output:
-        sim_counts="data/simulated.{mean}.all.txt",
-        known_counts="data/simulated.{mean}.known.txt"
+        sim_counts="data/simulated-MHD{dist,(2|4)}.{mean}.all.txt",
+        known_counts="data/simulated-MHD{dist}.{mean}.known.txt"
     params:
         cell_count=10
     script:
