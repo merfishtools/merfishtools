@@ -9,7 +9,7 @@ use bio::stats::logprobs::{Prob, LogProb};
 use bio::stats::logprobs;
 
 
-struct Factory {
+struct Params {
     N: u8,
     m: u8,
     p0: Prob,
@@ -17,37 +17,63 @@ struct Factory {
 }
 
 
-impl Factory {
+trait Model {
+
+    fn params(&self) -> &Params;
 
     /// Probability to make exactly i 1->0 and j 0->1 errors.
     fn xi(&self, i: u8, j: u8) -> Prob {
-        self.p1.powi(i as i32) * self.p0.powi(j as i32) * (1.0 - self.p1).powi((self.m - i) as i32) * (1.0 - self.p0).powi((self.N - self.m - j) as i32)
+        self.params().p1.powi(i as i32) * self.params().p0.powi(j as i32) *
+        (1.0 - self.params().p1).powi((self.params().m - i) as i32) * (1.0 - self.params().p0).powi((self.params().N - self.params().m - j) as i32)
     }
 
     /// Number of possibilities for i 1->0 and j 0->1 errors.
     fn psi(&self, i: u8, j: u8) -> f64 {
-        combinations(self.m as u64, i as u64) * combinations((self.N - self.m)  as u64, j as u64)
+        combinations(self.params().m as u64, i as u64) * combinations((self.params().N - self.params().m) as u64, j as u64)
     }
 
+    /// Probability to see an exact readout given that we have a call.
+    fn prob_call_exact(&self) -> Prob;
+
+    /// Probability to see a readout with one mismatch given that we have a call.
+    fn prob_call_mismatch(&self) -> Prob;
+
+    /// Probability to see an exact readout given that we have a miscall.
+    fn prob_miscall_exact(&self) -> Prob;
+
+    /// Probability to see a readout with one mismatch given that we have a miscall.
+    fn prob_miscall_mismatch(&self) -> Prob;
+
+    /// Probability to completely miss a readout because of too many errors.
+    fn prob_missed(&self) -> Prob;
+}
+
+
+struct MHD4 {
+    params: Params
+}
+
+
+impl Model for MHD4 {
+
+    fn params(&self) -> &Params {
+        &self.params
+    }
 
     /// Probability to see an exact readout given that we have a call.
     fn prob_call_exact(&self) -> Prob {
         self.xi(0, 0)
     }
 
-
     /// Probability to see a readout with one mismatch given that we have a call.
     fn prob_call_mismatch(&self) -> Prob {
-        //(self.m as f64 * self.xi(1, 0) + (self.N - self.m) as f64 * self.xi(0, 1)) / self.N as f64
-        (self.m as f64 * self.xi(1, 0) + (self.N - self.m) as f64 * self.xi(0, 1))
+        (self.params().m as f64 * self.xi(1, 0) + (self.params().N - self.params().m) as f64 * self.xi(0, 1))
     }
-
 
     /// Probability to see an exact readout given that we have a miscall.
     fn prob_miscall_exact(&self) -> Prob {
         self.psi(2,2) * self.xi(2, 2)
     }
-
 
     /// Probability to see a readout with one mismatch given that we have a miscall.
     fn prob_miscall_mismatch(&self) -> Prob {
@@ -55,12 +81,55 @@ impl Factory {
         self.psi(2, 3) * self.xi(2, 3) + self.psi(3, 2) * self.xi(3, 2)
     }
 
-
     /// Probability to completely miss a readout because of too many errors.
     fn prob_missed(&self) -> Prob {
         let mut p = 0.0;
         for k in 2..6 {
-            for i in 0..cmp::min(self.m, k) + 1 {
+            for i in 0..cmp::min(self.params().m, k) + 1 {
+                p += self.psi(i, k - i) * self.xi(i, k - i);
+            }
+        }
+        p
+    }
+}
+
+
+struct MHD2 {
+    params: Params
+}
+
+
+impl Model for MHD2 {
+
+    fn params(&self) -> &Params {
+        &self.params
+    }
+
+    /// Probability to see an exact readout given that we have a call.
+    fn prob_call_exact(&self) -> Prob {
+        self.xi(0, 0)
+    }
+
+    /// Probability to see a readout with one mismatch given that we have a call.
+    fn prob_call_mismatch(&self) -> Prob {
+        0.0
+    }
+
+    /// Probability to see an exact readout given that we have a miscall.
+    fn prob_miscall_exact(&self) -> Prob {
+        self.psi(1, 1) * self.xi(1, 1)
+    }
+
+    /// Probability to see a readout with one mismatch given that we have a miscall.
+    fn prob_miscall_mismatch(&self) -> Prob {
+        0.0
+    }
+
+    /// Probability to miss a readout because of too many errors.
+    fn prob_missed(&self) -> Prob {
+        let mut p = 0.0;
+        for k in 1..6 {
+            for i in 0..cmp::min(self.params().m, k) + 1 {
                 p += self.psi(i, k - i) * self.xi(i, k - i);
             }
         }
@@ -80,14 +149,19 @@ pub struct Readout {
 
 
 impl Readout {
-    pub fn new(N: u8, m: u8, p0: Prob, p1: Prob, dropout_rate: Prob) -> Self {
-        let factory = Factory { N: N, m: m, p0: p0, p1: p1};
+    pub fn new(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8) -> Self {
+        let params = Params { N: N, m: m, p0: p0, p1: p1};
+        let model: Box<Model> = match dist {
+            4 => Box::new(MHD4 { params: params }),
+            2 => Box::new(MHD2 { params: params }),
+            _ => panic!("Hamming distances other than 2 and 4 are unsupported at the moment.")
+        };
         Readout {
-            prob_call_exact: factory.prob_call_exact(),
-            prob_call_mismatch: factory.prob_call_mismatch(),
-            prob_miscall_exact: factory.prob_miscall_exact().ln(),
-            prob_miscall_mismatch: factory.prob_miscall_mismatch().ln(),
-            prob_missed: factory.prob_missed()
+            prob_call_exact: model.prob_call_exact(),
+            prob_call_mismatch: model.prob_call_mismatch(),
+            prob_miscall_exact: model.prob_miscall_exact().ln(),
+            prob_miscall_mismatch: model.prob_miscall_mismatch().ln(),
+            prob_missed: model.prob_missed()
         }
     }
 

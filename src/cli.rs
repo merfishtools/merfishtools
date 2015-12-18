@@ -27,8 +27,8 @@ struct Counts {
 }
 
 
-pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dropout_rate: Prob, estimate_path: Option<String>, threads: usize, cells: &str) {
-    let readout_model = model::Readout::new(N, m, p0, p1, dropout_rate);
+pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, estimate_path: Option<String>, threads: usize, cells: &str) {
+    let readout_model = model::Readout::new(N, m, p0, p1, dist);
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
     let mut pmf_writer = io::pmf::expression::Writer::from_writer(std::io::stdout());
     let mut est_writer = estimate_path.map(|path| io::estimation::expression::Writer::from_file(path));
