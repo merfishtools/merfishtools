@@ -5,21 +5,22 @@ merfishtools = "../target/release/merfishtools"
 
 
 contexts = ["paper"]
+datasets = ["140genesData"]
 
 
 rule all:
     input:
         expand([
-            "results/{context}/foldchange_cdf/140genesData.1.A-vs-B.{gene}.{settings}.foldchange_cdf.pdf",
-            "results/{context}/expression_pmf/140genesData.1.cell0.{gene}.{settings}.expression_pmf.pdf"
-        ], gene=config["genes"], context=contexts, settings=config["settings"]),
+            "results/{context}/foldchange_cdf/{dataset}.1.A-vs-B.{gene}.default.foldchange_cdf.pdf",
+            "results/{context}/expression_pmf/{dataset}.1.cell0.{gene}.default.expression_pmf.pdf"
+        ], gene=config["genes"], context=contexts, dataset=datasets),
         expand([
-            "results/{context}/140genesData.{settings}.pca.pdf",
-            "results/{context}/140genesData.{settings}.expression_dist.pdf",
-            "results/{context}/140genesData.{settings}.overdispersion.pdf",
-            "results/{context}/140genesData.{settings}.correlation.pdf"
-        ], context=contexts, settings=config["settings"]),
-        expand("results/{context}/simulation/squared_error.nodrop.svg", context=contexts)
+            "results/{context}/{dataset}.default.pca.pdf",
+            "results/{context}/{dataset}.default.expression_dist.pdf",
+            "results/{context}/{dataset}.default.overdispersion.pdf",
+            "results/{context}/{dataset}.default.correlation.pdf"
+        ], context=contexts, dataset=datasets),
+        expand("results/{context}/simulation-MHD{dist}/squared_error.default.svg", context=contexts, dist=[2, 4])
 
 
 rule format:
@@ -43,17 +44,17 @@ rule raw_counts:
 
 rule expressions:
     input:
-        "data/{dataset}.txt"
+        "data/{dataset}.{experiment}.{group}.txt"
     output:
-        pmf="expressions/{dataset}.{settings}.txt",
-        est="expressions/{dataset}.{settings}.est.txt",
+        pmf="expressions/{dataset}.{experiment}.{group}.{settings}.txt",
+        est="expressions/{dataset}.{experiment}.{group}.{settings}.est.txt",
     params:
-        dropout_rate=lambda wildcards: config["settings"][wildcards.settings]["dropout_rate"]
+        dist=lambda wildcards: config["dist"][wildcards.dataset]
     benchmark:
         "bench/exp/{dataset}.{settings}.txt"
     threads: 8
     shell:
-        "{merfishtools} exp --dropout-rate {params.dropout_rate} "
+        "{merfishtools} exp --hamming-dist {params.dist} "
         "--estimate {output.est} -t {threads} < {input} > {output.pmf}"
 
 
@@ -153,10 +154,12 @@ rule plot_codebook:
 
 rule simulate:
     input:
-        lambda wildcards: "data/140genes.1.codebook.txt" if dist == "4" else "data/1001genes.1.codebook.txt"
+        mhd4="data/140genes.1.codebook.txt",
+        mhd2="data/1001genes.1.codebook.txt"
     output:
-        sim_counts="data/simulated-MHD{dist,(2|4)}.{mean}.all.txt",
-        known_counts="data/simulated-MHD{dist}.{mean}.known.txt"
+        sim_counts_mhd4="data/simulated-MHD4.{mean}.all.txt",
+        sim_counts_mhd2="data/simulated-MHD2.{mean}.all.txt",
+        known_counts="data/simulated.{mean}.known.txt"
     params:
         cell_count=10
     script:
@@ -168,11 +171,11 @@ means = list(range(5, 40, 5))
 
 rule plot_simulation:
     input:
-        posterior_counts=expand("expressions/simulated.{mean}.all.{{settings}}.est.txt", mean=means),
-        raw_counts=expand("counts/simulated.{mean}.all.txt", mean=means),
+        posterior_counts=expand("expressions/simulated-MHD{{dist}}.{mean}.all.{{settings}}.est.txt", mean=means),
+        raw_counts=expand("counts/simulated-MHD{{dist}}.{mean}.all.txt", mean=means),
         known_counts=expand("data/simulated.{mean}.known.txt", mean=means)
     output:
-        "results/{context}/simulation/squared_error.{settings}.svg"
+        "results/{context}/simulation-MHD{dist}/squared_error.{settings}.svg"
     params:
         means=means
     script:

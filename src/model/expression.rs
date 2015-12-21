@@ -45,10 +45,9 @@ mod tests {
     const m: u8 = 4;
     const p0: Prob = 0.04;
     const p1: Prob = 0.1;
-    const dropout_rate: Prob = 0.15;
 
     fn setup() -> model::Readout {
-        model::Readout::new(N, m, p0, p1, dropout_rate)
+        model::Readout::new(N, m, p0, p1, 4)
     }
 
     #[test]
@@ -60,6 +59,17 @@ mod tests {
         println!("{:?}", pmf);
         println!("{}", total);
         assert!(total.approx_eq(&-0.0000011368907495423741));
+    }
+
+    #[test]
+    fn test_pmf2() {
+        let readout = setup();
+        let pmf = pmf(176, 25, &readout);
+
+        let total = log_prob_sum(&pmf.iter().map(|e| e.prob).collect_vec());
+        println!("{:?}", pmf);
+        println!("{}", total);
+        assert!(total.approx_eq(&0.0));
     }
 }
 /*

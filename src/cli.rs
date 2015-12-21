@@ -21,6 +21,7 @@ pub struct Selection {
 }
 
 
+#[derive(Debug)]
 struct Counts {
     exact: u32,
     corrected: u32
@@ -70,7 +71,11 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, estimate_path: Opt
     crossbeam::scope(|scope| {
         for (_, (cell, pmfs)) in pool.unordered_map(scope, counts.into_iter(), |(cell, counts)| {
             let pmfs = counts.into_iter().map(|(feature, count)| {
-                (feature, model::expression::pmf(count.exact + count.corrected, count.corrected, &readout_model))
+                let pmf = model::expression::pmf(count.exact + count.corrected, count.exact, &readout_model);
+                /*if feature == "COL5A1" {
+                    debug!("{:?} {:?}", count, pmf);
+                }*/
+                (feature, pmf)
             }).collect_vec();
             (cell, pmfs)
         }) {

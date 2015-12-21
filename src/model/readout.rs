@@ -117,7 +117,7 @@ impl Model for MHD2 {
 
     /// Probability to see an exact readout given that we have a miscall.
     fn prob_miscall_exact(&self) -> Prob {
-        self.psi(1, 1) * self.xi(1, 1)
+        (1..3).fold(0.0, |p, i| p + self.psi(i, i) * self.xi(i, i))
     }
 
     /// Probability to see a readout with one mismatch given that we have a miscall.
@@ -191,13 +191,15 @@ impl Readout {
             let jmin = if count_exact + i > count { count_exact + i - count } else { 0 };
             for j in jmin..(jmax + 1) {
                 let k = x - i;
-                let p = multinomial_pdf(&probs, &[j, i - j, k]).ln() +
-                        self.prob_miscall_exact *  (count_exact - j) as f64 +
-                        self.prob_miscall_mismatch * (count - count_exact - (i - j)) as f64;
+                let mut p = multinomial_pdf(&probs, &[j, i - j, k]).ln() +
+                        self.prob_miscall_exact *  (count_exact - j) as f64;
+                let l = count - count_exact - (i - j);
+                if l > 0 {
+                    p += self.prob_miscall_mismatch * l as f64;
+                }
                 summands.push(p);
             }
         }
-        //println!("{:?}", summands);
         let likelihood = logprobs::log_prob_sum(&summands);
         assert!(!likelihood.is_nan());
         likelihood
@@ -209,11 +211,11 @@ impl Readout {
 mod tests {
     #![allow(non_upper_case_globals)]
 
-    use super::Factory;
+    use super::{MHD4, Params, Model};
     use nalgebra::ApproxEq;
 
 
-    const factory: Factory = Factory { N: 16, m: 4, p0: 0.04, p1: 0.1 };
+    const factory: MHD4 = MHD4 { params: Params { N: 16, m: 4, p0: 0.04, p1: 0.1 } };
 
 
     #[test]

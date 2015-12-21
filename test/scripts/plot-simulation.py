@@ -16,16 +16,18 @@ for posterior_counts, raw_counts, known_counts in zip(
     snakemake.input.known_counts):
 
     posterior_counts = pd.read_table(posterior_counts, index_col=[0, 1])["expr_ev"]
-    print(raw_counts)
     raw_counts = pd.read_table(raw_counts, index_col=[0, 1])
     raw_counts = raw_counts["exact"] + raw_counts["corrected"]
-    known_counts = pd.read_table(known_counts, index_col=[0, 1], squeeze=True)
+    known_counts = pd.read_table(known_counts, index_col=[0, 1])
+
+    codebook = "mhd4" if snakemake.wildcards.dist == "4" else "mhd2"
+    known_counts = known_counts[known_counts[codebook]]
 
     raw_counts = raw_counts.reindex(known_counts.index, fill_value=0)
     posterior_counts = posterior_counts.reindex(known_counts.index, fill_value=0)
 
-    raw_se = (raw_counts - known_counts) ** 2
-    posterior_se = (posterior_counts - known_counts) ** 2
+    raw_se = (raw_counts - known_counts["count"]) ** 2
+    posterior_se = (posterior_counts - known_counts["count"]) ** 2
 
     raw_rmse.append(np.sqrt(raw_se.mean()))
     posterior_rmse.append(np.sqrt(posterior_se.mean()))

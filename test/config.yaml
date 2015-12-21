@@ -4,17 +4,19 @@ groups:
   cell0: "^0$"
   all: ".*"
 
+dist:
+  140genesData: 4
+  1001genesData: 2
+  simulated-MHD4: 4
+  simulated-MHD2: 2
+
 settings:
-  drop:
-    dropout_rate: 0.15
-  nodrop:
-    dropout_rate: 0.0
+  default:
 
 genes:
   - COL5A1
   - BRCA2
   - CKAP5
-  - GTF3C1
   - ATP11A
 
 experiment_count: 7

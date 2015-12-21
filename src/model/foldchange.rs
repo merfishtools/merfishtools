@@ -58,11 +58,10 @@ mod tests {
     const m: u8 = 4;
     const p0: Prob = 0.04;
     const p1: Prob = 0.1;
-    const dropout_rate: Prob = 0.15;
 
 
     fn setup() -> model::Readout {
-        model::Readout::new(N, m, p0, p1, dropout_rate)
+        model::Readout::new(N, m, p0, p1, 4)
     }
 
     #[test]

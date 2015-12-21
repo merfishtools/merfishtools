@@ -26,10 +26,11 @@ pub mod io;
 pub mod cli;
 
 
+#[allow(non_camel_case_types)]
 #[derive(Debug)]
 enum Command {
-    Exp,
-    Diffexp,
+    exp,
+    diffexp,
     None
 }
 
@@ -39,8 +40,8 @@ impl FromStr for Command {
 
     fn from_str(src: &str) -> Result<Command, ()> {
         return match src {
-            "exp"     => Ok(Command::Exp),
-            "diffexp" => Ok(Command::Diffexp),
+            "exp"     => Ok(Command::exp),
+            "diffexp" => Ok(Command::diffexp),
             _            => Err(()),
         };
     }
@@ -83,8 +84,8 @@ fn main() {
 
     args.insert(0, format!("subcommand {:?}", subcommand));
     match subcommand {
-        Command::Exp     => exp(args),
-        Command::Diffexp => diffexp(args),
+        Command::exp     => exp(args),
+        Command::diffexp => diffexp(args),
         Command::None       => {
             error!("Unknown subcommand.");
             std::process::exit(1);
@@ -126,7 +127,7 @@ Output is formatted into columns: experiment, cell, feature, expected value, sta
         ap.refer(&mut m).add_option(&["-m"], Store, "Number of 1-bits in readout (default: 4).");
         ap.refer(&mut p0).add_option(&["--p0"], Store, "Prior probability of 0->1 error (default: 0.04).");
         ap.refer(&mut p1).add_option(&["--p1"], Store, "Prior probability of 1->0 error (default: 0.1).");
-        ap.refer(&mut dist).add_option(&["--hammming-dist"], Store, "Hamming distance between encodings (default: 4).");
+        ap.refer(&mut dist).add_option(&["--hamming-dist"], Store, "Hamming distance between encodings (default: 4).");
         ap.refer(&mut threads)
           .add_option(&["--threads", "-t"], Store, "Number of threads to use.");
         ap.refer(&mut cells).add_option(&["--cells"], Store, "Regular expression for cells to select (default: all).");
