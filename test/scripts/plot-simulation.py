@@ -8,9 +8,9 @@ import seaborn as sns
 sns.set(style="ticks", palette="colorblind", context=snakemake.wildcards.context)
 plt.figure(figsize=snakemake.config["plots"]["figsize"])
 
-raw_rmse = []
-posterior_rmse = []
-for posterior_counts, raw_counts, known_counts in zip(
+errors = []
+for mean, posterior_counts, raw_counts, known_counts in zip(
+    snakemake.params.means,
     snakemake.input.posterior_counts,
     snakemake.input.raw_counts,
     snakemake.input.known_counts):
@@ -19,24 +19,22 @@ for posterior_counts, raw_counts, known_counts in zip(
     raw_counts = pd.read_table(raw_counts, index_col=[0, 1])
     raw_counts = raw_counts["exact"] + raw_counts["corrected"]
     known_counts = pd.read_table(known_counts, index_col=[0, 1])
-
     codebook = "mhd4" if snakemake.wildcards.dist == "4" else "mhd2"
     known_counts = known_counts[known_counts[codebook]]
 
     raw_counts = raw_counts.reindex(known_counts.index, fill_value=0)
     posterior_counts = posterior_counts.reindex(known_counts.index, fill_value=0)
 
-    raw_se = (raw_counts - known_counts["count"]) ** 2
-    posterior_se = (posterior_counts - known_counts["count"]) ** 2
+    errors.append(pd.DataFrame({"error": raw_counts - known_counts["count"], "mean": mean, "type": "raw"}))
+    errors.append(pd.DataFrame({"error": posterior_counts - known_counts["count"], "mean": mean, "type": "posterior"}))
 
-    raw_rmse.append(np.sqrt(raw_se.mean()))
-    posterior_rmse.append(np.sqrt(posterior_se.mean()))
+errors = pd.concat(errors)
 
-plt.plot(snakemake.params.means, raw_rmse, "-ko", label="raw counts")
-plt.plot(snakemake.params.means, posterior_rmse, "-ro", label="conditional expectation")
+sns.violinplot(x="mean", y="error", hue="type", data=errors, split=True, inner="quartile", linewidth=1)
+plt.plot(plt.xlim(), [0, 0], "-", color="grey", linewidth=1, zorder=-5)
 
 plt.xlabel("mean expression")
-plt.ylabel("RMSE")
+plt.ylabel("predicted - true")
 plt.legend(loc="upper left")
 sns.despine()
 

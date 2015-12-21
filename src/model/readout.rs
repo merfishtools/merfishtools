@@ -117,7 +117,7 @@ impl Model for MHD2 {
 
     /// Probability to see an exact readout given that we have a miscall.
     fn prob_miscall_exact(&self) -> Prob {
-        (1..3).fold(0.0, |p, i| p + self.psi(i, i) * self.xi(i, i))
+        (1..4).fold(0.0, |p, i| p + self.psi(i, i) * self.xi(i, i))
     }
 
     /// Probability to see a readout with one mismatch given that we have a miscall.
@@ -211,7 +211,7 @@ impl Readout {
 mod tests {
     #![allow(non_upper_case_globals)]
 
-    use super::{MHD4, Params, Model};
+    use super::{MHD4, MHD2, Params, Model};
     use nalgebra::ApproxEq;
 
 
@@ -251,6 +251,17 @@ mod tests {
         let p = factory.prob_missed();
         println!("{}", p);
         assert!(p.approx_eq(&0.21822058901379174));
+    }
+
+    #[test]
+    fn test_mhd2() {
+        let model = MHD2 { params: Params { N: 14, m: 4, p0: 0.04, p1: 0.1 } };
+        println!("{}", model.prob_call_exact());
+        println!("{}", model.prob_call_mismatch());
+        println!("{}", model.prob_miscall_exact());
+        println!("{}", model.prob_miscall_mismatch());
+        println!("{}", model.prob_missed());
+        assert!(false);
     }
 
     #[test]

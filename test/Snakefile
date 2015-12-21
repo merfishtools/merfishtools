@@ -49,12 +49,13 @@ rule expressions:
         pmf="expressions/{dataset}.{experiment}.{group}.{settings}.txt",
         est="expressions/{dataset}.{experiment}.{group}.{settings}.est.txt",
     params:
-        dist=lambda wildcards: config["dist"][wildcards.dataset]
+        dist=lambda wildcards: config["datasets"][wildcards.dataset]["dist"],
+        bits=lambda wildcards: config["datasets"][wildcards.dataset]["N"]
     benchmark:
         "bench/exp/{dataset}.{settings}.txt"
     threads: 8
     shell:
-        "{merfishtools} exp --hamming-dist {params.dist} "
+        "{merfishtools} exp --hamming-dist {params.dist} -N {params.bits} "
         "--estimate {output.est} -t {threads} < {input} > {output.pmf}"
 
 

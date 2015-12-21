@@ -4,11 +4,19 @@ groups:
   cell0: "^0$"
   all: ".*"
 
-dist:
-  140genesData: 4
-  1001genesData: 2
-  simulated-MHD4: 4
-  simulated-MHD2: 2
+datasets:
+  140genesData:
+    dist: 4
+    N: 16
+  1001genesData:
+    dist: 2
+    N: 14
+  simulated-MHD4:
+    dist: 4
+    N: 16
+  simulated-MHD2:
+    dist: 2
+    N: 14
 
 settings:
   default:
