@@ -31,6 +31,7 @@ pub mod cli;
 enum Command {
     exp,
     diffexp,
+    stats,
     None
 }
 
@@ -42,7 +43,8 @@ impl FromStr for Command {
         return match src {
             "exp"     => Ok(Command::exp),
             "diffexp" => Ok(Command::diffexp),
-            _            => Err(()),
+            "stats"   => Ok(Command::stats),
+            _         => Err(()),
         };
     }
 }
@@ -86,7 +88,8 @@ fn main() {
     match subcommand {
         Command::exp     => exp(args),
         Command::diffexp => diffexp(args),
-        Command::None       => {
+        Command::stats   => stats(args),
+        Command::None    => {
             error!("Unknown subcommand.");
             std::process::exit(1);
         }
@@ -100,6 +103,8 @@ fn exp(args: Vec<String>) {
     let mut p0 = 0.04;
     let mut p1 = 0.1;
     let mut dist = 4;
+    let mut codewords = 140;
+    let mut neighbors = 36;
     let mut threads = 1;
     let mut estimate_path = None;
     let mut cells = ".*".to_owned();
@@ -110,7 +115,6 @@ fn exp(args: Vec<String>) {
 r#"For given MERFISH data, calculate expressions for each feature (e.g. gene) in each cell.
 Results are provided as PMF (probability mass function) in columns:
 
-    experiment
     cell
     feature (e.g. gene, rna)
     expression
@@ -121,19 +125,21 @@ Example: 'merfishtools exp < data.txt > expression.txt'"#
 
         ap.refer(&mut estimate_path).add_option(&["--estimate"], StoreOption, r#"
 Path to write expected value and standard deviation estimates of expression to.
-Output is formatted into columns: experiment, cell, feature, expected value, standard deviation
+Output is formatted into columns: cell, feature, expected value, standard deviation
 "#);
         ap.refer(&mut N).add_option(&["-N"], Store, "Number of bits in readout, i.e., number of hybridization rounds (default: 16).");
         ap.refer(&mut m).add_option(&["-m"], Store, "Number of 1-bits in readout (default: 4).");
         ap.refer(&mut p0).add_option(&["--p0"], Store, "Prior probability of 0->1 error (default: 0.04).");
         ap.refer(&mut p1).add_option(&["--p1"], Store, "Prior probability of 1->0 error (default: 0.1).");
         ap.refer(&mut dist).add_option(&["--hamming-dist"], Store, "Hamming distance between encodings (default: 4).");
+        ap.refer(&mut codewords).add_option(&["--codewords"], Store, "Number of used codewords.");
+        ap.refer(&mut neighbors).add_option(&["--neighbors"], Store, "Number of neighbors.");
         ap.refer(&mut threads)
           .add_option(&["--threads", "-t"], Store, "Number of threads to use.");
         ap.refer(&mut cells).add_option(&["--cells"], Store, "Regular expression for cells to select (default: all).");
         parse_args_or_exit(&ap, args);
     }
-    cli::expression(N, m, p0, p1, dist, estimate_path, threads, &cells);
+    cli::expression(N, m, p0, p1, dist, codewords, neighbors, estimate_path, threads, &cells);
 }
 
 
@@ -173,6 +179,40 @@ Output is formatted into columns: feature, foldchange, posterior probability"#);
 
     }
     cli::differential_expression(&group1_path, &group2_path, pmf_path, min_fc, threads);
+}
+
+
+fn stats(args: Vec<String>) {
+    let mut N = 16;
+    let mut m = 4;
+    let mut p0 = 0.04;
+    let mut p1 = 0.1;
+    let mut dist = 4;
+    let mut codewords = 140;
+    let mut neighbors = 36;
+
+    {
+        let mut ap = ArgumentParser::new();
+        ap.set_description(
+r#"For given MERFISH data, calculate per cell statistics.
+Results are provided in columns:
+
+cell
+expected total expression
+
+Example: 'merfishtools stats < stats.txt > expression.txt'"#
+        );
+
+        ap.refer(&mut N).add_option(&["-N"], Store, "Number of bits in readout, i.e., number of hybridization rounds (default: 16).");
+        ap.refer(&mut m).add_option(&["-m"], Store, "Number of 1-bits in readout (default: 4).");
+        ap.refer(&mut p0).add_option(&["--p0"], Store, "Prior probability of 0->1 error (default: 0.04).");
+        ap.refer(&mut p1).add_option(&["--p1"], Store, "Prior probability of 1->0 error (default: 0.1).");
+        ap.refer(&mut dist).add_option(&["--hamming-dist"], Store, "Hamming distance between encodings (default: 4).");
+        ap.refer(&mut codewords).add_option(&["--codewords"], Store, "Number of used codewords.");
+        ap.refer(&mut neighbors).add_option(&["--neighbors"], Store, "Number of neighbors.");
+        parse_args_or_exit(&ap, args);
+    }
+    cli::stats(N, m, p0, p1, dist, codewords, neighbors);
 }
 
 

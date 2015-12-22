@@ -76,17 +76,17 @@ mod tests {
     const p1: Prob = 0.1;
 
     fn setup() -> model::Readout {
-        model::Readout::new(N, m, p0, p1, 4)
+        model::Readout::new(N, m, p0, p1, 4, 140, 36)
     }
 
     #[test]
     fn test_pmf() {
         let readout = setup();
         let pmfs = [
-            model::expression::pmf(5, 1, &readout),
-            model::expression::pmf(10, 1, &readout),
-            model::expression::pmf(3, 1, &readout),
-            model::expression::pmf(24, 1, &readout)
+            model::expression::pmf(5, 1, 1000, &readout),
+            model::expression::pmf(10, 1, 1000, &readout),
+            model::expression::pmf(3, 1, 1000, &readout),
+            model::expression::pmf(24, 1, 1000, &readout)
         ];
         let pmf = pmf(&pmfs);
 

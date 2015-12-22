@@ -8,10 +8,10 @@ use model;
 pub type PMF = model::pmf::PMF<f32>;
 
 
-pub fn pmf(count: u32, count_exact: u32, readout_model: &model::Readout) -> PMF {
+pub fn pmf(count: u32, count_exact: u32, count_total: u32, readout_model: &model::Readout) -> PMF {
     let (xmin, xmax) = readout_model.window(count);
     let likelihoods = (xmin..xmax + 1).map(|x| {
-        readout_model.likelihood(x, count, count_exact)
+        readout_model.likelihood(x, count, count_exact, count_total)
     }).collect_vec();
     // calculate (marginal / flat_prior)
     let marginal = logprobs::log_prob_sum(&likelihoods);
@@ -47,13 +47,13 @@ mod tests {
     const p1: Prob = 0.1;
 
     fn setup() -> model::Readout {
-        model::Readout::new(N, m, p0, p1, 4)
+        model::Readout::new(N, m, p0, p1, 4, 140, 36)
     }
 
     #[test]
     fn test_pmf() {
         let readout = setup();
-        let pmf = pmf(25, 10, &readout);
+        let pmf = pmf(25, 10, 1000, &readout);
 
         let total = log_prob_sum(&pmf.iter().map(|e| e.prob).collect_vec());
         println!("{:?}", pmf);
@@ -64,12 +64,12 @@ mod tests {
     #[test]
     fn test_pmf2() {
         let readout = setup();
-        let pmf = pmf(176, 25, &readout);
+        let pmf = pmf(176, 25, 1000, &readout);
 
         let total = log_prob_sum(&pmf.iter().map(|e| e.prob).collect_vec());
         println!("{:?}", pmf);
         println!("{}", total);
-        assert!(total.approx_eq(&0.0));
+        assert!(total.approx_eq(&-0.0000014614508687671446));
     }
 }
 /*

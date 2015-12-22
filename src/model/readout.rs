@@ -44,8 +44,19 @@ trait Model {
     /// Probability to see a readout with one mismatch given that we have a miscall.
     fn prob_miscall_mismatch(&self) -> Prob;
 
-    /// Probability to completely miss a readout because of too many errors.
-    fn prob_missed(&self) -> Prob;
+    /// Probability to miss or miscall a readout because of too many errors.
+    fn prob_missed(&self) -> Prob {
+        1.0 - self.prob_call_exact() - self.prob_call_mismatch()
+    }
+
+    fn prob_miscall(&self) -> Prob {
+        self.prob_miscall_exact() + self.prob_miscall_mismatch()
+    }
+
+    /// Probability to completely miss a readout (not miscalled).
+    fn prob_nocall(&self) -> Prob {
+        1.0 - self.prob_miscall_exact() - self.prob_miscall_mismatch()
+    }
 }
 
 
@@ -80,17 +91,6 @@ impl Model for MHD4 {
         self.psi(2, 1) * self.xi(2, 1) + self.psi(1, 2) * self.xi(1, 2) +
         self.psi(2, 3) * self.xi(2, 3) + self.psi(3, 2) * self.xi(3, 2)
     }
-
-    /// Probability to completely miss a readout because of too many errors.
-    fn prob_missed(&self) -> Prob {
-        let mut p = 0.0;
-        for k in 2..6 {
-            for i in 0..cmp::min(self.params().m, k) + 1 {
-                p += self.psi(i, k - i) * self.xi(i, k - i);
-            }
-        }
-        p
-    }
 }
 
 
@@ -124,17 +124,6 @@ impl Model for MHD2 {
     fn prob_miscall_mismatch(&self) -> Prob {
         0.0
     }
-
-    /// Probability to miss a readout because of too many errors.
-    fn prob_missed(&self) -> Prob {
-        let mut p = 0.0;
-        for k in 1..6 {
-            for i in 0..cmp::min(self.params().m, k) + 1 {
-                p += self.psi(i, k - i) * self.xi(i, k - i);
-            }
-        }
-        p
-    }
 }
 
 
@@ -142,14 +131,18 @@ impl Model for MHD2 {
 pub struct Readout {
     prob_call_exact: Prob,
     prob_call_mismatch: Prob,
-    prob_miscall_exact: LogProb,
-    prob_miscall_mismatch: LogProb,
-    prob_missed: Prob
+    prob_miscall_exact: Prob,
+    prob_miscall_mismatch: Prob,
+    prob_missed: Prob,
+    prob_nocall: Prob,
+    prob_miscall: Prob,
+    codewords: u32,
+    neighbors: u32
 }
 
 
 impl Readout {
-    pub fn new(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8) -> Self {
+    pub fn new(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codewords: u32, neighbors: u32) -> Self {
         let params = Params { N: N, m: m, p0: p0, p1: p1};
         let model: Box<Model> = match dist {
             4 => Box::new(MHD4 { params: params }),
@@ -159,18 +152,25 @@ impl Readout {
         Readout {
             prob_call_exact: model.prob_call_exact(),
             prob_call_mismatch: model.prob_call_mismatch(),
-            prob_miscall_exact: model.prob_miscall_exact().ln(),
-            prob_miscall_mismatch: model.prob_miscall_mismatch().ln(),
-            prob_missed: model.prob_missed()
+            prob_miscall_exact: model.prob_miscall_exact(),
+            prob_miscall_mismatch: model.prob_miscall_mismatch(),
+            prob_missed: model.prob_missed(),
+            prob_nocall: model.prob_nocall(),
+            prob_miscall: model.prob_miscall(),
+            codewords: codewords,
+            neighbors: neighbors
         }
     }
 
     pub fn window(&self, count: u32) -> (u32, u32) {
+        // x = i + j + k + miscall_exact + miscall_mismatch
         // i = count and j = count_exact maximize the inner probability of the likelihood because
         // we have no miscalls then.
         // Hence we can estimate a good center using the expected value of the multinomial distribution.
-        // E(j) = x * Pr(H=0 | E=e)
-        // E(i - j) = x * Pr(H=1 | E=e)
+        // E(j) = x * Pr(H=0, E=e)
+        // E(i - j) = x * Pr(H=1, E=e)
+        // E(miscall_exact) = x * Pr(H=0, E!=e)
+        // E(miscall_mismatch) = x * Pr(H=1, E!=e)
         // x * Pr(H=1) = i - x * Pr(H=0)
         // x = i / (Pr(H=1) + Pr(H=0))
 
@@ -178,31 +178,43 @@ impl Readout {
         (cmp::max(center - 30, 0) as u32, center as u32 + 30)
     }
 
-    pub fn likelihood(&self, x: u32, count: u32, count_exact: u32) -> LogProb {
+    pub fn likelihood(&self, x: u32, count: u32, count_exact: u32, count_total: u32) -> LogProb {
         let x = x;
         let count = count;
         let count_exact = count_exact;
         assert!(count >= count_exact);
 
         let mut summands = Vec::new();
-        let probs = [self.prob_call_exact, self.prob_call_mismatch, self.prob_missed];
+        let prob_call = 1.0 - self.prob_miscall; // Pr(E=e) = 1 - Pr(E!=e)
+        let probs = [
+            self.prob_call_exact * prob_call, // Pr(H=0, E=e) = Pr(H=0 | E=e) * Pr(E=e)
+            self.prob_call_mismatch * prob_call,
+            self.prob_missed * prob_call,
+            self.prob_miscall_exact,
+            self.prob_miscall_mismatch
+        ];
+
         for i in 0..(cmp::min(x, count) + 1) {
             let jmax = cmp::min(count_exact, i);
             let jmin = if count_exact + i > count { count_exact + i - count } else { 0 };
             for j in jmin..(jmax + 1) {
                 let k = x - i;
-                let mut p = multinomial_pdf(&probs, &[j, i - j, k]).ln() +
-                        self.prob_miscall_exact *  (count_exact - j) as f64;
-                let l = count - count_exact - (i - j);
-                if l > 0 {
-                    p += self.prob_miscall_mismatch * l as f64;
-                }
+                let exact_miscalls = count_exact - j;
+                let mismatch_miscalls = count - count_exact - (i - j);
+
+                let p = multinomial_pdf(&probs, &[j, i - j, k, exact_miscalls, mismatch_miscalls]).ln();
                 summands.push(p);
             }
         }
         let likelihood = logprobs::log_prob_sum(&summands);
         assert!(!likelihood.is_nan());
         likelihood
+    }
+
+    pub fn expected_total(&self, total_count: u32) -> f64 {
+        // c = x - x * p_nocall
+        // x = c / (1 - p_nocall)
+        total_count as f64 / (1.0 - self.prob_nocall)
     }
 }
 
@@ -250,7 +262,7 @@ mod tests {
     fn test_prob_missed() {
         let p = factory.prob_missed();
         println!("{}", p);
-        assert!(p.approx_eq(&0.21822058901379174));
+        assert!(p.approx_eq(&0.21833552708654924));
     }
 
     #[test]
@@ -261,7 +273,6 @@ mod tests {
         println!("{}", model.prob_miscall_exact());
         println!("{}", model.prob_miscall_mismatch());
         println!("{}", model.prob_missed());
-        assert!(false);
     }
 
     #[test]

@@ -61,23 +61,23 @@ mod tests {
 
 
     fn setup() -> model::Readout {
-        model::Readout::new(N, m, p0, p1, 4)
+        model::Readout::new(N, m, p0, p1, 4, 140, 36)
     }
 
     #[test]
     fn test_pmf() {
         let readout = setup();
         let pmfs1 = [
-            model::expression::pmf(5, 1, &readout),
-            model::expression::pmf(10, 1, &readout),
-            model::expression::pmf(3, 1, &readout),
-            model::expression::pmf(24, 1, &readout)
+            model::expression::pmf(5, 1, 1000, &readout),
+            model::expression::pmf(10, 1, 1000, &readout),
+            model::expression::pmf(3, 1, 1000, &readout),
+            model::expression::pmf(24, 1, 1000, &readout)
         ];
         let pmfs2 = [
-            model::expression::pmf(50, 1, &readout),
-            model::expression::pmf(100, 1, &readout),
-            model::expression::pmf(30, 1, &readout),
-            model::expression::pmf(240, 1, &readout)
+            model::expression::pmf(50, 1, 1000, &readout),
+            model::expression::pmf(100, 1, 1000, &readout),
+            model::expression::pmf(30, 1, 1000, &readout),
+            model::expression::pmf(240, 1, 1000, &readout)
         ];
         let pmf1 = model::expressionset::pmf(&pmfs1);
         let pmf2 = model::expressionset::pmf(&pmfs2);
@@ -89,7 +89,7 @@ mod tests {
 
         println!("{:?}", total);
         println!("ev={}", pmf.expected_value());
-        assert!(pmf.expected_value().approx_eq(&9.308333072366402));
-        assert!(total.approx_eq(&-0.000014408332189574935));
+        assert!(pmf.expected_value().approx_eq(&9.25643185097143));
+        assert!(total.approx_eq(&-0.00001747607580426802));
     }
 }
