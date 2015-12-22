@@ -30,12 +30,13 @@ for mean, posterior_counts, raw_counts, known_counts in zip(
 
 errors = pd.concat(errors)
 
-sns.violinplot(x="mean", y="error", hue="type", data=errors, split=True, inner="quartile", linewidth=1)
-plt.plot(plt.xlim(), [0, 0], "-", color="grey", linewidth=1, zorder=-5)
+colors = sns.xkcd_palette(["light grey", "grey"])
+sns.violinplot(x="mean", y="error", hue="type", data=errors, split=True, inner="quartile", linewidth=1, palette=colors)
+plt.plot(plt.xlim(), [0, 0], "-k", linewidth=1, zorder=-5)
 
 plt.xlabel("mean expression")
 plt.ylabel("predicted - true")
-plt.legend(loc="upper left")
+plt.legend(loc="lower left")
 sns.despine()
 
 plt.savefig(snakemake.output[0], bbox_inches="tight")

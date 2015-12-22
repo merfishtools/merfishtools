@@ -171,7 +171,7 @@ impl Readout {
         // x = i / (Pr(H=1) + Pr(H=0))
 
         let center = (count as f64 / (self.prob_call_exact + self.prob_call_mismatch)).round() as i32;
-        (cmp::max(center - 30, 0) as u32, center as u32 + 30)
+        (cmp::max(center - 50, 0) as u32, center as u32 + 50)
     }
 
     pub fn likelihood(&self, x: u32, count: u32, count_exact: u32) -> LogProb {
