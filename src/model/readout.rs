@@ -135,14 +135,12 @@ pub struct Readout {
     prob_miscall_mismatch: Prob,
     prob_missed: Prob,
     prob_nocall: Prob,
-    prob_miscall: Prob,
-    codewords: u32,
-    neighbors: u32
+    prob_miscall: Prob
 }
 
 
 impl Readout {
-    pub fn new(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codewords: u32, neighbors: u32) -> Self {
+    pub fn new(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8) -> Self {
         let params = Params { N: N, m: m, p0: p0, p1: p1};
         let model: Box<Model> = match dist {
             4 => Box::new(MHD4 { params: params }),
@@ -156,9 +154,7 @@ impl Readout {
             prob_miscall_mismatch: model.prob_miscall_mismatch(),
             prob_missed: model.prob_missed(),
             prob_nocall: model.prob_nocall(),
-            prob_miscall: model.prob_miscall(),
-            codewords: codewords,
-            neighbors: neighbors
+            prob_miscall: model.prob_miscall()
         }
     }
 
@@ -178,7 +174,7 @@ impl Readout {
         (cmp::max(center - 30, 0) as u32, center as u32 + 30)
     }
 
-    pub fn likelihood(&self, x: u32, count: u32, count_exact: u32, count_total: u32) -> LogProb {
+    pub fn likelihood(&self, x: u32, count: u32, count_exact: u32) -> LogProb {
         let x = x;
         let count = count;
         let count_exact = count_exact;

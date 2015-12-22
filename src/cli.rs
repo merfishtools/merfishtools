@@ -29,8 +29,8 @@ struct Counts {
 }
 
 
-pub fn stats(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codewords: u32, neighbors: u32) {
-    let readout_model = model::Readout::new(N, m, p0, p1, dist, codewords, neighbors);
+pub fn stats(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8) {
+    let readout_model = model::Readout::new(N, m, p0, p1, dist);
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
 
     let mut total_counts = collections::HashMap::new();
@@ -49,8 +49,8 @@ pub fn stats(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codewords: u32, neighbo
 }
 
 
-pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codewords: u32, neighbors: u32, estimate_path: Option<String>, threads: usize, cells: &str) {
-    let readout_model = model::Readout::new(N, m, p0, p1, dist, codewords, neighbors);
+pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, estimate_path: Option<String>, threads: usize, cells: &str) {
+    let readout_model = model::Readout::new(N, m, p0, p1, dist);
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
     let mut pmf_writer = io::pmf::expression::Writer::from_writer(std::io::stdout());
     let mut est_writer = estimate_path.map(|path| io::estimation::expression::Writer::from_file(path));
@@ -59,7 +59,6 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codewords: u32, ne
 
     let mut counts = collections::HashMap::new();
     let mut features = collections::HashSet::new();
-    let mut count_total = 0;
     for record in reader.records().filter_map(|res| {
             let rec = res.unwrap();
             features.insert(rec.feature.clone());
@@ -71,7 +70,6 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codewords: u32, ne
             }
         }
     ) {
-        count_total += 1;
         let cell_counts = counts.entry(record.cell_id).or_insert_with(collections::HashMap::new);
         let feature_counts = cell_counts.entry(record.feature).or_insert(Counts{ exact: 0, corrected: 0});
         if record.hamming_dist == 0 {
@@ -94,7 +92,7 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codewords: u32, ne
     crossbeam::scope(|scope| {
         for (_, (cell, pmfs)) in pool.unordered_map(scope, counts.into_iter(), |(cell, counts)| {
             let pmfs = counts.into_iter().map(|(feature, count)| {
-                let pmf = model::expression::pmf(count.exact + count.corrected, count.exact, count_total, &readout_model);
+                let pmf = model::expression::pmf(count.exact + count.corrected, count.exact, &readout_model);
                 /*if feature == "COL5A1" {
                     debug!("{:?} {:?}", count, pmf);
                 }*/
