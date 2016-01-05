@@ -3,6 +3,7 @@ use std::slice;
 use num::traits::{cast, NumCast};
 
 use bio::stats::logprobs::LogProb;
+use bio::stats::logprobs;
 
 
 #[derive(Clone, Debug)]
@@ -20,12 +21,17 @@ pub struct PMF<T: Clone + Copy> {
 
 impl<T: Clone + Copy + Sized> PMF<T> {
 
+    /// Create a new PMF from sorted vector.
     pub fn new(inner: Vec<Entry<T>>) -> Self {
         PMF { inner: inner }
     }
 
     pub fn iter(&self) -> slice::Iter<Entry<T>> {
         self.inner.iter()
+    }
+
+    pub fn cdf(&self) -> Vec<LogProb> {
+        logprobs::cumsum(self.inner.iter().map(|e| e.prob))
     }
 
     /// Return maximum a posteriori probability estimate (MAP).
@@ -37,6 +43,15 @@ impl<T: Clone + Copy + Sized> PMF<T> {
             }
         }
         max.value
+    }
+
+    /// Return the 5%-95% credible interval.
+    pub fn credible_interval(&self) -> (T, T) {
+        let cdf = self.cdf();
+        let lower = cdf.binary_search_by(|p| p.partial_cmp(&0.025).unwrap()).unwrap_or_else(|i| i);
+        let upper = cdf.binary_search_by(|p| p.partial_cmp(&0.975).unwrap()).unwrap_or_else(|i| i - 1);
+
+        (self.inner[lower].value, self.inner[upper].value)
     }
 }
 

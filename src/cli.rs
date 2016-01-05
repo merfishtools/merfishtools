@@ -108,7 +108,8 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, estimate_path: Opt
                         &cell,
                         &feature,
                         pmf.expected_value(),
-                        pmf.standard_deviation()
+                        pmf.standard_deviation(),
+                        pmf.credible_interval()
                     );
                 }
             }
@@ -151,7 +152,8 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
                 &feature,
                 pmf.differential_expression_pep(min_fc),
                 pmf.expected_value(),
-                pmf.standard_deviation()
+                pmf.standard_deviation(),
+                pmf.credible_interval()
             );
 
             if let Some(ref mut pmf_writer) = pmf_writer {

@@ -37,7 +37,7 @@ pub fn pmf(expression_pmfs: &[model::expression::PMF]) -> PMF {
                     let s = s + (x.value * SCALE as f32) as usize;
                     if s <= max_sum {
                         let prob = &mut curr[s];
-                        *prob = logprobs::log_prob_add(*prob, p + x.prob);
+                        *prob = logprobs::add(*prob, p + x.prob);
                     }
                 }
             }

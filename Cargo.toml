@@ -16,8 +16,8 @@ rustc-serialize = "*"
 argparse = "*"
 log = "*"
 fern = "*"
-simple_parallel = "*"
-crossbeam = "*"
+simple_parallel = "0.3"
+crossbeam = "0.1"
 GSL = "*"
 
 [[bin]]

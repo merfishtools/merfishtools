@@ -10,7 +10,7 @@ from matplotlib import gridspec
 
 
 # load data
-exprs = [pd.read_table(snakemake.input[0], index_col=0) for f in snakemake.input]
+exprs = [pd.read_table(f, index_col=0) for f in snakemake.input]
 exprs = pd.concat(exprs, axis="columns", keys=range(1, len(snakemake.input) + 1))
 exprs = np.log10(1 + exprs.transpose())
 

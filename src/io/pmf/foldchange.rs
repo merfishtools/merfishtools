@@ -3,7 +3,6 @@ use std::fs;
 use std::path::Path;
 
 use csv;
-use itertools::Itertools;
 
 use bio::stats::logprobs::LogProb;
 
@@ -43,10 +42,7 @@ impl<W: io::Write> Writer<W> {
     }
 
     pub fn write(&mut self, feature: &str, pmf: &PMF) {
-        let pmf = pmf.iter().filter(|e| e.prob >= model::MIN_PROB)
-                            .sorted_by(|a, b| a.value.partial_cmp(&b.value).unwrap());
-
-        for e in pmf.iter() {
+        for e in pmf.iter().filter(|e| e.prob >= model::MIN_PROB) {
             self.inner.write([feature, &format!("{}", e.value)[..], &format!("{}", e.prob)[..]].iter()).unwrap();
         }
     }

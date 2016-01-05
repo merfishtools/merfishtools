@@ -14,7 +14,7 @@ pub fn pmf(count: u32, count_exact: u32, readout_model: &model::Readout) -> PMF 
         readout_model.likelihood(x, count, count_exact)
     }).collect_vec();
     // calculate (marginal / flat_prior)
-    let marginal = logprobs::log_prob_sum(&likelihoods);
+    let marginal = logprobs::sum(&likelihoods);
 
     // TODO trim
     PMF::new(

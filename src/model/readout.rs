@@ -202,7 +202,7 @@ impl Readout {
                 summands.push(p);
             }
         }
-        let likelihood = logprobs::log_prob_sum(&summands);
+        let likelihood = logprobs::sum(&summands);
         assert!(!likelihood.is_nan());
         likelihood
     }

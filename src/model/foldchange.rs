@@ -22,23 +22,26 @@ pub fn pmf(a: &model::expressionset::PMF, b: &model::expressionset::PMF) -> PMF 
 
         if pmf.contains_key(&fc) {
             let p = pmf.get_mut(&fc).unwrap();
-            *p = logprobs::log_prob_add(*p, posterior_prob);
+            *p = logprobs::add(*p, posterior_prob);
         }
         else {
             pmf.insert(fc, posterior_prob);
         }
     }
 
-    PMF::new(pmf.iter().map(|(fc, prob)| {
+    let mut pmf = pmf.iter().map(|(fc, prob)| {
         model::pmf::Entry { value: *fc.numer() as f64 / *fc.denom() as f64, prob: *prob }
-    }).collect_vec())
+    }).collect_vec();
+    pmf.sort_by(|a, b| a.value.partial_cmp(&b.value).unwrap());
+
+    PMF::new(pmf)
 }
 
 
 impl PMF {
     pub fn differential_expression_pep(&self, min_fc: LogFC) -> LogProb {
         let probs = self.iter().filter(|e| e.value >= min_fc).map(|e| e.prob).collect_vec();
-        logprobs::ln_1m_exp(logprobs::log_prob_sum(&probs))
+        logprobs::ln_1m_exp(logprobs::sum(&probs))
     }
 }
 
