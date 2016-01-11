@@ -8,15 +8,19 @@ datasets:
   140genesData:
     dist: 4
     N: 16
+    experiments: 7
   1001genesData:
     dist: 2
     N: 14
+    experiments: 3
   simulated-MHD4:
     dist: 4
     N: 16
+    experiments: 1
   simulated-MHD2:
     dist: 2
     N: 14
+    experiments: 1
 
 settings:
   default:
@@ -26,8 +30,6 @@ genes:
   - BRCA2
   - CKAP5
   - ATP11A
-
-experiment_count: 7
 
 plots:
   figsize: [4.224, 2.904]

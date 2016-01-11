@@ -20,7 +20,8 @@ rule all:
             "results/{context}/{dataset}.default.overdispersion.pdf",
             "results/{context}/{dataset}.default.correlation.pdf"
         ], context=contexts, dataset=datasets),
-        expand("results/{context}/simulation-MHD{dist}/MHD{dist}.squared_error.default.pdf", context=contexts, dist=[2, 4])
+        expand("results/{context}/simulation-MHD{dist}/MHD{dist}.squared_error.default.pdf", context=contexts, dist=[2, 4]),
+        expand("results/{context}/default.dataset_correlation.pdf", context=contexts)
 
 
 rule format:
@@ -103,12 +104,27 @@ rule expression_matrix:
         "scripts/expression-matrix.py"
 
 
-matrices = expand("expressions/{{dataset}}.{experiment}.all.{{settings}}.matrix.txt", experiment=range(1, config["experiment_count"] + 1))
+rule count_matrix:
+    input:
+        "counts/{dataset}.{experiment}.{group}.txt"
+    output:
+        "counts/{dataset}.{experiment}.{group}.matrix.txt"
+    script:
+        "scripts/count-matrix.py"
+
+
+def matrices(dataset, type="expressions"):
+    suffix = ".{settings}." if type == "expressions" else "."
+    return expand("{type}/{dataset}.{experiment}.all{suffix}matrix.txt",
+                  dataset=dataset,
+                  type=type,
+                  suffix=suffix,
+                  experiment=range(1, config["datasets"][dataset]["experiments"] + 1))
 
 
 rule plot_expression_dist:
     input:
-        matrices
+        lambda wildcards: matrices(wildcards.dataset)
     output:
         "results/{context}/{dataset}.{settings}.expression_dist.svg"
     script:
@@ -117,7 +133,7 @@ rule plot_expression_dist:
 
 rule plot_overdispersion:
     input:
-        matrices
+        lambda wildcards: matrices(wildcards.dataset)
     output:
         "results/{context}/{dataset}.{settings}.overdispersion.svg"
     script:
@@ -126,7 +142,7 @@ rule plot_overdispersion:
 
 rule plot_correlation:
     input:
-        matrices
+        lambda wildcards: matrices(wildcards.dataset)
     output:
         "results/{context}/{dataset}.{settings}.correlation.svg"
     script:
@@ -135,7 +151,7 @@ rule plot_correlation:
 
 rule plot_pca:
     input:
-        matrices
+        lambda wildcards: matrices(wildcards.dataset)
     output:
         "results/{context}/{dataset}.{settings}.pca.svg"
     script:
@@ -181,6 +197,18 @@ rule plot_simulation:
         means=means
     script:
         "scripts/plot-simulation.py"
+
+
+rule plot_dataset_correlation:
+    input:
+        small=matrices("140genesData"),
+        large=matrices("1001genesData"),
+        small_counts=matrices("140genesData", type="counts"),
+        large_counts=matrices("1001genesData", type="counts")
+    output:
+        "results/{context}/{settings}.dataset_correlation.pdf"
+    script:
+        "scripts/plot-dataset-correlation.py"
 
 
 rule svg2pdf:
