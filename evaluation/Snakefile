@@ -113,8 +113,8 @@ rule count_matrix:
         "scripts/count-matrix.py"
 
 
-def matrices(dataset, type="expressions"):
-    suffix = ".{settings}." if type == "expressions" else "."
+def matrices(dataset, type="expressions", settings="default"):
+    suffix = ".{}.".format(settings) if type == "expressions" else "."
     return expand("{type}/{dataset}.{experiment}.all{suffix}matrix.txt",
                   dataset=dataset,
                   type=type,
@@ -124,7 +124,7 @@ def matrices(dataset, type="expressions"):
 
 rule plot_expression_dist:
     input:
-        lambda wildcards: matrices(wildcards.dataset)
+        lambda wildcards: matrices(wildcards.dataset, settings=wildcards.settings)
     output:
         "results/{context}/{dataset}.{settings}.expression_dist.svg"
     script:
@@ -133,7 +133,7 @@ rule plot_expression_dist:
 
 rule plot_overdispersion:
     input:
-        lambda wildcards: matrices(wildcards.dataset)
+        lambda wildcards: matrices(wildcards.dataset, settings=wildcards.settings)
     output:
         "results/{context}/{dataset}.{settings}.overdispersion.svg"
     script:
@@ -142,7 +142,7 @@ rule plot_overdispersion:
 
 rule plot_correlation:
     input:
-        lambda wildcards: matrices(wildcards.dataset)
+        lambda wildcards: matrices(wildcards.dataset, settings=wildcards.settings)
     output:
         "results/{context}/{dataset}.{settings}.correlation.svg"
     script:
@@ -151,7 +151,7 @@ rule plot_correlation:
 
 rule plot_pca:
     input:
-        lambda wildcards: matrices(wildcards.dataset)
+        lambda wildcards: matrices(wildcards.dataset, settings=wildcards.settings)
     output:
         "results/{context}/{dataset}.{settings}.pca.svg"
     script:
@@ -192,7 +192,7 @@ rule plot_simulation:
         raw_counts=expand("counts/simulated-MHD{{dist}}.{mean}.all.txt", mean=means),
         known_counts=expand("data/simulated.{mean}.known.txt", mean=means)
     output:
-        "results/{context}/simulation-MHD{dist}/MHD{dist}.squared_error.{settings}.svg"
+        "results/{context}/simulation-MHD{dist}/MHD{dist}.error.{settings}.svg"
     params:
         means=means
     script:
@@ -206,9 +206,81 @@ rule plot_dataset_correlation:
         small_counts=matrices("140genesData", type="counts"),
         large_counts=matrices("1001genesData", type="counts")
     output:
-        "results/{context}/{settings}.dataset_correlation.pdf"
+        "results/{context}/{settings}.dataset_correlation.svg"
     script:
         "scripts/plot-dataset-correlation.py"
+
+
+rule figure1:
+    input:
+        b="results/paper/expression_pmf/140genesData.1.cell0.COL5A1.default.expression_pmf.svg",
+        a="results/paper/expression_pmf/140genesData.1.cell0.CKAP5.default.expression_pmf.svg",
+        c="results/paper/foldchange_cdf/140genesData.1.A-vs-B.COL5A1.default.foldchange_cdf.svg"
+    output:
+        "figures/fig1.svg"
+    run:
+        import svgutils.transform as sg
+        fig = sg.SVGFigure("24.8cm", "6cm")
+        a = sg.fromfile(input.a).getroot()
+        b = sg.fromfile(input.b).getroot()
+        c = sg.fromfile(input.c).getroot()
+        b.moveto(294, 0)
+        c.moveto(588, 0)
+
+        la = sg.TextElement(0,10, "a", size=12, weight="bold")
+        lb = sg.TextElement(294,10, "b", size=12, weight="bold")
+        lc = sg.TextElement(588,10, "c", size=12, weight="bold")
+
+        fig.append([a, b, c, la, lb, lc])
+        fig.save(output[0])
+
+
+rule figure2:
+    input:
+        a="results/paper/140genesData.default.expression_dist.svg",
+        b="results/paper/default.dataset_correlation.svg",
+        c="results/paper/simulation-MHD4/MHD4.error.default.svg",
+        d="results/paper/simulation-MHD2/MHD2.error.default.svg"
+    output:
+        "figures/fig2.svg"
+    run:
+        import svgutils.transform as sg
+        fig = sg.SVGFigure("16.2cm", "12cm")
+        a = sg.fromfile(input.a).getroot()
+        b = sg.fromfile(input.b).getroot()
+        c = sg.fromfile(input.c).getroot()
+        d = sg.fromfile(input.d).getroot()
+        b.moveto(288, 0)
+        c.moveto(0, 200)
+        d.moveto(288, 200)
+
+        la = sg.TextElement(0,10, "a", size=12, weight="bold")
+        lb = sg.TextElement(288,10, "b", size=12, weight="bold")
+        lc = sg.TextElement(0,210, "c", size=12, weight="bold")
+        ld = sg.TextElement(288,210, "d", size=12, weight="bold")
+
+        fig.append([a, b, c, d, la, lb, lc, ld])
+        fig.save(output[0])
+
+
+rule figure3:
+    input:
+        a="results/paper/140genesData.default.pca.svg",
+        b="results/paper/140genesData.default.overdispersion.svg"
+    output:
+        "figures/fig3.svg"
+    run:
+        import svgutils.transform as sg
+        fig = sg.SVGFigure("17.2cm", "11.5cm")
+        a = sg.fromfile(input.a).getroot()
+        b = sg.fromfile(input.b).getroot()
+        b.moveto(0, 195)
+
+        la = sg.TextElement(0,10, "a", size=12, weight="bold")
+        lb = sg.TextElement(0,205, "b", size=12, weight="bold")
+
+        fig.append([a, b, la, lb])
+        fig.save(output[0])
 
 
 rule svg2pdf:

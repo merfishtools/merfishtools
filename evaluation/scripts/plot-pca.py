@@ -28,7 +28,7 @@ pcs = list(combinations(scores.columns, 2))
 # plot
 sns.set(style="ticks", palette="colorblind", context=snakemake.wildcards.context)
 width, height = snakemake.config["plots"]["figsize"]
-plt.figure(figsize=(width * 3, height))
+plt.figure(figsize=(height * 3, height))
 
 gs = gridspec.GridSpec(1, 3)
 for i, (a, b) in enumerate(pcs):
