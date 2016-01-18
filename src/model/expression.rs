@@ -35,7 +35,8 @@ mod tests {
 
     use itertools::Itertools;
     use nalgebra::ApproxEq;
-    use bio::stats::logprobs::{Prob, log_prob_sum};
+    use bio::stats::logprobs;
+    use bio::stats::logprobs::Prob;
 
     use super::*;
     use model;
@@ -47,15 +48,15 @@ mod tests {
     const p1: Prob = 0.1;
 
     fn setup() -> model::Readout {
-        model::Readout::new(N, m, p0, p1, 4, 140, 36)
+        model::Readout::new(N, m, p0, p1, 4)
     }
 
     #[test]
     fn test_pmf() {
         let readout = setup();
-        let pmf = pmf(25, 10, 1000, &readout);
+        let pmf = pmf(25, 10, &readout);
 
-        let total = log_prob_sum(&pmf.iter().map(|e| e.prob).collect_vec());
+        let total = logprobs::sum(&pmf.iter().map(|e| e.prob).collect_vec());
         println!("{:?}", pmf);
         println!("{}", total);
         assert!(total.approx_eq(&-0.0000011368907495423741));
@@ -64,12 +65,12 @@ mod tests {
     #[test]
     fn test_pmf2() {
         let readout = setup();
-        let pmf = pmf(176, 25, 1000, &readout);
+        let pmf = pmf(176, 25, &readout);
 
-        let total = log_prob_sum(&pmf.iter().map(|e| e.prob).collect_vec());
+        let total = logprobs::sum(&pmf.iter().map(|e| e.prob).collect_vec());
         println!("{:?}", pmf);
         println!("{}", total);
-        assert!(total.approx_eq(&-0.0000014614508687671446));
+        assert!(total.approx_eq(&-0.0000029387441422557004));
     }
 }
 /*

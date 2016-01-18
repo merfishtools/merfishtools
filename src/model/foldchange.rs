@@ -53,7 +53,8 @@ mod tests {
 
     use itertools::Itertools;
     use nalgebra::ApproxEq;
-    use bio::stats::logprobs::{Prob, log_prob_sum};
+    use bio::stats::logprobs;
+    use bio::stats::logprobs::Prob;
 
     use model;
 
@@ -64,23 +65,23 @@ mod tests {
 
 
     fn setup() -> model::Readout {
-        model::Readout::new(N, m, p0, p1, 4, 140, 36)
+        model::Readout::new(N, m, p0, p1, 4)
     }
 
     #[test]
     fn test_pmf() {
         let readout = setup();
         let pmfs1 = [
-            model::expression::pmf(5, 1, 1000, &readout),
-            model::expression::pmf(10, 1, 1000, &readout),
-            model::expression::pmf(3, 1, 1000, &readout),
-            model::expression::pmf(24, 1, 1000, &readout)
+            model::expression::pmf(5, 1, &readout),
+            model::expression::pmf(10, 1, &readout),
+            model::expression::pmf(3, 1, &readout),
+            model::expression::pmf(24, 1, &readout)
         ];
         let pmfs2 = [
-            model::expression::pmf(50, 1, 1000, &readout),
-            model::expression::pmf(100, 1, 1000, &readout),
-            model::expression::pmf(30, 1, 1000, &readout),
-            model::expression::pmf(240, 1, 1000, &readout)
+            model::expression::pmf(50, 1, &readout),
+            model::expression::pmf(100, 1, &readout),
+            model::expression::pmf(30, 1, &readout),
+            model::expression::pmf(240, 1, &readout)
         ];
         let pmf1 = model::expressionset::pmf(&pmfs1);
         let pmf2 = model::expressionset::pmf(&pmfs2);
@@ -88,11 +89,11 @@ mod tests {
         let pmf = pmf(&pmf1, &pmf2);
 
 
-        let total = log_prob_sum(&pmf.iter().map(|fc| fc.prob).collect_vec());
+        let total = logprobs::sum(&pmf.iter().map(|fc| fc.prob).collect_vec());
 
         println!("{:?}", total);
         println!("ev={}", pmf.expected_value());
-        assert!(pmf.expected_value().approx_eq(&9.25643185097143));
-        assert!(total.approx_eq(&-0.00001747607580426802));
+        assert!(pmf.expected_value().approx_eq(&9.170789943247653));
+        assert!(total.approx_eq(&-0.000019827547922623978));
     }
 }

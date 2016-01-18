@@ -63,7 +63,7 @@ def simulate(codebook, counts_path, has_corrected=True):
 
             for gene, word in codebook.items():
                 count = known_counts[cell][gene]
-                if not gene.startswith("notarget") and not gene.startswith("blank"):
+                if True: #not gene.startswith("notarget") and not gene.startswith("blank"):
                     for _ in range(count):
                         readout, errs = sim_errors(word)
                         errors.append(errs)

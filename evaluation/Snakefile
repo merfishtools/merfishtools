@@ -20,7 +20,7 @@ rule all:
             "results/{context}/{dataset}.default.overdispersion.pdf",
             "results/{context}/{dataset}.default.correlation.pdf"
         ], context=contexts, dataset=datasets),
-        expand("results/{context}/simulation-MHD{dist}/MHD{dist}.squared_error.default.pdf", context=contexts, dist=[2, 4]),
+        expand("results/{context}/simulation-MHD{dist}/MHD{dist}.error.default.pdf", context=contexts, dist=[2, 4]),
         expand("results/{context}/default.dataset_correlation.pdf", context=contexts)
 
 
@@ -192,7 +192,8 @@ rule plot_simulation:
         raw_counts=expand("counts/simulated-MHD{{dist}}.{mean}.all.txt", mean=means),
         known_counts=expand("data/simulated.{mean}.known.txt", mean=means)
     output:
-        "results/{context}/simulation-MHD{dist}/MHD{dist}.error.{settings}.svg"
+        violin="results/{context}/simulation-MHD{dist}/MHD{dist}.error.{settings}.svg",
+        scatter="results/{context}/simulation-MHD{dist}/MHD{dist}.scatter.{settings}.svg"
     params:
         means=means
     script:

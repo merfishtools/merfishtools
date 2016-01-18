@@ -159,19 +159,13 @@ impl Readout {
     }
 
     pub fn window(&self, count: u32) -> (u32, u32) {
-        // x = i + j + k + miscall_exact + miscall_mismatch
-        // i = count and j = count_exact maximize the inner probability of the likelihood because
-        // we have no miscalls then.
-        // Hence we can estimate a good center using the expected value of the multinomial distribution.
-        // E(j) = x * Pr(H=0, E=e)
-        // E(i - j) = x * Pr(H=1, E=e)
-        // E(miscall_exact) = x * Pr(H=0, E!=e)
-        // E(miscall_mismatch) = x * Pr(H=1, E!=e)
-        // x * Pr(H=1) = i - x * Pr(H=0)
-        // x = i / (Pr(H=1) + Pr(H=0))
+        let prob_call = 1.0 - self.prob_miscall;
+        //let n_0 = (count - count_exact) as f64 / (self.prob_call_mismatch * (1.0 - self.prob_miscall) + self.prob_miscall_mismatch);
+        //let n_1 = count_exact as f64 / (self.prob_call_exact * (1.0 - self.prob_miscall) + self.prob_miscall_exact);
+        let n = count as f64 / (self.prob_call_exact * prob_call +  self.prob_call_mismatch * prob_call + self.prob_miscall_exact + self.prob_miscall_mismatch);
+        let x = (n * self.prob_call_exact * prob_call + n * self.prob_call_mismatch * prob_call + n * self.prob_missed).round() as i32;
 
-        let center = (count as f64 / (self.prob_call_exact + self.prob_call_mismatch)).round() as i32;
-        (cmp::max(center - 50, 0) as u32, center as u32 + 50)
+        (cmp::max(x - 50, 0) as u32, x as u32 + 50)
     }
 
     pub fn likelihood(&self, x: u32, count: u32, count_exact: u32) -> LogProb {
@@ -219,7 +213,7 @@ impl Readout {
 mod tests {
     #![allow(non_upper_case_globals)]
 
-    use super::{MHD4, MHD2, Params, Model};
+    use super::{MHD4, MHD2, Params, Model, Readout};
     use nalgebra::ApproxEq;
 
 
@@ -285,5 +279,14 @@ mod tests {
         assert!(p.approx_eq(&0.00020678954309879646));
         let p = factory.xi(1, 2);
         assert!(p.approx_eq(&7.754607866204867e-05));
+    }
+
+    #[test]
+    fn test_window() {
+        let readout = Readout::new(16, 4, 0.04, 0.1, 4);
+        let (lower, upper) = readout.window(175);
+        println!("{} {}", lower, upper);
+        assert!(readout.likelihood(lower, 175, 25).exp().approx_eq(&0.0));
+        assert!(readout.likelihood(upper, 175, 25).exp().approx_eq(&0.0));
     }
 }

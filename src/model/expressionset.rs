@@ -64,7 +64,8 @@ mod tests {
 
     use itertools::Itertools;
     use nalgebra::ApproxEq;
-    use bio::stats::logprobs::{Prob, log_prob_sum};
+    use bio::stats::logprobs;
+    use bio::stats::logprobs::Prob;
 
     use super::*;
     use model;
@@ -76,21 +77,21 @@ mod tests {
     const p1: Prob = 0.1;
 
     fn setup() -> model::Readout {
-        model::Readout::new(N, m, p0, p1, 4, 140, 36)
+        model::Readout::new(N, m, p0, p1, 4)
     }
 
     #[test]
     fn test_pmf() {
         let readout = setup();
         let pmfs = [
-            model::expression::pmf(5, 1, 1000, &readout),
-            model::expression::pmf(10, 1, 1000, &readout),
-            model::expression::pmf(3, 1, 1000, &readout),
-            model::expression::pmf(24, 1, 1000, &readout)
+            model::expression::pmf(5, 1, &readout),
+            model::expression::pmf(10, 1, &readout),
+            model::expression::pmf(3, 1, &readout),
+            model::expression::pmf(24, 1, &readout)
         ];
         let pmf = pmf(&pmfs);
 
-        let total = log_prob_sum(&pmf.iter().map(|e| e.prob).collect_vec());
+        let total = logprobs::sum(&pmf.iter().map(|e| e.prob).collect_vec());
         let values = pmf.iter().map(|e| (*e.value.numer() as f64 / *e.value.denom() as f64, e.prob)).collect_vec();
 
         println!("{:?}", values);
