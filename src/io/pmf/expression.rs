@@ -12,6 +12,9 @@ use model::expression::PMF;
 use model;
 
 
+const HEADER: [&'static str; 4] = ["cell", "feat", "expr", "prob"];
+
+
 pub struct PMFs {
     inner: collections::HashMap<String, Vec<PMF>>
 }
@@ -56,16 +59,22 @@ pub struct Reader<R: io::Read> {
 
 impl Reader<fs::File> {
     /// Read from a given file path.
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Self {
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Option<Self> {
         fs::File::open(path).map(|f| Reader::from_reader(f)).ok().expect("Error opening file.")
     }
 }
 
 
 impl<R: io::Read> Reader<R> {
-    pub fn from_reader(rdr: R) -> Self {
-        Reader {
-            inner: csv::Reader::from_reader(rdr).delimiter(b'\t')
+    pub fn from_reader(rdr: R) -> Option<Self> {
+        let mut inner = csv::Reader::from_reader(rdr).delimiter(b'\t');
+        if inner.headers().unwrap() == HEADER {
+            Some(Reader {
+                inner: inner
+            })
+        }
+        else {
+            None
         }
     }
 
@@ -109,7 +118,7 @@ impl<W: io::Write> Writer<W> {
         let mut writer = Writer {
             inner: csv::Writer::from_writer(w).delimiter(b'\t')
         };
-        writer.inner.write(["cell", "feat", "expr", "prob"].iter()).unwrap();
+        writer.inner.write(HEADER.iter()).unwrap();
 
         writer
     }

@@ -20,7 +20,7 @@ rule all:
             "results/{context}/{dataset}.default.overdispersion.pdf",
             "results/{context}/{dataset}.default.correlation.pdf"
         ], context=contexts, dataset=datasets),
-        expand("results/{context}/simulation-MHD{dist}/MHD{dist}.error.default.pdf", context=contexts, dist=[2, 4]),
+        expand("results/{context}/simulation-MHD{dist}/MHD{dist}.{plot}.default.pdf", plot=["scatter", "error"], context=contexts, dist=[2, 4]),
         expand("results/{context}/default.dataset_correlation.pdf", context=contexts)
 
 
@@ -62,13 +62,13 @@ rule expressions:
 
 rule diffexp:
     input:
-        "expressions/{dataset}.{experiment}.{group1}.{settings}.txt",
-        "expressions/{dataset}.{experiment}.{group2}.{settings}.txt"
+        "expressions/{dataset}.{experiment1}.{group1}.{settings}.txt",
+        "expressions/{dataset}.{experiment2}.{group2}.{settings}.txt"
     output:
-        pmf="diffexp/{dataset}.{experiment}.{group1}-vs-{group2}.{settings}.txt",
-        est="diffexp/{dataset}.{experiment}.{group1}-vs-{group2}.{settings}.est.txt"
+        pmf="diffexp/{dataset}.{experiment1}.{group1}-vs-{experiment2}.{group2}.{settings}.txt",
+        est="diffexp/{dataset}.{experiment1}.{group1}-vs-{experiment2}.{group2}.{settings}.est.txt"
     benchmark:
-        "bench/diffexp/{dataset}.{experiment}.{group1}-vs-{group2}.{settings}.txt"
+        "bench/diffexp/{dataset}.{experiment1}.{group1}-vs-{experiment2}.{group2}.{settings}.txt"
     threads: 8
     shell:
         "{merfishtools} diffexp -t {threads} --pmf {output.pmf} {input} "
@@ -87,8 +87,8 @@ rule plot_expression_pmf:
 
 rule plot_foldchange_cdf:
     input:
-        pmf="diffexp/{dataset}.{experiment}.{group1}-vs-{group2}.{settings}.txt",
-        est="diffexp/{dataset}.{experiment}.{group1}-vs-{group2}.{settings}.est.txt"
+        pmf="diffexp/{dataset}.{experiment}.{group1}-vs-{experiment}.{group2}.{settings}.txt",
+        est="diffexp/{dataset}.{experiment}.{group1}-vs-{experiment}.{group2}.{settings}.est.txt"
     output:
         "results/{context}/foldchange_cdf/{dataset}.{experiment}.{group1}-vs-{group2}.{gene}.{settings}.foldchange_cdf.svg"
     script:
@@ -113,13 +113,37 @@ rule count_matrix:
         "scripts/count-matrix.py"
 
 
+def experiments(dataset):
+    return range(1, config["datasets"][dataset]["experiments"] + 1)
+
+
 def matrices(dataset, type="expressions", settings="default"):
     suffix = ".{}.".format(settings) if type == "expressions" else "."
     return expand("{type}/{dataset}.{experiment}.all{suffix}matrix.txt",
                   dataset=dataset,
                   type=type,
                   suffix=suffix,
-                  experiment=range(1, config["datasets"][dataset]["experiments"] + 1))
+                  experiment=experiments(dataset))
+
+
+rule plot_qq:
+    input:
+        lambda wildcards: matrices(wildcards.dataset, settings=wildcards.settings)
+    output:
+        "results/{context}/{dataset}.{settings}.qqplot.svg"
+    params:
+        experiments=lambda wildcards: experiments(wildcards.dataset)
+    script:
+        "scripts/plot-qq.py"
+
+
+rule normalize:
+    input:
+        lambda wildcards: matrices(wildcards.dataset, settings=wildcards.settings)
+    output:
+        "normalized_expressions/{dataset}.{settings}.matrix.txt"
+    script:
+        "scripts/normalize.py"
 
 
 rule plot_expression_dist:

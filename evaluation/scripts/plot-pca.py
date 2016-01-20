@@ -18,6 +18,7 @@ exprs = np.log10(1 + exprs.transpose())
 spca = decomposition.PCA(n_components=3)
 X = preprocessing.scale(exprs)
 scores = pd.DataFrame(spca.fit_transform(X))
+# scores.columns = ["PC{}".format(i) for i in range(1, 4)]
 scores.columns = [
     "PC{} ({:.2%})".format(i + 1, expl_var)
     for i, expl_var in enumerate(spca.explained_variance_ratio_)

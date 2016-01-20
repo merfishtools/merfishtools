@@ -119,8 +119,8 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, estimate_path: Opt
 
 
 pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: Option<String>, min_fc: LogFC, threads: usize) {
-    let mut reader1 = io::pmf::expression::Reader::from_file(group1_path);
-    let mut reader2 = io::pmf::expression::Reader::from_file(group2_path);
+    let mut reader1 = io::pmf::expression::Reader::from_file(group1_path).expect("Invalid input for group 1.");
+    let mut reader2 = io::pmf::expression::Reader::from_file(group2_path).expect("Invalid input for group 2.");
     let mut pmf_writer = pmf_path.map(|path| io::pmf::foldchange::Writer::from_file(path));
     let mut est_writer = io::estimation::differential_expression::Writer::from_writer(std::io::stdout());
 
