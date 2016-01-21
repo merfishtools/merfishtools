@@ -219,15 +219,15 @@ rule plot_pca:
         "scripts/plot-pca.py"
 
 
-rule plot_codebook:
+rule analyze_codebook:
     input:
         "data/{codebook}.codebook.txt"
     output:
-        "results/{context}/codebook/{codebook}.neighbors.svg"
+        "neighbors/{codebook}.neighbors.txt"
     params:
-        neighbor_dist=4
+        neighbor_dist=lambda wildcards: config["datasets"][wildcards.codebook.split(".")[0] + "Data"]["dist"]
     script:
-        "scripts/plot-codebook-neighbors.py"
+        "scripts/codebook-neighbors.py"
 
 
 rule simulate:
@@ -266,7 +266,8 @@ rule plot_dataset_correlation:
         small=matrices("140genesData"),
         large=matrices("1001genesData"),
         small_counts=matrices("140genesData", type="counts"),
-        large_counts=matrices("1001genesData", type="counts")
+        large_counts=matrices("1001genesData", type="counts"),
+        neighbors="neighbors/1001genes.1.neighbors.txt"
     output:
         "results/{context}/{settings}.dataset_correlation.svg"
     script:
