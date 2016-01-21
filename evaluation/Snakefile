@@ -1,3 +1,5 @@
+import pandas as pd
+
 configfile: "config.yaml"
 
 
@@ -8,6 +10,19 @@ contexts = ["paper"]
 datasets = ["140genesData"]
 
 
+def experiments(dataset):
+    return range(1, config["datasets"][dataset]["experiments"] + 1)
+
+
+def matrices(dataset, type="expressions", settings="default"):
+    suffix = "." if type == "counts" else ".{}.".format(settings)
+    return expand("{type}/{dataset}.{experiment}.all{suffix}matrix.txt",
+                  dataset=dataset,
+                  type=type,
+                  suffix=suffix,
+                  experiment=experiments(dataset))
+
+
 rule all:
     input:
         expand([
@@ -15,11 +30,14 @@ rule all:
             "results/{context}/expression_pmf/{dataset}.1.cell0.{gene}.default.expression_pmf.pdf"
         ], gene=config["genes"], context=contexts, dataset=datasets),
         expand([
-            "results/{context}/{dataset}.default.pca.pdf",
             "results/{context}/{dataset}.default.expression_dist.pdf",
             "results/{context}/{dataset}.default.overdispersion.pdf",
             "results/{context}/{dataset}.default.correlation.pdf"
         ], context=contexts, dataset=datasets),
+        expand(["results/{context}/{dataset}.{type}.default.pca.pdf",
+                "results/{context}/{dataset}.{type}.default.qqplot.pdf"],
+               context=contexts, dataset=datasets,
+               type=["expressions", "normalized_expressions"]),
         expand("results/{context}/simulation-MHD{dist}/MHD{dist}.{plot}.default.pdf", plot=["scatter", "error"], context=contexts, dist=[2, 4]),
         expand("results/{context}/default.dataset_correlation.pdf", context=contexts)
 
@@ -58,6 +76,19 @@ rule expressions:
     shell:
         "{merfishtools} exp --hamming-dist {params.dist} -N {params.bits} "
         "--estimate {output.est} -t {threads} < {input} > {output.pmf}"
+
+
+rule normalize_pmf:
+    input:
+        pmf="expressions/{dataset}.{experiment}.{group}.{settings}.txt",
+        scales="normalized_expressions/{dataset}.{settings}.scale_factors.txt"
+    output:
+        "normalized_expressions/{dataset}.{experiment}.{group}.{settings,(default)}.txt"
+    run:
+        pmf = pd.read_table(input.pmf, index_col=0)
+        scales = pd.read_table(input.scales, index_col=0, squeeze=True, header=None)
+        pmf["expr"] *= scales[int(wildcards.experiment)]
+        pmf.to_csv(output[0], sep="\t")
 
 
 rule diffexp:
@@ -104,6 +135,20 @@ rule expression_matrix:
         "scripts/expression-matrix.py"
 
 
+rule normalize_expression_matrix:
+    input:
+        expr="expressions/{dataset}.{experiment}.{group}.{settings}.matrix.txt",
+        scales="normalized_expressions/{dataset}.{settings}.scale_factors.txt"
+    output:
+        "normalized_expressions/{dataset}.{experiment}.{group}.{settings}.matrix.txt"
+    run:
+        expr = pd.read_table(input.expr, index_col=0)
+        scales = pd.read_table(input.scales, index_col=0, squeeze=True, header=None)
+        print(scales)
+        expr *= scales[int(wildcards.experiment)]
+        expr.to_csv(output[0], sep="\t")
+
+
 rule count_matrix:
     input:
         "counts/{dataset}.{experiment}.{group}.txt"
@@ -113,35 +158,24 @@ rule count_matrix:
         "scripts/count-matrix.py"
 
 
-def experiments(dataset):
-    return range(1, config["datasets"][dataset]["experiments"] + 1)
-
-
-def matrices(dataset, type="expressions", settings="default"):
-    suffix = ".{}.".format(settings) if type == "expressions" else "."
-    return expand("{type}/{dataset}.{experiment}.all{suffix}matrix.txt",
-                  dataset=dataset,
-                  type=type,
-                  suffix=suffix,
-                  experiment=experiments(dataset))
-
-
 rule plot_qq:
     input:
-        lambda wildcards: matrices(wildcards.dataset, settings=wildcards.settings)
+        lambda wildcards: matrices(wildcards.dataset, type=wildcards.type, settings=wildcards.settings)
     output:
-        "results/{context}/{dataset}.{settings}.qqplot.svg"
+        "results/{context}/{dataset}.{type}.{settings}.qqplot.svg"
     params:
         experiments=lambda wildcards: experiments(wildcards.dataset)
     script:
         "scripts/plot-qq.py"
 
 
-rule normalize:
+rule scale_factors:
     input:
         lambda wildcards: matrices(wildcards.dataset, settings=wildcards.settings)
     output:
-        "normalized_expressions/{dataset}.{settings}.matrix.txt"
+        "normalized_expressions/{dataset}.{settings}.scale_factors.txt"
+    params:
+        experiments=lambda wildcards: experiments(wildcards.dataset)
     script:
         "scripts/normalize.py"
 
@@ -175,9 +209,9 @@ rule plot_correlation:
 
 rule plot_pca:
     input:
-        lambda wildcards: matrices(wildcards.dataset, settings=wildcards.settings)
+        lambda wildcards: matrices(wildcards.dataset, type=wildcards.type, settings=wildcards.settings)
     output:
-        "results/{context}/{dataset}.{settings}.pca.svg"
+        "results/{context}/{dataset}.{type}.{settings}.pca.svg"
     script:
         "scripts/plot-pca.py"
 

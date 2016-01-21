@@ -21,10 +21,11 @@ for (i, (a, a_name)), (j, (b, b_name)) in combinations(enumerate(zip(exprs, snak
 
     vmax = max(q_a.max(), q_b.max())
 
-    plt.loglog(q_a, q_b, "k.")
+    plt.loglog(q_b, q_a, "k.")
     plt.loglog([0.01, vmax], [0.01, vmax], "r--")
-    plt.xlabel("experiment {}".format(a_name))
-    plt.ylabel("experiment {}".format(b_name))
+    plt.xlabel("experiment {}".format(b_name))
+    plt.ylabel("experiment {}".format(a_name))
     sns.despine()
+plt.tight_layout()
 
 plt.savefig(snakemake.output[0], bbox_inches="tight")
