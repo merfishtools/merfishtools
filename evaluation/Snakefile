@@ -1,4 +1,7 @@
 import pandas as pd
+sys.path.insert(0, "../")
+import merfishtools as mt
+
 
 configfile: "config.yaml"
 
