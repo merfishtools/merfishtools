@@ -26,6 +26,7 @@ def hamming1_env(word):
 
 
 codebook_mhd4 = pd.read_table(snakemake.input.mhd4, index_col=0, dtype=np.dtype(str))["codeword"].apply(bitarray)
+print(pd.read_table(snakemake.input.mhd2, index_col=0, dtype=np.dtype(str))["codeword"])
 codebook_mhd2 = pd.read_table(snakemake.input.mhd2, index_col=0, dtype=np.dtype(str))["codeword"].apply(bitarray)
 genes = set(codebook_mhd2.index) | set(codebook_mhd4.index)
 
