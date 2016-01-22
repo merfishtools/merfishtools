@@ -30,9 +30,9 @@ max_value = 100#max(small.max(), large.max())
 fig = plt.figure(figsize=snakemake.config["plots"]["figsize"])
 ax = fig.add_subplot(111, aspect='equal')
 
-ax.scatter(small, large, c=neighbors, cmap=mpl.cm.get_cmap("Reds"), label="conditional expectation", edgecolors="face", norm=mpl.colors.Normalize(vmin=5, vmax=50))
+ax.scatter(small, large, c=neighbors, cmap=mpl.cm.get_cmap("Reds"), label="conditional expectation", edgecolors="face", norm=mpl.colors.Normalize())#vmin=5, vmax=50))
 ax.plot([min_value, max_value], [min_value, max_value], "k--")
-ax.scatter(small_counts, large_counts, c=neighbors, cmap=mpl.cm.get_cmap("Greys"), label="raw counts", edgecolors="face", norm=mpl.colors.Normalize(vmin=5, vmax=50))
+ax.scatter(small_counts, large_counts, c=neighbors, cmap=mpl.cm.get_cmap("Greys"), label="raw counts", edgecolors="face", norm=mpl.colors.Normalize())#vmin=5, vmax=50))
 ax.set_xscale("log")
 ax.set_yscale("log")
 

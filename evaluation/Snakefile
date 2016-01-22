@@ -225,9 +225,19 @@ rule analyze_codebook:
     output:
         "neighbors/{codebook}.neighbors.txt"
     params:
-        neighbor_dist=lambda wildcards: config["datasets"][wildcards.codebook.split(".")[0] + "Data"]["dist"]
+        neighbor_dist=4#lambda wildcards: config["datasets"][wildcards.codebook.split(".")[0] + "Data"]["dist"]
     script:
         "scripts/codebook-neighbors.py"
+
+
+rule plot_neighbor_bias:
+    input:
+        neighbors="neighbors/1001genes.1.neighbors.txt",
+        counts=matrices("1001genesData", type="counts")
+    output:
+        "results/{context}/1001genesData.{settings}.neighbor_bias.svg"
+    script:
+        "scripts/plot-neighbor-bias.py"
 
 
 rule simulate:
