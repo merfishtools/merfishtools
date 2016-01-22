@@ -8,16 +8,18 @@ use bio::stats::combinatorics::combinations;
 use bio::stats::logprobs::{Prob, LogProb};
 use bio::stats::logprobs;
 
+use io::codebook::Codebook;
 
-struct Params {
+pub struct Params {
     N: u8,
     m: u8,
     p0: Prob,
-    p1: Prob
+    p1: Prob,
+    codebook: Codebook
 }
 
 
-trait Model {
+pub trait Model: Sync {
 
     fn params(&self) -> &Params;
 
@@ -27,7 +29,7 @@ trait Model {
         (1.0 - self.params().p1).powi((self.params().m - i) as i32) * (1.0 - self.params().p0).powi((self.params().N - self.params().m - j) as i32)
     }
 
-    /// Number of possibilities for i 1->0 and j 0->1 errors.
+    /// Number of possibilities to select i ones and j zeros.
     fn psi(&self, i: u8, j: u8) -> f64 {
         combinations(self.params().m as u64, i as u64) * combinations((self.params().N - self.params().m) as u64, j as u64)
     }
@@ -39,28 +41,28 @@ trait Model {
     fn prob_call_mismatch(&self) -> Prob;
 
     /// Probability to see an exact readout given that we have a miscall.
-    fn prob_miscall_exact(&self) -> Prob;
+    fn prob_miscall_exact(&self, feature: &str) -> Prob;
 
     /// Probability to see a readout with one mismatch given that we have a miscall.
-    fn prob_miscall_mismatch(&self) -> Prob;
+    fn prob_miscall_mismatch(&self, feature: &str) -> Prob;
 
     /// Probability to miss or miscall a readout because of too many errors.
     fn prob_missed(&self) -> Prob {
         1.0 - self.prob_call_exact() - self.prob_call_mismatch()
     }
 
-    fn prob_miscall(&self) -> Prob {
-        self.prob_miscall_exact() + self.prob_miscall_mismatch()
+    fn prob_miscall(&self, feature: &str) -> Prob {
+        self.prob_miscall_exact(feature) + self.prob_miscall_mismatch(feature)
     }
 
     /// Probability to completely miss a readout (not miscalled).
-    fn prob_nocall(&self) -> Prob {
-        1.0 - self.prob_miscall_exact() - self.prob_miscall_mismatch()
+    fn prob_nocall(&self, feature: &str) -> Prob {
+        1.0 - self.prob_miscall_exact(feature) - self.prob_miscall_mismatch(feature)
     }
 }
 
 
-struct MHD4 {
+pub struct MHD4 {
     params: Params
 }
 
@@ -82,19 +84,21 @@ impl Model for MHD4 {
     }
 
     /// Probability to see an exact readout given that we have a miscall.
-    fn prob_miscall_exact(&self) -> Prob {
-        self.psi(2,2) * self.xi(2, 2)
+    fn prob_miscall_exact(&self, feature: &str) -> Prob {
+        self.params().codebook.neighbors(feature, 4) as f64 * self.xi(2, 2)
     }
 
     /// Probability to see a readout with one mismatch given that we have a miscall.
-    fn prob_miscall_mismatch(&self) -> Prob {
-        self.psi(2, 1) * self.xi(2, 1) + self.psi(1, 2) * self.xi(1, 2) +
-        self.psi(2, 3) * self.xi(2, 3) + self.psi(3, 2) * self.xi(3, 2)
+    fn prob_miscall_mismatch(&self, feature: &str) -> Prob {
+        let n = self.params().codebook.neighbors(feature, 4) as f64;
+
+        n * self.psi(0, 1) * self.xi(2, 1) + n * self.psi(1, 0) * self.xi(1, 2) +
+        n * self.psi(1, 0) * self.xi(3, 2) + n * self.psi(0, 1) * self.xi(2, 3)
     }
 }
 
 
-struct MHD2 {
+pub struct MHD2 {
     params: Params
 }
 
@@ -116,14 +120,27 @@ impl Model for MHD2 {
     }
 
     /// Probability to see an exact readout given that we have a miscall.
-    fn prob_miscall_exact(&self) -> Prob {
-        (1..4).fold(0.0, |p, i| p + self.psi(i, i) * self.xi(i, i))
+    fn prob_miscall_exact(&self, feature: &str) -> Prob {
+        self.params().codebook.neighbors(feature, 2) as f64 * self.xi(1, 1) +
+        self.params().codebook.neighbors(feature, 4) as f64 * self.xi(2, 2)
     }
 
     /// Probability to see a readout with one mismatch given that we have a miscall.
-    fn prob_miscall_mismatch(&self) -> Prob {
+    #[allow(unused_variables)]
+    fn prob_miscall_mismatch(&self, feature: &str) -> Prob {
         0.0
     }
+}
+
+
+pub fn new_model(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook: Codebook) -> Box<Model> {
+    let params = Params { N: N, m: m, p0: p0, p1: p1, codebook: codebook};
+    let model: Box<Model> = match dist {
+        4 => Box::new(MHD4 { params: params }),
+        2 => Box::new(MHD2 { params: params }),
+        _ => panic!("Hamming distances other than 2 and 4 are unsupported at the moment.")
+    };
+    model
 }
 
 
@@ -140,21 +157,16 @@ pub struct Readout {
 
 
 impl Readout {
-    pub fn new(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8) -> Self {
-        let params = Params { N: N, m: m, p0: p0, p1: p1};
-        let model: Box<Model> = match dist {
-            4 => Box::new(MHD4 { params: params }),
-            2 => Box::new(MHD2 { params: params }),
-            _ => panic!("Hamming distances other than 2 and 4 are unsupported at the moment.")
-        };
+    pub fn new(feature: &str, model: &Box<Model>) -> Self {
+
         Readout {
             prob_call_exact: model.prob_call_exact(),
             prob_call_mismatch: model.prob_call_mismatch(),
-            prob_miscall_exact: model.prob_miscall_exact(),
-            prob_miscall_mismatch: model.prob_miscall_mismatch(),
+            prob_miscall_exact: model.prob_miscall_exact(feature),
+            prob_miscall_mismatch: model.prob_miscall_mismatch(feature),
             prob_missed: model.prob_missed(),
-            prob_nocall: model.prob_nocall(),
-            prob_miscall: model.prob_miscall()
+            prob_nocall: model.prob_nocall(feature),
+            prob_miscall: model.prob_miscall(feature)
         }
     }
 

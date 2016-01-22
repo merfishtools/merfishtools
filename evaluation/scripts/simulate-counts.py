@@ -25,8 +25,8 @@ def hamming1_env(word):
         yield w
 
 
-codebook_mhd4 = pd.read_table(snakemake.input.mhd4, index_col=0, dtype=np.dtype(str), squeeze=True).apply(bitarray)
-codebook_mhd2 = pd.read_table(snakemake.input.mhd2, index_col=0, dtype=np.dtype(str), squeeze=True).apply(bitarray)
+codebook_mhd4 = pd.read_table(snakemake.input.mhd4, index_col=0, dtype=np.dtype(str))["codeword"].apply(bitarray)
+codebook_mhd2 = pd.read_table(snakemake.input.mhd2, index_col=0, dtype=np.dtype(str))["codeword"].apply(bitarray)
 genes = set(codebook_mhd2.index) | set(codebook_mhd4.index)
 
 
@@ -63,7 +63,7 @@ def simulate(codebook, counts_path, has_corrected=True):
 
             for gene, word in codebook.items():
                 count = known_counts[cell][gene]
-                if True: #not gene.startswith("notarget") and not gene.startswith("blank"):
+                if not gene.startswith("notarget") and not gene.startswith("blank"):
                     for _ in range(count):
                         readout, errs = sim_errors(word)
                         errors.append(errs)

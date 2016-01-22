@@ -22,6 +22,22 @@ datasets:
     N: 14
     experiments: 1
 
+codebooks:
+  140genesData:
+    1: codebook/140genesData.1.txt
+    2: codebook/140genesData.2.txt
+    3: codebook/140genesData.1.txt
+    4: codebook/140genesData.2.txt
+    5: codebook/140genesData.2.txt
+    6: codebook/140genesData.1.txt
+    7: codebook/140genesData.1.txt
+  1001genesData:
+    1: codebook/1001genesData.txt
+    2: codebook/1001genesData.txt
+    3: codebook/1001genesData.txt
+  simulated-MHD4: codebook/140genesData.1.txt
+  simulated-MHD2: codebook/1001genesData.txt
+
 settings:
   default:
 

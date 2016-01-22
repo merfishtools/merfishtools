@@ -31,7 +31,7 @@ pub mod cli;
 enum Command {
     exp,
     diffexp,
-    stats,
+    //stats,
     None
 }
 
@@ -43,7 +43,7 @@ impl FromStr for Command {
         return match src {
             "exp"     => Ok(Command::exp),
             "diffexp" => Ok(Command::diffexp),
-            "stats"   => Ok(Command::stats),
+            //"stats"   => Ok(Command::stats),
             _         => Err(()),
         };
     }
@@ -88,7 +88,7 @@ fn main() {
     match subcommand {
         Command::exp     => exp(args),
         Command::diffexp => diffexp(args),
-        Command::stats   => stats(args),
+        //Command::stats   => stats(args),
         Command::None    => {
             error!("Unknown subcommand.");
             std::process::exit(1);
@@ -105,6 +105,7 @@ fn exp(args: Vec<String>) {
     let mut dist = 4;
     let mut threads = 1;
     let mut estimate_path = None;
+    let mut codebook_path: Option<String> = None;
     let mut cells = ".*".to_owned();
 
     {
@@ -121,6 +122,11 @@ Results are provided as PMF (probability mass function) in columns:
 Example: 'merfishtools exp < data.txt > expression.txt'"#
         );
 
+        ap.refer(&mut codebook_path).add_option(&["--codebook", "-c"], StoreOption, r#"
+Path to codebook definition consisting of tab separated columns: feature, codeword, expressed.
+The last column denotes if a codeword is assigned to e.g. a gene for which expression can be expected.
+Unless you have misidentification probes (see Chen et al. Science 2015), you will have only ones in this column.
+"#).required();
         ap.refer(&mut estimate_path).add_option(&["--estimate"], StoreOption, r#"
 Path to write expected value and standard deviation estimates of expression to.
 Output is formatted into columns: cell, feature, expected value, standard deviation
@@ -135,7 +141,7 @@ Output is formatted into columns: cell, feature, expected value, standard deviat
         ap.refer(&mut cells).add_option(&["--cells"], Store, "Regular expression for cells to select (default: all).");
         parse_args_or_exit(&ap, args);
     }
-    cli::expression(N, m, p0, p1, dist, estimate_path, threads, &cells);
+    cli::expression(N, m, p0, p1, dist, &codebook_path.unwrap(), estimate_path, threads, &cells);
 }
 
 
@@ -178,7 +184,7 @@ Output is formatted into columns: feature, foldchange, posterior probability"#);
 }
 
 
-fn stats(args: Vec<String>) {
+/*fn stats(args: Vec<String>) {
     let mut N = 16;
     let mut m = 4;
     let mut p0 = 0.04;
@@ -205,7 +211,7 @@ Example: 'merfishtools stats < stats.txt > expression.txt'"#
         parse_args_or_exit(&ap, args);
     }
     cli::stats(N, m, p0, p1, dist);
-}
+}*/
 
 
 fn parse_args_or_exit(ap: &ArgumentParser, args: Vec<String>) {

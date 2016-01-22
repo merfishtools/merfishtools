@@ -8,7 +8,8 @@ use model;
 pub type PMF = model::pmf::PMF<f32>;
 
 
-pub fn pmf(count: u32, count_exact: u32, readout_model: &model::Readout) -> PMF {
+pub fn pmf(feature: &str, count: u32, count_exact: u32, model: &Box<model::readout::Model>) -> PMF {
+    let readout_model = model::Readout::new(feature, model);
     let (xmin, xmax) = readout_model.window(count);
     let likelihoods = (xmin..xmax + 1).map(|x| {
         readout_model.likelihood(x, count, count_exact)

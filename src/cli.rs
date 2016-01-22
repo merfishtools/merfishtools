@@ -7,7 +7,6 @@ use itertools::Itertools;
 use simple_parallel;
 use crossbeam;
 use regex::Regex;
-use csv;
 
 use bio::stats::logprobs::Prob;
 
@@ -29,8 +28,9 @@ struct Counts {
 }
 
 
-pub fn stats(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8) {
-    let readout_model = model::Readout::new(N, m, p0, p1, dist);
+/*pub fn stats(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &str) {
+    let codebook = io::codebook::Reader::from_file(codebook_path, dist).unwrap().codebook();
+    let model = model::readout::new_model(N, m, p0, p1, dist);
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
 
     let mut total_counts = collections::HashMap::new();
@@ -46,11 +46,12 @@ pub fn stats(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8) {
     for (cell, total_count) in total_counts {
         writer.write([cell, format!("{}", readout_model.expected_total(total_count))].iter()).unwrap();
     }
-}
+}*/
 
 
-pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, estimate_path: Option<String>, threads: usize, cells: &str) {
-    let readout_model = model::Readout::new(N, m, p0, p1, dist);
+pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &str, estimate_path: Option<String>, threads: usize, cells: &str) {
+    let codebook = io::codebook::Reader::from_file(codebook_path, dist).unwrap().codebook();
+    let model = model::readout::new_model(N, m, p0, p1, dist, codebook);
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
     let mut pmf_writer = io::pmf::expression::Writer::from_writer(std::io::stdout());
     let mut est_writer = estimate_path.map(|path| io::estimation::expression::Writer::from_file(path));
@@ -92,7 +93,7 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, estimate_path: Opt
     crossbeam::scope(|scope| {
         for (_, (cell, pmfs)) in pool.unordered_map(scope, counts.into_iter(), |(cell, counts)| {
             let pmfs = counts.into_iter().map(|(feature, count)| {
-                let pmf = model::expression::pmf(count.exact + count.corrected, count.exact, &readout_model);
+                let pmf = model::expression::pmf(&feature, count.exact + count.corrected, count.exact, &model);
                 /*if feature == "COL5A1" {
                     debug!("{:?} {:?}", count, pmf);
                 }*/

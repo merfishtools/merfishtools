@@ -3,6 +3,9 @@ sys.path.insert(0, "../")
 import merfishtools as mt
 
 
+"""Analysis of MERFISHtools, using the data published at http://zhuang.harvard.edu/merfish."""
+
+
 configfile: "config.yaml"
 
 
@@ -64,12 +67,20 @@ rule raw_counts:
         "scripts/raw-counts.py"
 
 
+def get_codebook(wildcards):
+    codebooks = config["codebooks"][wildcards.dataset]
+    if isinstance(codebooks, str):
+        return codebooks
+    return codebooks[int(wildcards.experiment)]
+
+
 rule expressions:
     input:
-        "data/{dataset}.{experiment}.{group}.txt"
+        data="data/{dataset}.{experiment}.{group}.txt",
+        codebook=get_codebook
     output:
-        pmf="expressions/{dataset}.{experiment}.{group}.{settings}.txt",
-        est="expressions/{dataset}.{experiment}.{group}.{settings}.est.txt",
+        pmf="expressions/{dataset}.{experiment,[0-9]}.{group}.{settings}.txt",
+        est="expressions/{dataset}.{experiment,[0-9]}.{group}.{settings}.est.txt",
     params:
         dist=lambda wildcards: config["datasets"][wildcards.dataset]["dist"],
         bits=lambda wildcards: config["datasets"][wildcards.dataset]["N"]
@@ -77,8 +88,8 @@ rule expressions:
         "bench/exp/{dataset}.{settings}.txt"
     threads: 8
     shell:
-        "{merfishtools} exp --hamming-dist {params.dist} -N {params.bits} "
-        "--estimate {output.est} -t {threads} < {input} > {output.pmf}"
+        "{merfishtools} exp --codebook {input.codebook} --hamming-dist {params.dist} -N {params.bits} "
+        "--estimate {output.est} -t {threads} < {input.data} > {output.pmf}"
 
 
 rule normalize_pmf:
@@ -219,17 +230,6 @@ rule plot_pca:
         "scripts/plot-pca.py"
 
 
-rule analyze_codebook:
-    input:
-        "data/{codebook}.codebook.txt"
-    output:
-        "neighbors/{codebook}.neighbors.txt"
-    params:
-        neighbor_dist=4#lambda wildcards: config["datasets"][wildcards.codebook.split(".")[0] + "Data"]["dist"]
-    script:
-        "scripts/codebook-neighbors.py"
-
-
 rule plot_neighbor_bias:
     input:
         neighbors="neighbors/1001genes.1.neighbors.txt",
@@ -242,8 +242,8 @@ rule plot_neighbor_bias:
 
 rule simulate:
     input:
-        mhd4="data/140genes.1.codebook.txt",
-        mhd2="data/1001genes.1.codebook.txt"
+        mhd4="codebook/140genesData.1.txt",
+        mhd2="codebook/1001genesData.txt"
     output:
         sim_counts_mhd4="data/simulated-MHD4.{mean}.all.txt",
         sim_counts_mhd2="data/simulated-MHD2.{mean}.all.txt",
