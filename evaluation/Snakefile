@@ -79,8 +79,8 @@ rule expressions:
         data="data/{dataset}.{experiment}.{group}.txt",
         codebook=get_codebook
     output:
-        pmf="expressions/{dataset}.{experiment,[0-9]}.{group}.{settings}.txt",
-        est="expressions/{dataset}.{experiment,[0-9]}.{group}.{settings}.est.txt",
+        pmf="expressions/{dataset}.{experiment,[0-9]+}.{group}.{settings}.txt",
+        est="expressions/{dataset}.{experiment,[0-9]+}.{group}.{settings}.est.txt",
     params:
         dist=lambda wildcards: config["datasets"][wildcards.dataset]["dist"],
         bits=lambda wildcards: config["datasets"][wildcards.dataset]["N"]
