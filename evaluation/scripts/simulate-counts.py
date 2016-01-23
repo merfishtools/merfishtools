@@ -37,12 +37,13 @@ for gene, a in codebook_mhd4.items():
 with open(snakemake.output.known_counts, "w") as known_out:
     known_out = csv.writer(known_out, delimiter="\t")
     known_out.writerow(["cell", "feat", "mhd2", "mhd4", "count"])
-    known_counts = defaultdict(dict)
+    known_counts = defaultdict(lambda: defaultdict(int))
     for cell in range(snakemake.params.cell_count):
         random_counts = np.random.poisson(int(snakemake.wildcards.mean), len(genes))
         for gene, count in zip(genes, random_counts):
-            known_counts[cell][gene] = count
-            known_out.writerow([cell, gene, gene in codebook_mhd2.index, gene in codebook_mhd4.index, count])
+            if not gene.startswith("notarget") and not gene.startswith("blank"):
+                known_counts[cell][gene] = count
+                known_out.writerow([cell, gene, gene in codebook_mhd2.index, gene in codebook_mhd4.index, count])
 
 
 def simulate(codebook, counts_path, has_corrected=True):
@@ -62,11 +63,10 @@ def simulate(codebook, counts_path, has_corrected=True):
 
             for gene, word in codebook.items():
                 count = known_counts[cell][gene]
-                if not gene.startswith("notarget") and not gene.startswith("blank"):
-                    for _ in range(count):
-                        readout, errs = sim_errors(word)
-                        errors.append(errs)
-                        readouts.append(readout)
+                for _ in range(count):
+                    readout, errs = sim_errors(word)
+                    errors.append(errs)
+                    readouts.append(readout)
 
             exact_counts = Counter()
             corrected_counts = Counter()
