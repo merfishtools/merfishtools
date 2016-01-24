@@ -92,8 +92,8 @@ impl Model for MHD4 {
     fn prob_miscall_mismatch(&self, feature: &str) -> Prob {
         let n = self.params().codebook.neighbors(feature, 4) as f64;
 
-        n * self.psi(0, 1) * self.xi(2, 1) + n * self.psi(1, 0) * self.xi(1, 2) +
-        n * self.psi(1, 0) * self.xi(3, 2) + n * self.psi(0, 1) * self.xi(2, 3)
+        n * (self.params().m - 2) as f64 * self.xi(2, 1) + n * (self.params().N - self.params().m - 2) as f64 * self.xi(1, 2) +
+        n * (self.params().m - 1) as f64 * self.xi(3, 2) + n * (self.params().N - self.params().m - 1) as f64 * self.xi(2, 3)
     }
 }
 
