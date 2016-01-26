@@ -233,18 +233,10 @@ rule plot_pca:
         lambda wildcards: matrices(wildcards.dataset, type=wildcards.type, settings=wildcards.settings)
     output:
         "results/{context}/{dataset}.{type}.{settings}.pca.svg"
+    params:
+        codebooks=lambda wildcards: [config["codebooks"][wildcards.dataset][expmnt] for expmnt in experiments(wildcards.dataset)]
     script:
         "scripts/plot-pca.py"
-
-
-rule plot_neighbor_bias:
-    input:
-        neighbors="neighbors/1001genes.1.neighbors.txt",
-        counts=matrices("1001genesData", type="counts")
-    output:
-        "results/{context}/1001genesData.{settings}.neighbor_bias.svg"
-    script:
-        "scripts/plot-neighbor-bias.py"
 
 
 rule simulate:
@@ -283,8 +275,7 @@ rule plot_dataset_correlation:
         small=matrices("140genesData"),
         large=matrices("1001genesData"),
         small_counts=matrices("140genesData", type="counts"),
-        large_counts=matrices("1001genesData", type="counts"),
-        neighbors="neighbors/1001genes.1.neighbors.txt"
+        large_counts=matrices("1001genesData", type="counts")
     output:
         "results/{context}/{settings}.dataset_correlation.svg"
     script:
