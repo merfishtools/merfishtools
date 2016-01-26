@@ -30,7 +30,7 @@ pub fn pmf(a: &model::expressionset::PMF, b: &model::expressionset::PMF) -> PMF 
     }
 
     let mut pmf = pmf.iter().map(|(fc, prob)| {
-        model::pmf::Entry { value: *fc.numer() as f64 / *fc.denom() as f64, prob: *prob }
+        model::pmf::Entry { value: (*fc.numer() as f64 / *fc.denom() as f64).log2(), prob: *prob }
     }).collect_vec();
     pmf.sort_by(|a, b| a.value.partial_cmp(&b.value).unwrap());
 
@@ -40,7 +40,7 @@ pub fn pmf(a: &model::expressionset::PMF, b: &model::expressionset::PMF) -> PMF 
 
 impl PMF {
     pub fn differential_expression_pep(&self, min_fc: LogFC) -> LogProb {
-        let probs = self.iter().filter(|e| e.value >= min_fc).map(|e| e.prob).collect_vec();
+        let probs = self.iter().filter(|e| e.value.abs() > min_fc).map(|e| e.prob).collect_vec();
         logprobs::ln_1m_exp(logprobs::sum(&probs))
     }
 }
