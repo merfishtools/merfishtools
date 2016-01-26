@@ -150,7 +150,7 @@ fn diffexp(args: Vec<String>) {
     let mut group1_path = "".to_owned();
     let mut group2_path = "".to_owned();
     let mut pmf_path: Option<String> = None;
-    let mut min_fc = 1.5f64.log2();
+    let mut min_fc = 1.0f64.log2();
 
     {
         let mut ap = ArgumentParser::new();
