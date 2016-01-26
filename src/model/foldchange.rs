@@ -9,7 +9,7 @@ use model;
 
 
 pub type LogFC = f64;
-pub type FC = rational::Ratio<u32>;
+pub type FC = rational::Ratio<u64>;
 pub type PMF = model::pmf::PMF<LogFC>;
 
 

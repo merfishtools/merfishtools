@@ -7,6 +7,8 @@ import numpy as np
 from bitarray import bitarray
 
 
+np.random.seed(42)
+
 p0 = 0.04
 p1 = 0.1
 
@@ -41,7 +43,7 @@ with open(snakemake.output.known_counts, "w") as known_out:
     for cell in range(snakemake.params.cell_count):
         random_counts = np.random.poisson(int(snakemake.wildcards.mean), len(genes))
         for gene, count in zip(genes, random_counts):
-            if not gene.startswith("notarget") and not gene.startswith("blank"):
+            if True: # not gene.startswith("notarget") and not gene.startswith("blank"):
                 known_counts[cell][gene] = count
                 known_out.writerow([cell, gene, gene in codebook_mhd2.index, gene in codebook_mhd4.index, count])
 

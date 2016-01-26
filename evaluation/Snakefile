@@ -1,3 +1,4 @@
+from itertools import combinations
 import pandas as pd
 sys.path.insert(0, "../")
 import merfishtools as mt
@@ -105,10 +106,15 @@ rule normalize_pmf:
         pmf.to_csv(output[0], sep="\t")
 
 
+def diffexp_input(wildcards):
+    expr = "expressions" if wildcards.experiment1 == wildcards.experiment2 else "normalized_expressions"
+    return ["{expr}/{dataset}.{experiment1}.{group1}.{settings}.txt".format(expr=expr, **wildcards),
+            "{expr}/{dataset}.{experiment2}.{group2}.{settings}.txt".format(expr=expr, **wildcards)]
+
+
 rule diffexp:
     input:
-        "expressions/{dataset}.{experiment1}.{group1}.{settings}.txt",
-        "expressions/{dataset}.{experiment2}.{group2}.{settings}.txt"
+        diffexp_input
     output:
         pmf="diffexp/{dataset}.{experiment1}.{group1}-vs-{experiment2}.{group2}.{settings}.txt",
         est="diffexp/{dataset}.{experiment1}.{group1}-vs-{experiment2}.{group2}.{settings}.est.txt"
@@ -242,14 +248,14 @@ rule plot_neighbor_bias:
 
 rule simulate:
     input:
-        mhd4="codebook/140genesData.1.txt",
-        mhd2="codebook/1001genesData.txt"
+        mhd4=config["codebooks"]["simulated-MHD4"],
+        mhd2=config["codebooks"]["simulated-MHD2"]
     output:
         sim_counts_mhd4="data/simulated-MHD4.{mean}.all.txt",
         sim_counts_mhd2="data/simulated-MHD2.{mean}.all.txt",
         known_counts="data/simulated.{mean}.known.txt"
     params:
-        cell_count=10
+        cell_count=100
     script:
         "scripts/simulate-counts.py"
 
@@ -282,6 +288,12 @@ rule plot_dataset_correlation:
         "results/{context}/{settings}.dataset_correlation.svg"
     script:
         "scripts/plot-dataset-correlation.py"
+
+
+rule plot_go_term_enrichment:
+    input:
+        expand("diffexp/140genesData.{experiment[0]}.all-vs-{experiment[1]}.all.default.est.txt",
+               experiment=combinations(experiments("140genesData"), 2))
 
 
 rule figure1:

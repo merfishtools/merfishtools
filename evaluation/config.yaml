@@ -35,8 +35,8 @@ codebooks:
     1: codebook/1001genesData.txt
     2: codebook/1001genesData.txt
     3: codebook/1001genesData.txt
-  simulated-MHD4: codebook/140genesData.1.txt
-  simulated-MHD2: codebook/1001genesData.txt
+  simulated-MHD4: codebook/simulated-MHD4.txt
+  simulated-MHD2: codebook/simulated-MHD2.txt
 
 settings:
   default:
