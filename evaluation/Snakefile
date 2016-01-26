@@ -10,8 +10,8 @@ import merfishtools as mt
 configfile: "config.yaml"
 
 
-#merfishtools = "../target/release/merfishtools"
-merfishtools = "merfishtools"
+merfishtools = "../target/release/merfishtools"
+#merfishtools = "merfishtools"
 
 
 contexts = ["paper"]
@@ -123,7 +123,7 @@ rule diffexp:
         "bench/diffexp/{dataset}.{experiment1}.{group1}-vs-{experiment2}.{group2}.{settings}.txt"
     threads: 8
     shell:
-        "{merfishtools} diffexp -t {threads} --pmf {output.pmf} {input} "
+        "{merfishtools} diffexp -t {threads} --min-log2fc 0.9999 --pmf {output.pmf} {input} "
         "> {output.est}"
 
 
@@ -286,6 +286,23 @@ rule plot_go_term_enrichment:
     input:
         expand("diffexp/140genesData.{experiment[0]}.all-vs-{experiment[1]}.all.default.est.txt",
                experiment=combinations(experiments("140genesData"), 2))
+    output:
+        "diffexp/140genesData.experiments.genes.txt"
+    run:
+        ests = pd.concat([pd.read_table(f, index_col=0) for f in input], keys=["{} vs {}".format(*c) for c in combinations(experiments("140genesData"), 2)])
+        matrix = ests["log2fc_ev"].unstack(0)
+        print(matrix)
+        return
+
+        matrix = pd.concat([pd.read_table(f, index_col=0)["diff_pep"] for f in input], axis=1)
+        
+        maxfc = log2fc.abs().max(axis="columns")
+        maxfc.sort_values(inplace=True, ascending=False)
+        maxfc = maxfc.reset_index(name="feat")
+        maxfc.columns = "feat abs_log2fc".split()
+        maxfc = maxfc[~(maxfc["feat"].str.startswith("notarget") | maxfc["feat"].str.startswith("blank"))]
+        maxfc.to_csv(output[0], index=False, sep="\t")
+
 
 
 rule figure1:
