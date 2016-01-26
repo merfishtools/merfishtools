@@ -10,7 +10,8 @@ import merfishtools as mt
 configfile: "config.yaml"
 
 
-merfishtools = "../target/release/merfishtools"
+#merfishtools = "../target/release/merfishtools"
+merfishtools = "merfishtools"
 
 
 contexts = ["paper"]
