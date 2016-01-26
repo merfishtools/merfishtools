@@ -31,11 +31,16 @@ sns.set(style="ticks", palette="colorblind", context=snakemake.wildcards.context
 width, height = snakemake.config["plots"]["figsize"]
 plt.figure(figsize=(height * 3, height))
 
+markers = dict(zip(snakemake.params.codebooks, "o^"))
+print(markers)
 gs = gridspec.GridSpec(1, 3)
 for i, (a, b) in enumerate(pcs):
     ax = plt.subplot(gs[0, i])
-    for expmnt, _scores in scores.groupby(level=0):
-        ax.plot(_scores.loc[:, a], _scores.loc[:, b], ".", label=expmnt, markersize=4, alpha=0.9)
+    for color, codebook, (expmnt, _scores) in zip(sns.color_palette("muted", len(snakemake.params.codebooks)),
+                                                  snakemake.params.codebooks, scores.groupby(level=0)):
+        ax.scatter(_scores.loc[:, a], _scores.loc[:, b],
+                   marker=markers[codebook], label=expmnt,
+                   c=color, edgecolors="face", alpha=0.7)
     #if i == 2:
     #    ax.legend(bbox_to_anchor=(1.6, 1), title="experiment")
     plt.xlabel(a)
