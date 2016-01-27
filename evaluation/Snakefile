@@ -212,7 +212,7 @@ rule plot_expression_dist:
 
 rule plot_overdispersion:
     input:
-        lambda wildcards: matrices(wildcards.dataset, settings=wildcards.settings)
+        lambda wildcards: matrices(wildcards.dataset, type="normalized_expressions", settings=wildcards.settings)
     output:
         "results/{context}/{dataset}.{settings}.overdispersion.svg"
     script:
@@ -282,27 +282,21 @@ rule plot_dataset_correlation:
         "scripts/plot-dataset-correlation.py"
 
 
+comparisons = list(combinations(experiments("140genesData"), 2))
+
 rule plot_go_term_enrichment:
     input:
         expand("diffexp/140genesData.{experiment[0]}.all-vs-{experiment[1]}.all.default.est.txt",
-               experiment=combinations(experiments("140genesData"), 2))
+               experiment=comparisons)
     output:
-        "diffexp/140genesData.experiments.genes.txt"
-    run:
-        ests = pd.concat([pd.read_table(f, index_col=0) for f in input], keys=["{} vs {}".format(*c) for c in combinations(experiments("140genesData"), 2)])
-        matrix = ests["log2fc_ev"].unstack(0)
-        print(matrix)
-        return
-
-        matrix = pd.concat([pd.read_table(f, index_col=0)["diff_pep"] for f in input], axis=1)
-        
-        maxfc = log2fc.abs().max(axis="columns")
-        maxfc.sort_values(inplace=True, ascending=False)
-        maxfc = maxfc.reset_index(name="feat")
-        maxfc.columns = "feat abs_log2fc".split()
-        maxfc = maxfc[~(maxfc["feat"].str.startswith("notarget") | maxfc["feat"].str.startswith("blank"))]
-        maxfc.to_csv(output[0], index=False, sep="\t")
-
+        clust="results/{context}/comparisons/140genesData.comparisons.svg",
+        foreground="results/{context}/comparisons/foreground.txt",
+        background="results/{context}/comparisons/background.txt",
+        ranked="results/{context}/comparisons/ranked.txt"
+    params:
+        comparisons=comparisons
+    script:
+        "scripts/experiment-diffexp.py"
 
 
 rule figure1:
@@ -331,8 +325,10 @@ rule figure1:
 
 rule figure2:
     input:
-        a="results/paper/140genesData.default.expression_dist.svg",
-        b="results/paper/default.dataset_correlation.svg",
+        #a="results/paper/140genesData.default.expression_dist.svg",
+        #b="results/paper/default.dataset_correlation.svg",
+        a="results/paper/simulation-MHD4/MHD4.scatter.default.svg",
+        b="results/paper/simulation-MHD2/MHD2.scatter.default.svg",
         c="results/paper/simulation-MHD4/MHD4.error.default.svg",
         d="results/paper/simulation-MHD2/MHD2.error.default.svg"
     output:
@@ -345,13 +341,13 @@ rule figure2:
         c = sg.fromfile(input.c).getroot()
         d = sg.fromfile(input.d).getroot()
         b.moveto(288, 0)
-        c.moveto(0, 200)
-        d.moveto(288, 200)
+        c.moveto(0, 210)
+        d.moveto(288, 210)
 
         la = sg.TextElement(0,10, "a", size=12, weight="bold")
         lb = sg.TextElement(288,10, "b", size=12, weight="bold")
-        lc = sg.TextElement(0,210, "c", size=12, weight="bold")
-        ld = sg.TextElement(288,210, "d", size=12, weight="bold")
+        lc = sg.TextElement(0,220, "c", size=12, weight="bold")
+        ld = sg.TextElement(288,220, "d", size=12, weight="bold")
 
         fig.append([a, b, c, d, la, lb, lc, ld])
         fig.save(output[0])
@@ -359,7 +355,7 @@ rule figure2:
 
 rule figure3:
     input:
-        a="results/paper/140genesData.default.pca.svg",
+        a="results/paper/140genesData.normalized_expressions.default.pca.svg",
         b="results/paper/140genesData.default.overdispersion.svg"
     output:
         "figures/fig3.svg"
