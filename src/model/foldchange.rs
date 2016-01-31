@@ -30,7 +30,7 @@ pub fn pmf(a: &model::expressionset::PMF, b: &model::expressionset::PMF) -> PMF 
     }
 
     let mut pmf = pmf.iter().map(|(fc, prob)| {
-        model::pmf::Entry { value: (*fc.numer() as f64 / *fc.denom() as f64).log2(), prob: *prob }
+        model::pmf::Entry { value: (*fc.numer() as f64 + 1.0).log2() - (*fc.denom() as f64 + 1.0).log2(), prob: *prob }
     }).collect_vec();
     pmf.sort_by(|a, b| a.value.partial_cmp(&b.value).unwrap());
 
