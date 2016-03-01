@@ -8,11 +8,15 @@ from sklearn import preprocessing, manifold
 from itertools import combinations
 from matplotlib import gridspec
 
-
+experiments = np.array(list(range(1, len(snakemake.input) + 1)))
 # load data
-exprs = [pd.read_table(f, index_col=0) for f in snakemake.input]
-exprs = pd.concat(exprs, axis="columns", keys=range(1, len(snakemake.input) + 1))
+exprs = [pd.read_table(f, index_col=0) for f in snakemake.input.exprs]
+exprs = pd.concat(exprs, axis="columns", keys=experiments, names=["expmnt", "cell"])
 exprs = np.log10(1 + exprs.transpose())
+exprs.index = exprs.index.set_levels(exprs.index.levels[1].astype(np.int64), level=1)
+
+cellsizes = [pd.read_table(f, index_col=0) for f in snakemake.input.cellsizes]
+cellsizes = pd.concat(cellsizes, keys=experiments, names=["expmnt", "cell"])
 
 # calculate t-SNE embedding
 tsne = manifold.TSNE(random_state=21498)
@@ -25,16 +29,29 @@ sns.set(style="ticks", palette="colorblind", context=snakemake.wildcards.context
 width, height = snakemake.config["plots"]["figsize"]
 fig = plt.figure(figsize=snakemake.config["plots"]["figsize"])
 
-markers = dict(zip(snakemake.params.codebooks, "o^"))
-for color, codebook, (expmnt, _embedding) in zip(sns.color_palette("muted", len(snakemake.params.codebooks)),
-                                              snakemake.params.codebooks, embedding.groupby(level=0)):
-    plt.scatter(_embedding['x'], _embedding['y'],
-               marker=markers[codebook], label=expmnt,
-               c=color, edgecolors="face", alpha=0.7)
+for expmnt, codebook in zip(experiments, snakemake.params.codebooks):
+    embedding.loc[expmnt, "codebook"] = codebook
+embedding["codebook"] = embedding["codebook"].astype("category")
+embedding = pd.concat([embedding, cellsizes], axis="columns")
+#embedding["cellsize"] = cellsizes["area"]
+embedding.reset_index(inplace=True)
 
+if snakemake.wildcards.highlight == "expmnt":
+    colors = sns.color_palette("muted", len(experiments))
+    highlight = [colors[e] for e in embedding["expmnt"]]
+    cmap = None
+elif snakemake.wildcards.highlight == "codebook":
+    codebooks = embedding["codebook"].cat.categories
+    colors = dict(zip(codebooks, sns.color_palette("muted", len(codebooks))))
+    highlight = [colors[c] for c in embedding["codebook"]]
+    cmap = None
+elif snakemake.wildcards.highlight == "cellsize":
+    highlight = "area"
+    cmap = "viridis"
+ax = plt.scatter("x", "y", c=highlight, data=embedding, cmap=cmap, alpha=0.7, edgecolors="face")
 
-# save the figure
 plt.axis("off")
-extent = plt.gca().get_window_extent().transformed(plt.gcf().dpi_scale_trans.inverted())
-#plt.tight_layout()
-plt.savefig(snakemake.output[0], bbox_inches=extent, pad_inches=0)
+if snakemake.wildcards.highlight == "cellsize":
+    cb = plt.colorbar(ax)
+    cb.set_label("cell size in nm²")
+plt.savefig(snakemake.output[0], bbox_inches="tight")

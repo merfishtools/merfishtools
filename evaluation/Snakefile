@@ -42,9 +42,10 @@ rule all:
             "results/{context}/{dataset}.default.overdispersion.pdf",
             "results/{context}/{dataset}.default.correlation.pdf"
         ], context=contexts, dataset=datasets),
-        expand(["results/{context}/{dataset}.{type}.default.tsne.pdf",
+        expand(["results/{context}/{dataset}.{type}.default.{highlight}.tsne.pdf",
                 "results/{context}/{dataset}.{type}.default.qqplot.pdf"],
                context=contexts, dataset=datasets,
+               highlight=["expmnt", "codebook", "cellsize"],
                type=["expressions", "normalized_expressions"]),
         expand("results/{context}/simulation-MHD{dist}/MHD{dist}.{plot}.default.pdf", plot=["scatter", "error"], context=contexts, dist=[2, 4]),
         expand("results/{context}/default.dataset_correlation.pdf", context=contexts),
@@ -59,6 +60,14 @@ rule format:
     script:
         "scripts/format-dataset.py"
 
+
+rule cell_size:
+    input:
+        "data/{dataset}.{experiment}.all.txt"
+    output:
+        "cellsize/{dataset}.{experiment}.all.txt"
+    script:
+        "scripts/cell-size.py"
 
 
 rule raw_counts:
@@ -231,9 +240,14 @@ rule plot_correlation:
 
 rule plot_tsne:
     input:
-        lambda wildcards: matrices(wildcards.dataset, type=wildcards.type, settings=wildcards.settings)
+        exprs=lambda wildcards: matrices(wildcards.dataset,
+                                         type=wildcards.type,
+                                         settings=wildcards.settings),
+        cellsizes=lambda wildcards: expand("cellsize/{dataset}.{experiment}.all.txt",
+                                           dataset=wildcards.dataset,
+                                           experiment=experiments(wildcards.dataset))
     output:
-        "results/{context}/{dataset}.{type}.{settings}.tsne.svg"
+        "results/{context}/{dataset}.{type}.{settings}.{highlight,(expmnt|codebook|cellsize)}.tsne.svg"
     params:
         codebooks=lambda wildcards: [config["codebooks"][wildcards.dataset][expmnt] for expmnt in experiments(wildcards.dataset)]
     script:
