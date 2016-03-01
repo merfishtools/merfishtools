@@ -42,12 +42,13 @@ rule all:
             "results/{context}/{dataset}.default.overdispersion.pdf",
             "results/{context}/{dataset}.default.correlation.pdf"
         ], context=contexts, dataset=datasets),
-        expand(["results/{context}/{dataset}.{type}.default.pca.pdf",
+        expand(["results/{context}/{dataset}.{type}.default.tsne.pdf",
                 "results/{context}/{dataset}.{type}.default.qqplot.pdf"],
                context=contexts, dataset=datasets,
                type=["expressions", "normalized_expressions"]),
         expand("results/{context}/simulation-MHD{dist}/MHD{dist}.{plot}.default.pdf", plot=["scatter", "error"], context=contexts, dist=[2, 4]),
-        expand("results/{context}/default.dataset_correlation.pdf", context=contexts)
+        expand("results/{context}/default.dataset_correlation.pdf", context=contexts),
+        expand("figures/fig{n}.pdf", n=range(2, 5))
 
 
 rule format:
@@ -228,15 +229,15 @@ rule plot_correlation:
         "scripts/plot-correlation.py"
 
 
-rule plot_pca:
+rule plot_tsne:
     input:
         lambda wildcards: matrices(wildcards.dataset, type=wildcards.type, settings=wildcards.settings)
     output:
-        "results/{context}/{dataset}.{type}.{settings}.pca.svg"
+        "results/{context}/{dataset}.{type}.{settings}.tsne.svg"
     params:
         codebooks=lambda wildcards: [config["codebooks"][wildcards.dataset][expmnt] for expmnt in experiments(wildcards.dataset)]
     script:
-        "scripts/plot-pca.py"
+        "scripts/plot-tsne.py"
 
 
 rule simulate:
@@ -299,13 +300,13 @@ rule plot_go_term_enrichment:
         "scripts/experiment-diffexp.py"
 
 
-rule figure1:
+rule figure2:
     input:
         b="results/paper/expression_pmf/140genesData.1.cell0.COL5A1.default.expression_pmf.svg",
         a="results/paper/expression_pmf/140genesData.1.cell0.CKAP5.default.expression_pmf.svg",
         c="results/paper/foldchange_cdf/140genesData.1.A-vs-B.COL5A1.default.foldchange_cdf.svg"
     output:
-        "figures/fig1.svg"
+        "figures/fig2.svg"
     run:
         import svgutils.transform as sg
         fig = sg.SVGFigure("24.8cm", "6cm")
@@ -323,7 +324,7 @@ rule figure1:
         fig.save(output[0])
 
 
-rule figure2:
+rule figure3:
     input:
         #a="results/paper/140genesData.default.expression_dist.svg",
         #b="results/paper/default.dataset_correlation.svg",
@@ -332,7 +333,7 @@ rule figure2:
         c="results/paper/simulation-MHD4/MHD4.error.default.svg",
         d="results/paper/simulation-MHD2/MHD2.error.default.svg"
     output:
-        "figures/fig2.svg"
+        "figures/fig3.svg"
     run:
         import svgutils.transform as sg
         fig = sg.SVGFigure("16.2cm", "12cm")
@@ -353,12 +354,12 @@ rule figure2:
         fig.save(output[0])
 
 
-rule figure3:
+rule figure4:
     input:
-        a="results/paper/140genesData.normalized_expressions.default.pca.svg",
+        a="results/paper/140genesData.normalized_expressions.default.tsne.svg",
         b="results/paper/140genesData.default.overdispersion.svg"
     output:
-        "figures/fig3.svg"
+        "figures/fig4.svg"
     run:
         import svgutils.transform as sg
         fig = sg.SVGFigure("17.2cm", "11.5cm")

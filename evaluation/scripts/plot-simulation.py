@@ -51,7 +51,7 @@ print(errors[s].describe())
 
 plt.figure(figsize=snakemake.config["plots"]["figsize"])
 colors = sns.xkcd_palette(["light grey", "grey"])
-sns.violinplot(x="mean", y="error", hue="type", data=errors, split=True, inner="quartile", linewidth=1, palette=colors)
+sns.violinplot(x="mean", y="error", hue="type", data=errors, bw=1, split=True, inner="quartile", linewidth=1, palette=colors)
 plt.plot(plt.xlim(), [0, 0], "-k", linewidth=1, zorder=-5)
 
 plt.xlabel("mean expression")
