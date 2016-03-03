@@ -16,6 +16,7 @@ merfishtools = "../target/release/merfishtools"
 
 contexts = ["paper"]
 datasets = ["140genesData"]
+formats = ["png", "pdf", "fixed.svg"]
 
 
 def experiments(dataset):
@@ -34,21 +35,22 @@ def matrices(dataset, type="expressions", settings="default"):
 rule all:
     input:
         expand([
-            "results/{context}/foldchange_cdf/{dataset}.1.A-vs-B.{gene}.default.foldchange_cdf.pdf",
-            "results/{context}/expression_pmf/{dataset}.1.cell0.{gene}.default.expression_pmf.pdf"
-        ], gene=config["genes"], context=contexts, dataset=datasets),
+            "results/{context}/foldchange_cdf/{dataset}.1.A-vs-B.{gene}.default.foldchange_cdf.{fmt}",
+            "results/{context}/expression_pmf/{dataset}.1.cell0.{gene}.default.expression_pmf.{fmt}"
+        ], gene=config["genes"], context=contexts, dataset=datasets, fmt=formats),
         expand([
-            "results/{context}/{dataset}.default.expression_dist.pdf",
-            "results/{context}/{dataset}.default.overdispersion.pdf",
-            "results/{context}/{dataset}.default.correlation.pdf"
-        ], context=contexts, dataset=datasets),
-        expand(["results/{context}/{dataset}.{type}.default.{highlight}.tsne.pdf",
-                "results/{context}/{dataset}.{type}.default.qqplot.pdf"],
+            "results/{context}/{dataset}.default.expression_dist.{fmt}",
+            "results/{context}/{dataset}.default.overdispersion.{fmt}",
+            "results/{context}/{dataset}.default.correlation.{fmt}"
+        ], context=contexts, dataset=datasets, fmt=formats),
+        expand(["results/{context}/{dataset}.{type}.default.{highlight}.tsne.{fmt}",
+                "results/{context}/{dataset}.{type}.default.qqplot.{fmt}"],
                context=contexts, dataset=datasets,
                highlight=["expmnt", "codebook", "cellsize"],
-               type=["expressions", "normalized_expressions"]),
-        expand("results/{context}/simulation-MHD{dist}/MHD{dist}.{plot}.default.pdf", plot=["scatter", "error"], context=contexts, dist=[2, 4]),
-        expand("results/{context}/default.dataset_correlation.pdf", context=contexts),
+               type=["expressions", "normalized_expressions"],
+               fmt=formats),
+        expand("results/{context}/simulation-MHD{dist}/MHD{dist}.{plot}.default.{fmt}", plot=["scatter", "error"], context=contexts, dist=[2, 4], fmt=formats),
+        expand("results/{context}/default.dataset_correlation.{fmt}", context=contexts, fmt=formats),
         expand("figures/fig{n}.pdf", n=range(2, 5))
 
 
@@ -388,10 +390,19 @@ rule figure4:
         fig.save(output[0])
 
 
-rule svg2pdf:
+rule convert_svg:
     input:
         "{prefix}.svg"
     output:
-        "{prefix}.pdf"
+        "{prefix}.{fmt,(pdf|png)}"
     shell:
-        "rsvg-convert -f pdf {input} > {output}"
+        "rsvg-convert -f {wildcards.fmt} {input} > {output}"
+
+
+rule fix_svg:
+    input:
+       "{prefix}.svg"
+    output:
+        "{prefix}.fixed.svg"
+    shell:
+        "rsvg-convert -f svg {input} > {output}"

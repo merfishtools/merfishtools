@@ -227,49 +227,67 @@ mod tests {
 
     use super::{MHD4, MHD2, Params, Model, Readout};
     use nalgebra::ApproxEq;
+    use io;
 
-
-    const factory: MHD4 = MHD4 { params: Params { N: 16, m: 4, p0: 0.04, p1: 0.1 } };
+    fn factory() -> MHD4 {
+        MHD4 {
+            params: Params {
+                N: 16,
+                m: 4,
+                p0: 0.04,
+                p1: 0.1,
+                codebook: io::codebook::Reader::from_file("evaluation/codebook/140genesData.1.txt", 4).unwrap().codebook()
+            }
+        }
+    }
 
 
     #[test]
     fn test_prob_call_exact() {
-        let p = factory.prob_call_exact();
+        let p = factory().prob_call_exact();
         println!("{}", p);
         assert!(p.approx_eq(&0.4019988717840602));
     }
 
     #[test]
     fn test_prob_call_mismatch() {
-        let p = factory.prob_call_mismatch();
+        let p = factory().prob_call_mismatch();
         println!("{}", p);
         assert!(p.approx_eq(&0.3796656011293904));
     }
 
     #[test]
     fn test_prob_miscall_exact() {
-        let p = factory.prob_miscall_exact();
+        let p = factory().prob_miscall_exact();
         println!("{}", p);
         assert!(p.approx_eq(&0.003412027461130142));
     }
 
     #[test]
     fn test_prob_miscall_mismatch() {
-        let p = factory.prob_miscall_mismatch();
+        let p = factory().prob_miscall_mismatch();
         println!("{}", p);
         assert!(p.approx_eq(&0.03608764734772748));
     }
 
     #[test]
     fn test_prob_missed() {
-        let p = factory.prob_missed();
+        let p = factory().prob_missed();
         println!("{}", p);
         assert!(p.approx_eq(&0.21833552708654924));
     }
 
     #[test]
     fn test_mhd2() {
-        let model = MHD2 { params: Params { N: 14, m: 4, p0: 0.04, p1: 0.1 } };
+        let model = MHD2 {
+            params: Params {
+                N: 14,
+                m: 4,
+                p0: 0.04,
+                p1: 0.1,
+                codebook: io::codebook::Reader::from_file("evaluation/codebook/1001genesData.txt", 2).unwrap().codebook()
+            }
+        };
         println!("{}", model.prob_call_exact());
         println!("{}", model.prob_call_mismatch());
         println!("{}", model.prob_miscall_exact());

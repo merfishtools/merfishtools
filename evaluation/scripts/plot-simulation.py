@@ -35,8 +35,8 @@ for i, (mean, posterior_counts, raw_counts, known_counts) in enumerate(zip(
     errors.append(pd.DataFrame({"error": raw_counts - known_counts["count"], "mean": mean, "type": "raw"}))
     errors.append(pd.DataFrame({"error": posterior_counts - known_counts["count"], "mean": mean, "type": "posterior"}))
 
-plt.plot([epsilon, plt.xlim()[1]], [epsilon, plt.ylim()[1]], "--k")
 maxv = max(plt.xlim()[1], plt.ylim()[1])
+plt.plot([epsilon, maxv], [epsilon, maxv], "--k")
 plt.xlim((0, maxv))
 plt.ylim((0,maxv))
 plt.ylabel("predicted")
