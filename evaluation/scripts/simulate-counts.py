@@ -17,7 +17,10 @@ def sim_errors(word):
     p = np.random.uniform(0, 1, len(word))
     err10 = bitarray(list(p <= p1)) & word
     err01 = bitarray(list(p <= p0)) & ~word
-    return (word ^ err10) ^ err01, err10.count(True) + err01.count(True)
+    readout = (word ^ err10) ^ err01
+    errs = err10.count(True) + err01.count(True)
+    assert errs == 0 or word != readout
+    return readout, errs
 
 
 def hamming1_env(word):
@@ -59,9 +62,11 @@ def simulate(codebook, counts_path, has_corrected=True):
         sim_out = csv.writer(sim_out, delimiter="\t")
         sim_out.writerow(["cell", "feat", "dist", "cell_x", "cell_y", "x", "y"])
 
-        errors = []
         for cell in range(snakemake.params.cell_count):
             readouts = []
+            words = []
+            genes = []
+            errors = []
 
             for gene, word in codebook.items():
                 count = known_counts[cell][gene]
@@ -69,15 +74,24 @@ def simulate(codebook, counts_path, has_corrected=True):
                     readout, errs = sim_errors(word)
                     errors.append(errs)
                     readouts.append(readout)
+                    words.append(word)
+                    genes.append(gene)
 
             exact_counts = Counter()
             corrected_counts = Counter()
-            for readout in readouts:
+            exact_miscalls = Counter()
+            corrected_miscalls = Counter()
+            for readout, errs, word, orig_gene in zip(readouts, errors, words, genes):
                 try:
-                    exact_counts[lookup_exact[readout.tobytes()]] += 1
+                    gene = lookup_exact[readout.tobytes()]
+                    exact_counts[gene] += 1
+                    if errs > 0:
+                        exact_miscalls[gene] += 1
                 except KeyError:
                     try:
                         corrected_counts[lookup_corrected[readout.tobytes()]] += 1
+                        if errs > 1:
+                            corrected_miscalls[gene] += 1
                     except KeyError:
                         # readout is lost
                         pass
@@ -87,10 +101,41 @@ def simulate(codebook, counts_path, has_corrected=True):
                     sim_out.writerow([cell, gene, 0, 0, 0, 0, 0])
                 for _ in range(corrected_counts[gene]):
                     sim_out.writerow([cell, gene, 1, 0, 0, 0, 0])
-        errors = pd.Series(errors)
-        print(errors.value_counts())
-        print(errors.value_counts() / errors.sum())
+
+            # disable stats (for debugging only)
+            continue
+            
+            stats = []
+            for gene in exact_counts:
+                known = known_counts[cell][gene]
+                counts = exact_counts[gene] + corrected_counts[gene]
+                _exact_miscalls = exact_miscalls[gene]
+                _corrected_miscalls = corrected_miscalls[gene]
+                miscalls = _exact_miscalls + _corrected_miscalls
+                missed = known - counts + miscalls
+                stats.append([known, missed, counts, miscalls])
+
+            stats = pd.DataFrame(stats)
+            stats.columns = ["truth", "missed", "counts", "miscalls"]
+            stats["total"] = stats["truth"] + stats["miscalls"]
+            stats["calls"] = stats["counts"] - stats["miscalls"]
+
+            print("rates vs counts")
+            print("miscalls", (stats["miscalls"] / stats["counts"]).mean())
+            print("calls", (stats["calls"] / stats["counts"]).mean())
+            print("missed", (stats["missed"] / stats["counts"]).mean())
+            print("rates vs truth")
+            print("miscalls", (stats["miscalls"] / stats["truth"]).mean())
+            print("calls", (stats["calls"] / stats["truth"]).mean())
+            print("missed", (stats["missed"] / stats["truth"]).mean())
+            print("rates vs total")
+            print("miscalls", (stats["miscalls"] / stats["total"]).mean())
+            print("calls", (stats["calls"] / stats["total"]).mean())
+            print("missed", (stats["missed"] / stats["total"]).mean())
 
 
+
+print("Simulating MHD4")
 simulate(codebook_mhd4, snakemake.output.sim_counts_mhd4, has_corrected=True)
+print("Simulating MHD2")
 simulate(codebook_mhd2, snakemake.output.sim_counts_mhd2, has_corrected=False)

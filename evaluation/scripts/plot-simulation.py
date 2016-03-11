@@ -28,9 +28,19 @@ for i, (mean, posterior_counts, raw_counts, known_counts) in enumerate(zip(
 
     raw_counts = raw_counts.reindex(known_counts.index, fill_value=0)
     posterior_counts = posterior_counts.reindex(known_counts.index, fill_value=0)
+    biased = posterior_counts[posterior_counts > 70].index
+    unbiased = posterior_counts[(posterior_counts > 49) & (posterior_counts < 51)].index
+    print(posterior_counts.loc[biased])
+    print(raw_counts.loc[biased])
+    print(known_counts.loc[biased])
+    print("unbiased")
+    print(posterior_counts.loc[unbiased])
+    print(raw_counts.loc[unbiased])
+    print(known_counts.loc[unbiased])
 
-    plt.plot(known_counts["count"] + epsilon, posterior_counts + epsilon, "r.", label="conditional expectation" if i == 0 else "", zorder=1, alpha=0.2, rasterized=True)
-    plt.plot(known_counts["count"] + epsilon, raw_counts + epsilon, "k.", label="raw counts" if i == 0 else "", zorder=0, alpha=0.2, rasterized=True)
+
+    plt.plot(known_counts["count"], posterior_counts, "r.", label="conditional expectation" if i == 0 else "", zorder=1, alpha=0.01, rasterized=True)
+    plt.plot(known_counts["count"], raw_counts, "k.", label="raw counts" if i == 0 else "", zorder=0, alpha=0.01, rasterized=True)
 
     errors.append(pd.DataFrame({"error": raw_counts - known_counts["count"], "mean": mean, "type": "raw"}))
     errors.append(pd.DataFrame({"error": posterior_counts - known_counts["count"], "mean": mean, "type": "posterior"}))

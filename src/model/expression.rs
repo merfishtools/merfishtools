@@ -41,21 +41,23 @@ mod tests {
 
     use super::*;
     use model;
+    use io;
 
 
     const N: u8 = 16;
     const m: u8 = 4;
     const p0: Prob = 0.04;
     const p1: Prob = 0.1;
+    const GENE: &'static str = "COL5A1";
 
-    fn setup() -> model::Readout {
-        model::Readout::new(N, m, p0, p1, 4)
+    fn setup() -> Box<model::readout::Model> {
+        model::readout::new_model(16, 4, 0.04, 0.1, 4, io::codebook::Reader::from_file("evaluation/codebook/140genesData.1.txt", 4).unwrap().codebook())
     }
 
     #[test]
     fn test_pmf() {
         let readout = setup();
-        let pmf = pmf(25, 10, &readout);
+        let pmf = pmf(GENE, 25, 10, &readout);
 
         let total = logprobs::sum(&pmf.iter().map(|e| e.prob).collect_vec());
         println!("{:?}", pmf);
@@ -66,7 +68,7 @@ mod tests {
     #[test]
     fn test_pmf2() {
         let readout = setup();
-        let pmf = pmf(176, 25, &readout);
+        let pmf = pmf(GENE, 176, 25, &readout);
 
         let total = logprobs::sum(&pmf.iter().map(|e| e.prob).collect_vec());
         println!("{:?}", pmf);

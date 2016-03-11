@@ -198,6 +198,7 @@ impl Readout {
 
         for i in 0..(cmp::min(x, count) + 1) {
             let jmax = cmp::min(count_exact, i);
+            // i - j <= count - count_exact
             let jmin = if count_exact + i > count { count_exact + i - count } else { 0 };
             for j in jmin..(jmax + 1) {
                 let k = x - i;
@@ -225,96 +226,92 @@ impl Readout {
 mod tests {
     #![allow(non_upper_case_globals)]
 
-    use super::{MHD4, MHD2, Params, Model, Readout};
+    use super::*;
     use nalgebra::ApproxEq;
     use io;
 
-    fn factory() -> MHD4 {
-        MHD4 {
-            params: Params {
-                N: 16,
-                m: 4,
-                p0: 0.04,
-                p1: 0.1,
-                codebook: io::codebook::Reader::from_file("evaluation/codebook/140genesData.1.txt", 4).unwrap().codebook()
-            }
-        }
+    fn setup_mhd4() -> Box<Model> {
+        new_model(16, 4, 0.04, 0.1, 4, io::codebook::Reader::from_file("evaluation/codebook/140genesData.1.txt", 4).unwrap().codebook())
+    }
+
+
+    fn setup_mhd2() -> Box<Model> {
+        new_model(14, 4, 0.04, 0.1, 2, io::codebook::Reader::from_file("evaluation/codebook/1001genesData.txt", 2).unwrap().codebook())
     }
 
 
     #[test]
     fn test_prob_call_exact() {
-        let p = factory().prob_call_exact();
+        let model = setup_mhd4();
+        let p = model.prob_call_exact();
         println!("{}", p);
         assert!(p.approx_eq(&0.4019988717840602));
     }
 
     #[test]
     fn test_prob_call_mismatch() {
-        let p = factory().prob_call_mismatch();
+        let model = setup_mhd4();
+        let p = model.prob_call_mismatch();
         println!("{}", p);
         assert!(p.approx_eq(&0.3796656011293904));
     }
 
     #[test]
     fn test_prob_miscall_exact() {
-        let p = factory().prob_miscall_exact();
+        let model = setup_mhd4();
+        let p = model.prob_miscall_exact("COL5A1");
         println!("{}", p);
         assert!(p.approx_eq(&0.003412027461130142));
     }
 
     #[test]
     fn test_prob_miscall_mismatch() {
-        let p = factory().prob_miscall_mismatch();
+        let model = setup_mhd4();
+        let p = model.prob_miscall_mismatch("COL5A1");
         println!("{}", p);
         assert!(p.approx_eq(&0.03608764734772748));
     }
 
     #[test]
     fn test_prob_missed() {
-        let p = factory().prob_missed();
+        let model = setup_mhd4();
+        let p = model.prob_missed();
         println!("{}", p);
         assert!(p.approx_eq(&0.21833552708654924));
     }
 
     #[test]
     fn test_mhd2() {
-        let model = MHD2 {
-            params: Params {
-                N: 14,
-                m: 4,
-                p0: 0.04,
-                p1: 0.1,
-                codebook: io::codebook::Reader::from_file("evaluation/codebook/1001genesData.txt", 2).unwrap().codebook()
-            }
-        };
+        let model = setup_mhd2();
         println!("{}", model.prob_call_exact());
         println!("{}", model.prob_call_mismatch());
-        println!("{}", model.prob_miscall_exact());
-        println!("{}", model.prob_miscall_mismatch());
+        println!("{}", model.prob_miscall_exact("COL7A1"));
+        println!("{}", model.prob_miscall_mismatch("COL7A1"));
         println!("{}", model.prob_missed());
         assert!(false);
     }
 
     #[test]
     fn test_xi() {
-        let p = factory.xi(0, 0);
+        let model = setup_mhd4();
+        let p = model.xi(0, 0);
         assert!(p.approx_eq(&0.4019988717840602));
-        let p = factory.xi(1, 0);
+        let p = model.xi(1, 0);
         assert!(p.approx_eq(&0.04466654130934002));
-        let p = factory.xi(0, 1);
+        let p = model.xi(0, 1);
         assert!(p.approx_eq(&0.01674995299100251));
-        let p = factory.xi(2, 2);
+        let p = model.xi(2, 2);
         assert!(p.approx_eq(&8.616230962449852e-06));
-        let p = factory.xi(2, 1);
+        let p = model.xi(2, 1);
         assert!(p.approx_eq(&0.00020678954309879646));
-        let p = factory.xi(1, 2);
+        let p = model.xi(1, 2);
         assert!(p.approx_eq(&7.754607866204867e-05));
     }
 
     #[test]
     fn test_window() {
-        let readout = Readout::new(16, 4, 0.04, 0.1, 4);
+        let model = setup_mhd4();
+        let readout = Readout::new("COL5A1", &model);
         let (lower, upper) = readout.window(175);
         println!("{} {}", lower, upper);
         assert!(readout.likelihood(lower, 175, 25).exp().approx_eq(&0.0));

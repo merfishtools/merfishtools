@@ -57,43 +57,43 @@ mod tests {
     use bio::stats::logprobs::Prob;
 
     use model;
+    use io;
 
     const N: u8 = 16;
     const m: u8 = 4;
     const p0: Prob = 0.04;
     const p1: Prob = 0.1;
+    const GENE: &'static str = "COL5A1";
 
-
-    fn setup() -> model::Readout {
-        model::Readout::new(N, m, p0, p1, 4)
+    fn setup() -> Box<model::readout::Model> {
+        model::readout::new_model(16, 4, 0.04, 0.1, 4, io::codebook::Reader::from_file("evaluation/codebook/140genesData.1.txt", 4).unwrap().codebook())
     }
 
     #[test]
     fn test_pmf() {
         let readout = setup();
         let pmfs1 = [
-            model::expression::pmf(5, 1, &readout),
-            model::expression::pmf(10, 1, &readout),
-            model::expression::pmf(3, 1, &readout),
-            model::expression::pmf(24, 1, &readout)
+            model::expression::pmf(GENE, 5, 5, &readout),
+            model::expression::pmf(GENE, 5, 5, &readout),
+            model::expression::pmf(GENE, 5, 5, &readout),
+            model::expression::pmf(GENE, 5, 5, &readout)
         ];
         let pmfs2 = [
-            model::expression::pmf(50, 1, &readout),
-            model::expression::pmf(100, 1, &readout),
-            model::expression::pmf(30, 1, &readout),
-            model::expression::pmf(240, 1, &readout)
+            model::expression::pmf(GENE, 50, 50, &readout),
+            model::expression::pmf(GENE, 50, 50, &readout),
+            model::expression::pmf(GENE, 50, 50, &readout),
+            model::expression::pmf(GENE, 50, 50, &readout)
         ];
         let pmf1 = model::expressionset::pmf(&pmfs1);
         let pmf2 = model::expressionset::pmf(&pmfs2);
 
         let pmf = pmf(&pmf1, &pmf2);
 
-
         let total = logprobs::sum(&pmf.iter().map(|fc| fc.prob).collect_vec());
+        let fc = 2.0f64.powf(pmf.expected_value());
 
         println!("{:?}", total);
-        println!("ev={}", pmf.expected_value());
-        assert!(pmf.expected_value().approx_eq(&9.170789943247653));
-        assert!(total.approx_eq(&-0.000019827547922623978));
+        println!("ev={}", fc);
+        assert!(total.approx_eq(&-0.000014479671117229032));
     }
 }

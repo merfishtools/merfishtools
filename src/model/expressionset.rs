@@ -69,25 +69,27 @@ mod tests {
 
     use super::*;
     use model;
+    use io;
 
 
     const N: u8 = 16;
     const m: u8 = 4;
     const p0: Prob = 0.04;
     const p1: Prob = 0.1;
+    const GENE: &'static str = "COL5A1";
 
-    fn setup() -> model::Readout {
-        model::Readout::new(N, m, p0, p1, 4)
+    fn setup() -> Box<model::readout::Model> {
+        model::readout::new_model(16, 4, 0.04, 0.1, 4, io::codebook::Reader::from_file("evaluation/codebook/140genesData.1.txt", 4).unwrap().codebook())
     }
 
     #[test]
     fn test_pmf() {
         let readout = setup();
         let pmfs = [
-            model::expression::pmf(5, 1, &readout),
-            model::expression::pmf(10, 1, &readout),
-            model::expression::pmf(3, 1, &readout),
-            model::expression::pmf(24, 1, &readout)
+            model::expression::pmf(GENE, 5, 1, &readout),
+            model::expression::pmf(GENE, 10, 1, &readout),
+            model::expression::pmf(GENE, 3, 1, &readout),
+            model::expression::pmf(GENE, 24, 1, &readout)
         ];
         let pmf = pmf(&pmfs);
 
