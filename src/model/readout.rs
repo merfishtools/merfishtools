@@ -152,12 +152,13 @@ pub struct Readout {
     prob_miscall_mismatch: Prob,
     prob_missed: Prob,
     prob_nocall: Prob,
-    prob_miscall: Prob
+    prob_miscall: Prob,
+    margin: u32
 }
 
 
 impl Readout {
-    pub fn new(feature: &str, model: &Box<Model>) -> Self {
+    pub fn new(feature: &str, model: &Box<Model>, window_width: u32) -> Self {
 
         Readout {
             prob_call_exact: model.prob_call_exact(),
@@ -166,7 +167,8 @@ impl Readout {
             prob_miscall_mismatch: model.prob_miscall_mismatch(feature),
             prob_missed: model.prob_missed(),
             prob_nocall: model.prob_nocall(feature),
-            prob_miscall: model.prob_miscall(feature)
+            prob_miscall: model.prob_miscall(feature),
+            margin: window_width / 2
         }
     }
 
@@ -177,11 +179,10 @@ impl Readout {
         let n = count as f64 / (self.prob_call_exact * prob_call +  self.prob_call_mismatch * prob_call + self.prob_miscall_exact + self.prob_miscall_mismatch);
         let x = (n * self.prob_call_exact * prob_call + n * self.prob_call_mismatch * prob_call + n * self.prob_missed).round() as i32;
 
-        (cmp::max(x - 50, 0) as u32, x as u32 + 50)
+        (cmp::max(x - self.margin as i32, 0) as u32, x as u32 + self.margin)
     }
 
     pub fn likelihood(&self, x: u32, count: u32, count_exact: u32) -> LogProb {
-        let x = x;
         let count = count;
         let count_exact = count_exact;
         assert!(count >= count_exact);
@@ -201,6 +202,7 @@ impl Readout {
             // i - j <= count - count_exact
             let jmin = if count_exact + i > count { count_exact + i - count } else { 0 };
             for j in jmin..(jmax + 1) {
+                //let n = combinations((count - count_exact) as u64, (i - j) as u64).ln() + combinations(count_exact as u64, j as u64).ln();
                 let k = x - i;
                 let exact_miscalls = count_exact - j;
                 let mismatch_miscalls = count - count_exact - (i - j);
@@ -231,12 +233,12 @@ mod tests {
     use io;
 
     fn setup_mhd4() -> Box<Model> {
-        new_model(16, 4, 0.04, 0.1, 4, io::codebook::Reader::from_file("evaluation/codebook/140genesData.1.txt", 4).unwrap().codebook())
+        new_model(16, 4, 0.04, 0.1, 4, io::codebook::Reader::from_file("evaluation/codebook/simulated-MHD4.txt", 4).unwrap().codebook())
     }
 
 
     fn setup_mhd2() -> Box<Model> {
-        new_model(14, 4, 0.04, 0.1, 2, io::codebook::Reader::from_file("evaluation/codebook/1001genesData.txt", 2).unwrap().codebook())
+        new_model(14, 4, 0.04, 0.1, 2, io::codebook::Reader::from_file("evaluation/codebook/simulated-MHD2.txt", 2).unwrap().codebook())
     }
 
 
@@ -311,7 +313,7 @@ mod tests {
     #[test]
     fn test_window() {
         let model = setup_mhd4();
-        let readout = Readout::new("COL5A1", &model);
+        let readout = Readout::new("COL5A1", &model, 100);
         let (lower, upper) = readout.window(175);
         println!("{} {}", lower, upper);
         assert!(readout.likelihood(lower, 175, 25).exp().approx_eq(&0.0));

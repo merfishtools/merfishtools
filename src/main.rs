@@ -107,6 +107,7 @@ fn exp(args: Vec<String>) {
     let mut estimate_path = None;
     let mut codebook_path: Option<String> = None;
     let mut cells = ".*".to_owned();
+    let mut window_width = 100;
 
     {
         let mut ap = ArgumentParser::new();
@@ -139,9 +140,10 @@ Output is formatted into columns: cell, feature, expected value, standard deviat
         ap.refer(&mut threads)
           .add_option(&["--threads", "-t"], Store, "Number of threads to use.");
         ap.refer(&mut cells).add_option(&["--cells"], Store, "Regular expression for cells to select (default: all).");
+        ap.refer(&mut window_width).add_option(&["--pmf-window-width"], Store, "Width of the window to calculate PMF for (default: 100).");
         parse_args_or_exit(&ap, args);
     }
-    cli::expression(N, m, p0, p1, dist, &codebook_path.unwrap(), estimate_path, threads, &cells);
+    cli::expression(N, m, p0, p1, dist, &codebook_path.unwrap(), estimate_path, threads, &cells, window_width);
 }
 
 

@@ -62,6 +62,7 @@ def simulate(codebook, counts_path, has_corrected=True):
         sim_out = csv.writer(sim_out, delimiter="\t")
         sim_out.writerow(["cell", "feat", "dist", "cell_x", "cell_y", "x", "y"])
 
+        stats = []
         for cell in range(snakemake.params.cell_count):
             readouts = []
             words = []
@@ -102,11 +103,9 @@ def simulate(codebook, counts_path, has_corrected=True):
                 for _ in range(corrected_counts[gene]):
                     sim_out.writerow([cell, gene, 1, 0, 0, 0, 0])
 
-            # disable stats (for debugging only)
-            continue
-            
-            stats = []
             for gene in exact_counts:
+                if gene != "COL7A1":
+                    continue
                 known = known_counts[cell][gene]
                 counts = exact_counts[gene] + corrected_counts[gene]
                 _exact_miscalls = exact_miscalls[gene]
@@ -115,23 +114,23 @@ def simulate(codebook, counts_path, has_corrected=True):
                 missed = known - counts + miscalls
                 stats.append([known, missed, counts, miscalls])
 
-            stats = pd.DataFrame(stats)
-            stats.columns = ["truth", "missed", "counts", "miscalls"]
-            stats["total"] = stats["truth"] + stats["miscalls"]
-            stats["calls"] = stats["counts"] - stats["miscalls"]
+        stats = pd.DataFrame(stats)
+        stats.columns = ["truth", "missed", "counts", "miscalls"]
+        stats["total"] = stats["truth"] + stats["miscalls"]
+        stats["calls"] = stats["counts"] - stats["miscalls"]
 
-            print("rates vs counts")
-            print("miscalls", (stats["miscalls"] / stats["counts"]).mean())
-            print("calls", (stats["calls"] / stats["counts"]).mean())
-            print("missed", (stats["missed"] / stats["counts"]).mean())
-            print("rates vs truth")
-            print("miscalls", (stats["miscalls"] / stats["truth"]).mean())
-            print("calls", (stats["calls"] / stats["truth"]).mean())
-            print("missed", (stats["missed"] / stats["truth"]).mean())
-            print("rates vs total")
-            print("miscalls", (stats["miscalls"] / stats["total"]).mean())
-            print("calls", (stats["calls"] / stats["total"]).mean())
-            print("missed", (stats["missed"] / stats["total"]).mean())
+        print("rates vs counts")
+        print("miscalls", (stats["miscalls"] / stats["counts"]).mean())
+        print("calls", (stats["calls"] / stats["counts"]).mean())
+        print("missed", (stats["missed"] / stats["counts"]).mean())
+        print("rates vs truth")
+        print("miscalls", (stats["miscalls"] / stats["truth"]).mean())
+        print("calls", (stats["calls"] / stats["truth"]).mean())
+        print("missed", (stats["missed"] / stats["truth"]).mean())
+        print("rates vs total")
+        print("miscalls", (stats["miscalls"] / stats["total"]).mean())
+        print("calls", (stats["calls"] / stats["total"]).mean())
+        print("missed", (stats["missed"] / stats["total"]).mean())
 
 
 

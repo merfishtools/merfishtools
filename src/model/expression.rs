@@ -8,8 +8,8 @@ use model;
 pub type PMF = model::pmf::PMF<f32>;
 
 
-pub fn pmf(feature: &str, count: u32, count_exact: u32, model: &Box<model::readout::Model>) -> PMF {
-    let readout_model = model::Readout::new(feature, model);
+pub fn pmf(feature: &str, count: u32, count_exact: u32, model: &Box<model::readout::Model>, window_width: u32) -> PMF {
+    let readout_model = model::Readout::new(feature, model, window_width);
     let (xmin, xmax) = readout_model.window(count);
     let likelihoods = (xmin..xmax + 1).map(|x| {
         readout_model.likelihood(x, count, count_exact)
@@ -54,10 +54,14 @@ mod tests {
         model::readout::new_model(16, 4, 0.04, 0.1, 4, io::codebook::Reader::from_file("evaluation/codebook/140genesData.1.txt", 4).unwrap().codebook())
     }
 
+    fn setup_mhd2() -> Box<model::readout::Model> {
+        model::readout::new_model(14, 4, 0.04, 0.1, 2, io::codebook::Reader::from_file("evaluation/codebook/simulated-MHD2.txt", 2).unwrap().codebook())
+    }
+
     #[test]
     fn test_pmf() {
         let readout = setup();
-        let pmf = pmf(GENE, 25, 10, &readout);
+        let pmf = pmf(GENE, 25, 10, &readout, 100);
 
         let total = logprobs::sum(&pmf.iter().map(|e| e.prob).collect_vec());
         println!("{:?}", pmf);
@@ -68,12 +72,27 @@ mod tests {
     #[test]
     fn test_pmf2() {
         let readout = setup();
-        let pmf = pmf(GENE, 176, 25, &readout);
+        let pmf = pmf(GENE, 176, 25, &readout, 100);
 
         let total = logprobs::sum(&pmf.iter().map(|e| e.prob).collect_vec());
         println!("{:?}", pmf);
         println!("{}", total);
         assert!(total.approx_eq(&-0.0000029387441422557004));
+    }
+
+    #[test]
+    fn test_pmf3() {
+        let total = 100;
+        let calls = 40;
+        let miscalls = 8;
+        let missed = 52;
+        let count = calls + miscalls;
+
+        let readout = setup_mhd2();
+        let pmf = pmf("COL7A1", count, count, &readout, 100);
+
+        println!("{:?} {} {:?}", pmf.expected_value(), pmf.map(), pmf);
+        assert!(false);
     }
 }
 /*

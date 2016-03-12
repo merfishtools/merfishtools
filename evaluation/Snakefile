@@ -265,7 +265,7 @@ rule simulate:
         sim_counts_mhd2="data/simulated-MHD2.{mean}.all.txt",
         known_counts="data/simulated.{mean}.known.txt"
     params:
-        cell_count=100
+        cell_count=1000
     script:
         "scripts/simulate-counts.py"
 

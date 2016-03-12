@@ -49,7 +49,7 @@ struct Counts {
 }*/
 
 
-pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &str, estimate_path: Option<String>, threads: usize, cells: &str) {
+pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &str, estimate_path: Option<String>, threads: usize, cells: &str, window_width: u32) {
     let codebook = io::codebook::Reader::from_file(codebook_path, dist).unwrap().codebook();
     let model = model::readout::new_model(N, m, p0, p1, dist, codebook);
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
@@ -93,7 +93,7 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &st
     crossbeam::scope(|scope| {
         for (_, (cell, pmfs)) in pool.unordered_map(scope, counts.into_iter(), |(cell, counts)| {
             let pmfs = counts.into_iter().map(|(feature, count)| {
-                let pmf = model::expression::pmf(&feature, count.exact + count.corrected, count.exact, &model);
+                let pmf = model::expression::pmf(&feature, count.exact + count.corrected, count.exact, &model, window_width);
                 /*if feature == "COL5A1" {
                     debug!("{:?} {:?}", count, pmf);
                 }*/

@@ -73,16 +73,16 @@ mod tests {
     fn test_pmf() {
         let readout = setup();
         let pmfs1 = [
-            model::expression::pmf(GENE, 5, 5, &readout),
-            model::expression::pmf(GENE, 5, 5, &readout),
-            model::expression::pmf(GENE, 5, 5, &readout),
-            model::expression::pmf(GENE, 5, 5, &readout)
+            model::expression::pmf(GENE, 5, 5, &readout, 100),
+            model::expression::pmf(GENE, 5, 5, &readout, 100),
+            model::expression::pmf(GENE, 5, 5, &readout, 100),
+            model::expression::pmf(GENE, 5, 5, &readout, 100)
         ];
         let pmfs2 = [
-            model::expression::pmf(GENE, 50, 50, &readout),
-            model::expression::pmf(GENE, 50, 50, &readout),
-            model::expression::pmf(GENE, 50, 50, &readout),
-            model::expression::pmf(GENE, 50, 50, &readout)
+            model::expression::pmf(GENE, 50, 50, &readout, 100),
+            model::expression::pmf(GENE, 50, 50, &readout, 100),
+            model::expression::pmf(GENE, 50, 50, &readout, 100),
+            model::expression::pmf(GENE, 50, 50, &readout, 100)
         ];
         let pmf1 = model::expressionset::pmf(&pmfs1);
         let pmf2 = model::expressionset::pmf(&pmfs2);
