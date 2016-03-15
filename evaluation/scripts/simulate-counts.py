@@ -7,7 +7,8 @@ import numpy as np
 from bitarray import bitarray
 
 
-np.random.seed(42)
+# Fix the seed for a particular mean, so that results are reproducible.
+np.random.seed(int(snakemake.wildcards.mean))
 
 p0 = 0.04
 p1 = 0.1

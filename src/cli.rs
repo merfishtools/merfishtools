@@ -110,6 +110,7 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &st
                         &feature,
                         pmf.expected_value(),
                         pmf.standard_deviation(),
+                        pmf.map(),
                         pmf.credible_interval()
                     );
                 }
