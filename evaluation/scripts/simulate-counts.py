@@ -52,7 +52,7 @@ with open(snakemake.output.known_counts, "w") as known_out:
                 known_out.writerow([cell, gene, gene in codebook_mhd2.index, gene in codebook_mhd4.index, count])
 
 
-def simulate(codebook, counts_path, has_corrected=True):
+def simulate(codebook, counts_path, stats_path, has_corrected=True):
     lookup_exact = {word.tobytes(): gene for gene, word in codebook.items()}
     if has_corrected:
         lookup_corrected = {w.tobytes(): gene for gene, word in codebook.items() for w in hamming1_env(word)}
@@ -105,20 +105,22 @@ def simulate(codebook, counts_path, has_corrected=True):
                     sim_out.writerow([cell, gene, 1, 0, 0, 0, 0])
 
             for gene in exact_counts:
-                if gene != "COL7A1":
-                    continue
                 known = known_counts[cell][gene]
                 counts = exact_counts[gene] + corrected_counts[gene]
                 _exact_miscalls = exact_miscalls[gene]
                 _corrected_miscalls = corrected_miscalls[gene]
                 miscalls = _exact_miscalls + _corrected_miscalls
                 missed = known - counts + miscalls
-                stats.append([known, missed, counts, miscalls])
+                stats.append([cell, gene, known, missed, counts, miscalls])
 
         stats = pd.DataFrame(stats)
-        stats.columns = ["truth", "missed", "counts", "miscalls"]
+        stats.columns = ["cell", "gene", "truth", "missed", "counts", "miscalls"]
         stats["total"] = stats["truth"] + stats["miscalls"]
         stats["calls"] = stats["counts"] - stats["miscalls"]
+        stats["call-rate"] = stats["calls"] / stats["total"]
+        stats["miscall-rate"] = stats["calls"] / stats["total"]
+        stats["missed-rate"] = stats["missed"] / stats["total"]
+        stats.to_csv(stats_path, sep="\t")
 
         print("rates vs counts")
         print("miscalls", (stats["miscalls"] / stats["counts"]).mean())
@@ -136,6 +138,6 @@ def simulate(codebook, counts_path, has_corrected=True):
 
 
 print("Simulating MHD4")
-simulate(codebook_mhd4, snakemake.output.sim_counts_mhd4, has_corrected=True)
+simulate(codebook_mhd4, snakemake.output.sim_counts_mhd4, snakemake.output.stats_mhd4, has_corrected=True)
 print("Simulating MHD2")
-simulate(codebook_mhd2, snakemake.output.sim_counts_mhd2, has_corrected=False)
+simulate(codebook_mhd2, snakemake.output.sim_counts_mhd2, snakemake.output.stats_mhd2, has_corrected=False)

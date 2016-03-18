@@ -30,13 +30,15 @@ for i, (mean, posterior_counts, raw_counts, known_counts) in enumerate(zip(
     posterior_counts = posterior_counts.reindex(known_counts.index, fill_value=0)
     biased = posterior_counts[posterior_counts > 70].index
     unbiased = posterior_counts[(posterior_counts > 49) & (posterior_counts < 51)].index
-    print(posterior_counts.loc[biased])
-    print(raw_counts.loc[biased])
-    print(known_counts.loc[biased])
-    print("unbiased")
-    print(posterior_counts.loc[unbiased])
-    print(raw_counts.loc[unbiased])
-    print(known_counts.loc[unbiased])
+
+    if mean == 30:
+        print(posterior_counts.loc[biased])
+        print(raw_counts.loc[biased])
+        print(known_counts.loc[biased])
+        print("unbiased")
+        print(posterior_counts.loc[unbiased])
+        print(raw_counts.loc[unbiased])
+        print(known_counts.loc[unbiased])
 
 
     plt.plot(known_counts["count"], posterior_counts, "r.", label="conditional expectation" if i == 0 else "", zorder=1, alpha=0.01, rasterized=True)

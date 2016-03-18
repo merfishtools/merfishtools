@@ -51,7 +51,7 @@ rule all:
                fmt=formats),
         expand("results/{context}/simulation-MHD{dist}/MHD{dist}.{plot}.default.{fmt}", plot=["scatter", "error"], context=contexts, dist=[2, 4], fmt=formats),
         expand("results/{context}/default.dataset_correlation.{fmt}", context=contexts, fmt=formats),
-        expand("figures/fig{n}.pdf", n=range(2, 5))
+        #expand("figures/fig{n}.pdf", n=range(2, 5))
 
 
 rule format:
@@ -263,7 +263,9 @@ rule simulate:
     output:
         sim_counts_mhd4="data/simulated-MHD4.{mean}.all.txt",
         sim_counts_mhd2="data/simulated-MHD2.{mean}.all.txt",
-        known_counts="data/simulated.{mean}.known.txt"
+        known_counts="data/simulated.{mean}.known.txt",
+        stats_mhd4="data/simulated-MHD4.{mean}.stats.txt",
+        stats_mhd2="data/simulated-MHD2.{mean}.stats.txt"
     params:
         cell_count=1000
     script:

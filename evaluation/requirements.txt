@@ -1,7 +1,0 @@
-matplotlib
-snakemake
-scikit-learn
-pandas
-seaborn
-bitarray
-statsmodels

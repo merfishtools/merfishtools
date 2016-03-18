@@ -1,0 +1,12 @@
+channels:
+  - bioconda
+  - ostrokach
+dependencies:
+  - matplotlib
+  - snakemake
+  - scikit-learn
+  - scipy ==0.17.0
+  - pandas ==0.17.1
+  - seaborn
+  - bitarray
+  - librsvg
