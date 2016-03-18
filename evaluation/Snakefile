@@ -35,10 +35,6 @@ def matrices(dataset, type="expressions", settings="default"):
 rule all:
     input:
         expand([
-            "results/{context}/foldchange_cdf/{dataset}.1.A-vs-B.{gene}.default.foldchange_cdf.{fmt}",
-            "results/{context}/expression_pmf/{dataset}.1.cell0.{gene}.default.expression_pmf.{fmt}"
-        ], gene=config["genes"], context=contexts, dataset=datasets, fmt=formats),
-        expand([
             "results/{context}/{dataset}.default.expression_dist.{fmt}",
             "results/{context}/{dataset}.default.overdispersion.{fmt}",
             "results/{context}/{dataset}.default.correlation.{fmt}"
@@ -142,9 +138,10 @@ rule diffexp:
 rule plot_expression_pmf:
     input:
         expr="expressions/{dataset}.{experiment}.{group}.{settings}.txt",
+        expr_est="expressions/{dataset}.{experiment}.{group}.{settings}.est.txt",
         raw_counts="counts/{dataset}.{experiment}.{group}.txt"
     output:
-        "results/{context}/expression_pmf/{dataset}.{experiment}.{group}.{gene}.{settings}.expression_pmf.svg"
+        "results/{context}/expression_pmf/{dataset}.{experiment}.{group}.{gene}.{settings}.expression_pmf.{legend,(legend|nolegend)}.svg"
     script:
         "scripts/plot-expression-pmf.py"
 
@@ -154,7 +151,7 @@ rule plot_foldchange_cdf:
         pmf="diffexp/{dataset}.{experiment}.{group1}-vs-{experiment}.{group2}.{settings}.txt",
         est="diffexp/{dataset}.{experiment}.{group1}-vs-{experiment}.{group2}.{settings}.est.txt"
     output:
-        "results/{context}/foldchange_cdf/{dataset}.{experiment}.{group1}-vs-{group2}.{gene}.{settings}.foldchange_cdf.svg"
+        "results/{context}/foldchange_cdf/{dataset}.{experiment}.{group1}-vs-{group2}.{gene}.{settings}.foldchange_cdf.{legend,(legend|nolegend)}.svg"
     script:
         "scripts/plot-foldchange-cdf.py"
 
@@ -320,9 +317,9 @@ rule plot_go_term_enrichment:
 
 rule figure2:
     input:
-        b="results/paper/expression_pmf/140genesData.1.cell0.COL5A1.default.expression_pmf.svg",
-        a="results/paper/expression_pmf/140genesData.1.cell0.CKAP5.default.expression_pmf.svg",
-        c="results/paper/foldchange_cdf/140genesData.1.A-vs-B.COL5A1.default.foldchange_cdf.svg"
+        a="results/paper/expression_pmf/140genesData.1.cell34.COL5A1.default.expression_pmf.legend.svg",
+        b="results/paper/expression_pmf/140genesData.1.cell0.COL5A1.default.expression_pmf.nolegend.svg",
+        c="results/paper/foldchange_cdf/140genesData.1.cell34-vs-cell0.COL5A1.default.foldchange_cdf.nolegend.svg"
     output:
         "figures/fig2.svg"
     run:
