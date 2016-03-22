@@ -162,7 +162,7 @@ Results are provided as columns:
 
     feature (e.g. gene, rna)
     posterior error probability (PEP) for differential expression
-    expected log2 fold change
+    expected log2 fold change of first vs second group
     standard deviation of log2 fold change
 
 Example: "merfishtools diffexp data1.txt data2.txt > diffexp.txt""#
