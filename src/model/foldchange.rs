@@ -13,12 +13,13 @@ pub type FC = rational::Ratio<u64>;
 pub type PMF = model::pmf::PMF<LogFC>;
 
 
+/// PMF of log2 fold change of a vs b. Specifically, we calculate log2((mean(a) + 1) / (mean(b) + 1))
 pub fn pmf(a: &model::expressionset::PMF, b: &model::expressionset::PMF) -> PMF {
     let mut pmf = collections::HashMap::new();
     for (a, b) in a.iter().cartesian_product(b.iter()) {
         // add pseudocount
-        let fc = (b.value + rational::Ratio::from_integer(1)) / (a.value + rational::Ratio::from_integer(1));
-        let posterior_prob = b.prob + a.prob;
+        let fc = (a.value + rational::Ratio::from_integer(1)) / (b.value + rational::Ratio::from_integer(1));
+        let posterior_prob = a.prob + b.prob;
 
         if pmf.contains_key(&fc) {
             let p = pmf.get_mut(&fc).unwrap();
