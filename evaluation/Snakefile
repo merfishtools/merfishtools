@@ -16,7 +16,8 @@ merfishtools = "../target/release/merfishtools"
 
 contexts = ["paper"]
 datasets = ["140genesData"]
-formats = ["png", "pdf", "fixed.svg"]
+types = ["expressions", "normalized_expressions"]
+
 
 
 def experiments(dataset):
@@ -34,21 +35,11 @@ def matrices(dataset, type="expressions", settings="default"):
 
 rule all:
     input:
-        expand([
-            "results/{context}/{dataset}.default.expression_dist.{fmt}",
-            "results/{context}/{dataset}.default.overdispersion.{fmt}",
-            "results/{context}/{dataset}.default.correlation.{fmt}"
-        ], context=contexts, dataset=datasets, fmt=formats),
-        expand(["results/{context}/{dataset}.{type}.default.{highlight}.tsne.{fmt}",
-                "results/{context}/{dataset}.{type}.default.qqplot.{fmt}"],
-               context=contexts, dataset=datasets,
-               highlight=["expmnt", "codebook", "cellsize"],
-               type=["expressions", "normalized_expressions"],
-               fmt=formats),
-        expand("results/{context}/simulation-MHD{dist}/MHD{dist}.{plot}.default.{fmt}", plot=["scatter", "error"], context=contexts, dist=[2, 4], fmt=formats),
-        expand("results/{context}/default.dataset_correlation.{fmt}", context=contexts, fmt=formats),
-        #expand("figures/fig{n}.pdf", n=range(2, 5))
-
+        "figures/fig_example.pdf",
+        "figures/fig_simulation.pdf",
+        expand("figures/fig_{dataset}.{type}.clustering.pdf", dataset=datasets, type=types),
+        expand("results/{context}/{dataset}.{type}.default.qqplot.pdf", context="paper", dataset=datasets, type=types)
+        
 
 rule format:
     input:
@@ -327,13 +318,13 @@ rule plot_go_term_enrichment:
         "scripts/experiment-diffexp.py"
 
 
-rule figure2:
+rule figure_example:
     input:
         a="results/paper/expression_pmf/140genesData.1.cell34.COL5A1.default.expression_pmf.legend.svg",
         b="results/paper/expression_pmf/140genesData.1.cell0.COL5A1.default.expression_pmf.nolegend.svg",
         c="results/paper/foldchange_cdf/140genesData.1.cell0-vs-cell34.COL5A1.default.foldchange_cdf.nolegend.svg"
     output:
-        "figures/fig2.svg"
+        "figures/fig_example.svg"
     run:
         import svgutils.transform as sg
         fig = sg.SVGFigure("24.8cm", "6cm")
@@ -351,14 +342,14 @@ rule figure2:
         fig.save(output[0])
 
 
-rule figure3:
+rule figure_simulation:
     input:
         b="results/paper/simulation-MHD4/MHD4.scatter.default.svg",
         d="results/paper/simulation-MHD2/MHD2.scatter.default.svg",
         a="results/paper/simulation-MHD4/MHD4.error.default.svg",
         c="results/paper/simulation-MHD2/MHD2.error.default.svg"
     output:
-        "figures/fig3.svg"
+        "figures/fig_simulation.svg"
     run:
         import svgutils.transform as sg
         fig = sg.SVGFigure("14.2cm", "12cm")
@@ -379,23 +370,31 @@ rule figure3:
         fig.save(output[0])
 
 
-rule figure4:
+rule figure_clustering:
     input:
-        a="results/paper/140genesData.normalized_expressions.default.tsne.svg",
-        b="results/paper/140genesData.default.overdispersion.svg"
+        a="results/paper/{dataset}.{type}.default.cellsize.tsne.svg",
+        b="results/paper/{dataset}.{type}.default.cellpos.tsne.svg",
+        c="results/paper/{dataset}.{type}.default.codebook.tsne.svg",
+        d="results/paper/{dataset}.{type}.default.expmnt.tsne.svg"
     output:
-        "figures/fig4.svg"
+        "figures/fig_{dataset}.{type}.clustering.svg"
     run:
         import svgutils.transform as sg
-        fig = sg.SVGFigure("17.2cm", "11.5cm")
+        fig = sg.SVGFigure("23.8cm", "5.3cm")
         a = sg.fromfile(input.a).getroot()
         b = sg.fromfile(input.b).getroot()
-        b.moveto(0, 195)
+        c = sg.fromfile(input.c).getroot()
+        d = sg.fromfile(input.d).getroot()
+        b.moveto(258, 0)
+        c.moveto(453, 0)
+        d.moveto(650, 0)
 
         la = sg.TextElement(0,10, "a", size=12, weight="bold")
-        lb = sg.TextElement(0,205, "b", size=12, weight="bold")
+        lb = sg.TextElement(258,10, "b", size=12, weight="bold")
+        lc = sg.TextElement(453,10, "c", size=12, weight="bold")
+        ld = sg.TextElement(650,10, "d", size=12, weight="bold")
 
-        fig.append([a, b, la, lb])
+        fig.append([a, b, c, d, la, lb, lc, ld])
         fig.save(output[0])
 
 

@@ -4,7 +4,7 @@ import matplotlib
 matplotlib.use("agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn import preprocessing, manifold
+from sklearn import preprocessing, manifold, decomposition
 from itertools import combinations
 from matplotlib import gridspec
 
@@ -17,9 +17,11 @@ exprs.index = exprs.index.set_levels(exprs.index.levels[1].astype(np.int64), lev
 
 cellprops = [pd.read_table(f, index_col=0) for f in snakemake.input.cellprops]
 cellprops = pd.concat(cellprops, keys=experiments, names=["expmnt", "cell"])
+cellprops.columns = ["area", "cell_x", "cell_y"]
 # reduce cell position dimensionality to 1 dimension
+#pca = decomposition.PCA(n_components=1)
 tsne = manifold.TSNE(n_components=1, random_state=2390)
-pos = tsne.fit_transform(cellprops[["x", "y"]])[:, 0]
+pos = tsne.fit_transform(cellprops[["cell_x", "cell_y"]])[:, 0]
 cellprops["pos"] = pos
 
 # calculate t-SNE embedding
@@ -32,6 +34,7 @@ embedding.index = exprs.index
 sns.set(style="ticks", palette="colorblind", context=snakemake.wildcards.context)
 width, height = snakemake.config["plots"]["figsize"]
 fig = plt.figure(figsize=snakemake.config["plots"]["figsize"])
+plt.subplot(111, aspect="equal")
 
 for expmnt, codebook in zip(experiments, snakemake.params.codebooks):
     embedding.loc[expmnt, "codebook"] = codebook
