@@ -15,8 +15,12 @@ exprs = pd.concat(exprs, axis="columns", keys=experiments, names=["expmnt", "cel
 exprs = np.log10(1 + exprs.transpose())
 exprs.index = exprs.index.set_levels(exprs.index.levels[1].astype(np.int64), level=1)
 
-cellsizes = [pd.read_table(f, index_col=0) for f in snakemake.input.cellsizes]
-cellsizes = pd.concat(cellsizes, keys=experiments, names=["expmnt", "cell"])
+cellprops = [pd.read_table(f, index_col=0) for f in snakemake.input.cellprops]
+cellprops = pd.concat(cellprops, keys=experiments, names=["expmnt", "cell"])
+# reduce cell position dimensionality to 1 dimension
+tsne = manifold.TSNE(n_components=1, random_state=2390)
+pos = tsne.fit_transform(cellprops[["x", "y"]])[:, 0]
+cellprops["pos"] = pos
 
 # calculate t-SNE embedding
 tsne = manifold.TSNE(random_state=21498)
@@ -32,8 +36,7 @@ fig = plt.figure(figsize=snakemake.config["plots"]["figsize"])
 for expmnt, codebook in zip(experiments, snakemake.params.codebooks):
     embedding.loc[expmnt, "codebook"] = codebook
 embedding["codebook"] = embedding["codebook"].astype("category")
-embedding = pd.concat([embedding, cellsizes], axis="columns")
-#embedding["cellsize"] = cellsizes["area"]
+embedding = pd.concat([embedding, cellprops], axis="columns")
 embedding.reset_index(inplace=True)
 
 if snakemake.wildcards.highlight == "expmnt":
@@ -48,7 +51,11 @@ elif snakemake.wildcards.highlight == "codebook":
 elif snakemake.wildcards.highlight == "cellsize":
     highlight = "area"
     cmap = "viridis"
+elif snakemake.wildcards.highlight == "cellpos":
+    highlight = "pos"
+    cmap = "viridis"
 ax = plt.scatter("x", "y", c=highlight, data=embedding, cmap=cmap, alpha=0.7, edgecolors="face")
+    
 
 plt.axis("off")
 if snakemake.wildcards.highlight == "cellsize":

@@ -13,6 +13,7 @@ plt.figure(figsize=snakemake.config["plots"]["figsize"])
 plt.subplot(111, aspect="equal")
 
 errors = []
+counts = []
 for i, (mean, posterior_counts, raw_counts, known_counts) in enumerate(zip(
     snakemake.params.means,
     snakemake.input.posterior_counts,
@@ -41,14 +42,25 @@ for i, (mean, posterior_counts, raw_counts, known_counts) in enumerate(zip(
         print(known_counts.loc[unbiased])
 
 
-    plt.plot(known_counts["count"], posterior_counts, "r.", label="conditional expectation" if i == 0 else "", zorder=1, alpha=0.01, rasterized=True)
-    plt.plot(known_counts["count"], raw_counts, "k.", label="raw counts" if i == 0 else "", zorder=0, alpha=0.01, rasterized=True)
+    #plt.plot(known_counts["count"], posterior_counts, "r.", label="conditional expectation" if i == 0 else "", zorder=1, alpha=0.01, rasterized=True)
+    #plt.plot(known_counts["count"], raw_counts, "k.", label="raw counts" if i == 0 else "", zorder=0, alpha=0.01, rasterized=True)
+
+    counts.append(pd.DataFrame({"known": known_counts["count"], "raw": raw_counts, "posterior": posterior_counts}))
 
     errors.append(pd.DataFrame({"error": raw_counts - known_counts["count"], "mean": mean, "type": "raw"}))
     errors.append(pd.DataFrame({"error": posterior_counts - known_counts["count"], "mean": mean, "type": "posterior"}))
 
+counts = pd.concat(counts)
+plt.scatter(counts["known"], counts["raw"], s=1, c="k", alpha=0.3, rasterized=True, edgecolors="face", marker="o")
+plt.scatter(counts["known"], counts["posterior"], s=1, c="r", alpha=0.3, rasterized=True, edgecolors="face", marker="o")
+
+#sns.kdeplot(counts["known"], counts["raw"], bw=2, shade=True, shade_lowest=False, alpha=0.5, cmap="Greys", n_levels=60)
+#sns.kdeplot(counts["known"], counts["posterior"], bw=2, shade=True, shade_lowest=False, alpha=0.5, cmap="Reds", n_levels=60)
+
 maxv = max(plt.xlim()[1], plt.ylim()[1])
-plt.plot([epsilon, maxv], [epsilon, maxv], "--k")
+
+
+plt.plot([0, maxv], [0, maxv], "--k")
 plt.xlim((0, maxv))
 plt.ylim((0,maxv))
 plt.ylabel("predicted")
@@ -62,7 +74,7 @@ s = (errors["type"] == "posterior") & (errors["mean"] == 5)
 print(errors[s].describe())
 
 plt.figure(figsize=snakemake.config["plots"]["figsize"])
-colors = sns.xkcd_palette(["light grey", "grey"])
+colors = sns.xkcd_palette(["grey", "light red"])
 sns.violinplot(x="mean", y="error", hue="type", data=errors, bw=1, split=True, inner="quartile", linewidth=1, palette=colors)
 plt.plot(plt.xlim(), [0, 0], "-k", linewidth=1, zorder=-5)
 

@@ -2,12 +2,14 @@ channels:
   - bioconda
   - ostrokach
 dependencies:
-  - matplotlib
-  - snakemake
-  - scikit-learn
+  - python ==3.5.1
+  - numpy ==1.10.4
+  - matplotlib ==1.5.1
+  - snakemake ==3.6.0
+  - scikit-learn ==0.17.1
   - scipy ==0.17.0
   - pandas ==0.17.1
-  - seaborn
-  - bitarray
+  - seaborn ==0.7.0
+  - bitarray ==0.8.1
   - librsvg
-  - svgutils
+  - svgutils ==0.1.0

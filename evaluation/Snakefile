@@ -59,13 +59,13 @@ rule format:
         "scripts/format-dataset.py"
 
 
-rule cell_size:
+rule cell_props:
     input:
         "data/{dataset}.{experiment}.all.txt"
     output:
-        "cellsize/{dataset}.{experiment}.all.txt"
+        "cell_properties/{dataset}.{experiment}.all.txt"
     script:
-        "scripts/cell-size.py"
+        "scripts/cell-properties.py"
 
 
 rule raw_counts:
@@ -242,11 +242,11 @@ rule plot_tsne:
         exprs=lambda wildcards: matrices(wildcards.dataset,
                                          type=wildcards.type,
                                          settings=wildcards.settings),
-        cellsizes=lambda wildcards: expand("cellsize/{dataset}.{experiment}.all.txt",
+        cellprops=lambda wildcards: expand("cell_properties/{dataset}.{experiment}.all.txt",
                                            dataset=wildcards.dataset,
-                                           experiment=experiments(wildcards.dataset))
+                                           experiment=experiments(wildcards.dataset)),
     output:
-        "results/{context}/{dataset}.{type}.{settings}.{highlight,(expmnt|codebook|cellsize)}.tsne.svg"
+        "results/{context}/{dataset}.{type}.{settings}.{highlight,(expmnt|codebook|cellsize|cellpos)}.tsne.svg"
     params:
         codebooks=lambda wildcards: [config["codebooks"][wildcards.dataset][expmnt] for expmnt in experiments(wildcards.dataset)]
     script:
@@ -264,7 +264,7 @@ rule simulate:
         stats_mhd4="data/simulated-MHD4.{mean}.stats.txt",
         stats_mhd2="data/simulated-MHD2.{mean}.stats.txt"
     params:
-        cell_count=1000
+        cell_count=100
     script:
         "scripts/simulate-counts.py"
 
@@ -284,6 +284,18 @@ rule plot_simulation:
         means=means
     script:
         "scripts/plot-simulation.py"
+
+
+rule plot_simulation_pmf:
+    input:
+        pmfs=expand("expressions/simulated-MHD{{dist}}.{mean}.all.{{settings}}.txt", mean=means),
+        known_counts=expand("data/simulated.{mean}.known.txt", mean=means)
+    output:
+        "results/{context}/simulation-MHD{dist}/MHD{dist}.pmf.{settings}.svg"
+    params:
+        means=means
+    script:
+        "scripts/plot-simulation-pmf.py"
 
 
 rule plot_dataset_correlation:
@@ -319,7 +331,7 @@ rule figure2:
     input:
         a="results/paper/expression_pmf/140genesData.1.cell34.COL5A1.default.expression_pmf.legend.svg",
         b="results/paper/expression_pmf/140genesData.1.cell0.COL5A1.default.expression_pmf.nolegend.svg",
-        c="results/paper/foldchange_cdf/140genesData.1.cell34-vs-cell0.COL5A1.default.foldchange_cdf.nolegend.svg"
+        c="results/paper/foldchange_cdf/140genesData.1.cell0-vs-cell34.COL5A1.default.foldchange_cdf.nolegend.svg"
     output:
         "figures/fig2.svg"
     run:
@@ -341,17 +353,15 @@ rule figure2:
 
 rule figure3:
     input:
-        #a="results/paper/140genesData.default.expression_dist.svg",
-        #b="results/paper/default.dataset_correlation.svg",
-        a="results/paper/simulation-MHD4/MHD4.scatter.default.svg",
-        b="results/paper/simulation-MHD2/MHD2.scatter.default.svg",
-        c="results/paper/simulation-MHD4/MHD4.error.default.svg",
-        d="results/paper/simulation-MHD2/MHD2.error.default.svg"
+        b="results/paper/simulation-MHD4/MHD4.scatter.default.svg",
+        d="results/paper/simulation-MHD2/MHD2.scatter.default.svg",
+        a="results/paper/simulation-MHD4/MHD4.error.default.svg",
+        c="results/paper/simulation-MHD2/MHD2.error.default.svg"
     output:
         "figures/fig3.svg"
     run:
         import svgutils.transform as sg
-        fig = sg.SVGFigure("16.2cm", "12cm")
+        fig = sg.SVGFigure("14.2cm", "12cm")
         a = sg.fromfile(input.a).getroot()
         b = sg.fromfile(input.b).getroot()
         c = sg.fromfile(input.c).getroot()
