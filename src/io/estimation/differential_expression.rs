@@ -35,8 +35,8 @@ impl<W: io::Write> Writer<W> {
     pub fn write(&mut self, feature: &str, differential_expression_pep: LogProb, fdr: LogProb, expected_value: LogFC, standard_deviation: LogFC, credible_interval: (LogFC, LogFC)) {
         self.inner.write([
             feature.to_owned(),
-            format!("{:e}", differential_expression_pep.exp()),
-            format!("{:e}", fdr.exp()),
+            format!("{:.*e}", 2, differential_expression_pep.exp()),
+            format!("{:.*e}", 2, fdr.exp()),
             format!("{:.*}", 2, expected_value),
             format!("{:.*}", 4, standard_deviation),
             format!("{:.*}", 2, credible_interval.0),
