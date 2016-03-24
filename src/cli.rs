@@ -167,6 +167,7 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
             &feature,
             estimate.differential_expression_pep,
             fdr,
+            estimate.differential_expression_bf,
             estimate.expected_value,
             estimate.standard_deviation,
             estimate.credible_interval

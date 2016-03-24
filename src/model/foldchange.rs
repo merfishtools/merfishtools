@@ -15,6 +15,7 @@ pub type PMF = model::pmf::PMF<LogFC>;
 
 pub struct Estimate {
     pub differential_expression_pep: LogProb,
+    pub differential_expression_bf: f64,
     pub expected_value: f64,
     pub standard_deviation: f64,
     pub credible_interval: (f64, f64)
@@ -48,14 +49,24 @@ pub fn pmf(a: &model::expressionset::PMF, b: &model::expressionset::PMF) -> PMF 
 
 
 impl PMF {
+    /// Posterior error probability for differential expression.
     pub fn differential_expression_pep(&self, max_fc: LogFC) -> LogProb {
         let probs = self.iter().filter(|e| e.value.abs() > max_fc).map(|e| e.prob).collect_vec();
         logprobs::ln_1m_exp(logprobs::sum(&probs))
     }
 
+    /// 2 * ln Bayes factor for differential expression.
+    pub fn differential_expression_bf(&self, max_fc: LogFC) -> f64 {
+        let m0 = self.iter().filter(|e| e.value.abs() <= max_fc).map(|e| e.prob).collect_vec();
+        let m1 = self.iter().filter(|e| e.value.abs() > max_fc).map(|e| e.prob).collect_vec();
+
+        2.0 * (logprobs::sum(&m1) - logprobs::sum(&m0))
+    }
+
     pub fn estimate(&self, max_fc: LogFC) -> Estimate {
         Estimate {
             differential_expression_pep: self.differential_expression_pep(max_fc),
+            differential_expression_bf: self.differential_expression_bf(max_fc),
             expected_value: self.expected_value(),
             standard_deviation: self.standard_deviation(),
             credible_interval: self.credible_interval()
