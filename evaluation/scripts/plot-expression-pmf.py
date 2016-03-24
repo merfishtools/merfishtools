@@ -30,7 +30,7 @@ plot_pmf(pmf["expr"], np.exp(pmf["prob"]))
 ylim = plt.ylim()
 
 ci_lower, ci_upper = est[['expr_ci_lower', 'expr_ci_upper']]
-plt.fill([ci_lower, ci_upper, ci_upper, ci_lower], [0, 0, ylim[1], ylim[1]], "red", lw=0, label="95% credible interval", alpha=0.5)
+plt.fill([ci_lower, ci_upper, ci_upper, ci_lower], [0, 0, ylim[1], ylim[1]], "red", lw=0, label="95% CI", alpha=0.5)
 plt.vlines([est['expr_ev']], *ylim, colors="red", label="expected value")
 
 plt.vlines([count_total], *ylim, colors="grey", linestyles="--", label="total count")
@@ -40,7 +40,7 @@ plt.ylim(ylim)
 plt.xlabel("expression")
 plt.ylabel("PMF")
 if snakemake.wildcards.legend == "legend":
-    plt.legend(loc="best")
+    plt.legend(loc="upper left", bbox_to_anchor=(0.5, 1))
 plt.xlim([0, plt.xlim()[1]])
 
 sns.despine()

@@ -49,4 +49,4 @@ genes:
   - ATP11A
 
 plots:
-  figsize: [4.224, 2.904]
+  figsize: [2.4, 2]

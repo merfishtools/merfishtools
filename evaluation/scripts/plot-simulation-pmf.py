@@ -8,7 +8,9 @@ import seaborn as sns
 
 sns.set(style="ticks", palette="colorblind", context=snakemake.wildcards.context)
 
-plt.figure(figsize=snakemake.config["plots"]["figsize"])
+x, y = snakemake.config["plots"]["figsize"]
+
+plt.figure(figsize=(5.59, y))
 
 
 pmfs = []
@@ -30,15 +32,16 @@ for i, (mean, pmf, known_counts) in enumerate(zip(
     pmf["expr"] -= known_counts
     pmf.set_index("expr", append=True, inplace=True)
     pmf = pmf.unstack(level=[0, 1])
-    pmf = np.exp(pmf.sample(10, axis=1))
-    pmf.columns = np.arange(pmf.shape[1])
+    pmf.columns = known_counts
+    pmf = np.exp(pmf.sample(10, axis=1, random_state=mean))
     pmfs.append(pmf)
 
 print("plotting")
 pmfs = pd.concat(pmfs, axis=1)
-pmfs = pmfs.reindex(np.arange(-10, 11))
+pmfs = pmfs.reindex(np.arange(-20, 21))
 pmfs.fillna(0, inplace=True)
 pmfs.sort_index(ascending=False, inplace=True)
+pmfs.sort_index(inplace=True, axis=1)
 sns.heatmap(pmfs, cbar=False, cmap="Greys", xticklabels=False, yticklabels=10)
 
 plt.ylabel("predicted - truth")

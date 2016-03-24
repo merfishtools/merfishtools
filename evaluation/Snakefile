@@ -122,7 +122,7 @@ rule diffexp:
         "bench/diffexp/{dataset}.{experiment1}.{group1}-vs-{experiment2}.{group2}.{settings}.txt"
     threads: 8
     shell:
-        "{merfishtools} diffexp -t {threads} --min-log2fc 0.9999 --pmf {output.pmf} {input} "
+        "{merfishtools} diffexp -t {threads} --max-null-log2fc 1.0 --pmf {output.pmf} {input} "
         "> {output.est}"
 
 
@@ -327,16 +327,16 @@ rule figure_example:
         "figures/fig_example.svg"
     run:
         import svgutils.transform as sg
-        fig = sg.SVGFigure("24.8cm", "6cm")
+        fig = sg.SVGFigure("6.4in", "1.8in")
         a = sg.fromfile(input.a).getroot()
         b = sg.fromfile(input.b).getroot()
         c = sg.fromfile(input.c).getroot()
-        b.moveto(294, 0)
-        c.moveto(588, 0)
+        b.moveto(200, 0)
+        c.moveto(390, 0)
 
         la = sg.TextElement(0,10, "a", size=12, weight="bold")
-        lb = sg.TextElement(294,10, "b", size=12, weight="bold")
-        lc = sg.TextElement(588,10, "c", size=12, weight="bold")
+        lb = sg.TextElement(200,10, "b", size=12, weight="bold")
+        lc = sg.TextElement(390,10, "c", size=12, weight="bold")
 
         fig.append([a, b, c, la, lb, lc])
         fig.save(output[0])
@@ -352,19 +352,19 @@ rule figure_simulation:
         "figures/fig_simulation.svg"
     run:
         import svgutils.transform as sg
-        fig = sg.SVGFigure("14.2cm", "12cm")
+        fig = sg.SVGFigure("4.6in", "3.6in")
         a = sg.fromfile(input.a).getroot()
         b = sg.fromfile(input.b).getroot()
         c = sg.fromfile(input.c).getroot()
         d = sg.fromfile(input.d).getroot()
-        b.moveto(288, 0)
-        c.moveto(0, 210)
-        d.moveto(288, 210)
+        b.moveto(250, 0)
+        c.moveto(0, 160)
+        d.moveto(250, 160)
 
         la = sg.TextElement(0,10, "a", size=12, weight="bold")
-        lb = sg.TextElement(288,10, "b", size=12, weight="bold")
-        lc = sg.TextElement(0,220, "c", size=12, weight="bold")
-        ld = sg.TextElement(288,220, "d", size=12, weight="bold")
+        lb = sg.TextElement(250,10, "b", size=12, weight="bold")
+        lc = sg.TextElement(0,170, "c", size=12, weight="bold")
+        ld = sg.TextElement(250,170, "d", size=12, weight="bold")
 
         fig.append([a, b, c, d, la, lb, lc, ld])
         fig.save(output[0])

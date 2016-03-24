@@ -73,7 +73,8 @@ errors = pd.concat(errors)
 s = (errors["type"] == "posterior") & (errors["mean"] == 5)
 print(errors[s].describe())
 
-plt.figure(figsize=snakemake.config["plots"]["figsize"])
+x, y = snakemake.config["plots"]["figsize"]
+plt.figure(figsize=(x * 1.5, y))
 colors = sns.xkcd_palette(["grey", "light red"])
 sns.violinplot(x="mean", y="error", hue="type", data=errors, bw=1, split=True, inner="quartile", linewidth=1, palette=colors)
 plt.plot(plt.xlim(), [0, 0], "-k", linewidth=1, zorder=-5)
