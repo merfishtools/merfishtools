@@ -28,14 +28,19 @@ for i, (mean, pmf, known_counts) in enumerate(zip(
     pmf = pmf.loc[common]
 
     pmf["expr"] -= known_counts
-    for _, _pmf in pmf.groupby(level=[0, 1]):
-        _pmf.reset_index(drop=True, inplace=True)
-        pmfs.append(pd.Series(data=_pmf["prob"], index=_pmf["expr"]))
-    break
-        
+    pmf.set_index("expr", append=True, inplace=True)
+    pmf = pmf.unstack(level=[0, 1])
+    pmf = np.exp(pmf.sample(10, axis=1))
+    pmf.columns = np.arange(pmf.shape[1])
+    pmfs.append(pmf)
 
-pmfs = pd.concat(pmfs, axis=1).fillna(0)
-sns.heatmap(pmfs)
+print("plotting")
+pmfs = pd.concat(pmfs, axis=1)
+pmfs = pmfs.reindex(np.arange(-10, 11))
+pmfs.fillna(0, inplace=True)
+pmfs.sort_index(ascending=False, inplace=True)
+sns.heatmap(pmfs, cbar=False, cmap="Greys", xticklabels=False, yticklabels=10)
+
 plt.ylabel("predicted - truth")
 plt.xlabel("PMF")
 
