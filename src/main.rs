@@ -20,6 +20,7 @@ extern crate simple_parallel;
 extern crate crossbeam;
 extern crate regex;
 extern crate rgsl;
+extern crate ord_subset;
 
 pub mod model;
 pub mod io;
@@ -152,7 +153,7 @@ fn diffexp(args: Vec<String>) {
     let mut group1_path = "".to_owned();
     let mut group2_path = "".to_owned();
     let mut pmf_path: Option<String> = None;
-    let mut min_fc = 1.0f64.log2();
+    let mut max_fc = 1.0f64.log2();
 
     {
         let mut ap = ArgumentParser::new();
@@ -173,8 +174,8 @@ r#"Path to write PMF (probability mass function) of Log2 fold change to.
 Output is formatted into columns: feature, foldchange, posterior probability"#);
         ap.refer(&mut threads)
           .add_option(&["--threads", "-t"], Store, "Number of threads to use (default: 1).");
-        ap.refer(&mut min_fc)
-          .add_option(&["--min-log2fc"], Store, "Minimum absolute log2 fold change considered as differential expression (default: log2(1.5)).");
+        ap.refer(&mut max_fc)
+          .add_option(&["--max-null-log2fc"], Store, "Maximum absolute log2 fold change considered as no differential expression (default: 0.0).");
         ap.refer(&mut group1_path).required()
           .add_argument("group1", Store, "Path to expression PMFs for group of cells.");
         ap.refer(&mut group2_path).required()
@@ -182,7 +183,7 @@ Output is formatted into columns: feature, foldchange, posterior probability"#);
         parse_args_or_exit(&ap, args);
 
     }
-    cli::differential_expression(&group1_path, &group2_path, pmf_path, min_fc, threads);
+    cli::differential_expression(&group1_path, &group2_path, pmf_path, max_fc, threads);
 }
 
 
