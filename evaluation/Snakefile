@@ -35,7 +35,7 @@ def matrices(dataset, type="expressions", settings="default"):
 
 rule all:
     input:
-        "figures/fig_example.pdf",
+        expand("figures/fig_example_{gene}.pdf", gene=config["genes"]),
         "figures/fig_simulation.pdf",
         expand("figures/fig_{dataset}.{type}.clustering.pdf", dataset=datasets, type=types),
         expand("results/{context}/{dataset}.{type}.default.qqplot.pdf", context="paper", dataset=datasets, type=types)
@@ -320,11 +320,11 @@ rule plot_go_term_enrichment:
 
 rule figure_example:
     input:
-        a="results/paper/expression_pmf/140genesData.1.cell34.COL5A1.default.expression_pmf.legend.svg",
-        b="results/paper/expression_pmf/140genesData.1.cell0.COL5A1.default.expression_pmf.nolegend.svg",
-        c="results/paper/foldchange_cdf/140genesData.1.cell0-vs-cell34.COL5A1.default.foldchange_cdf.nolegend.svg"
+        a="results/paper/expression_pmf/140genesData.1.cell34.{gene}.default.expression_pmf.legend.svg",
+        b="results/paper/expression_pmf/140genesData.1.cell0.{gene}.default.expression_pmf.nolegend.svg",
+        c="results/paper/foldchange_cdf/140genesData.1.cell0-vs-cell34.{gene}.default.foldchange_cdf.nolegend.svg"
     output:
-        "figures/fig_example.svg"
+        "figures/fig_example_{gene}.svg"
     run:
         import svgutils.transform as sg
         fig = sg.SVGFigure("6.4in", "1.8in")

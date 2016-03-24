@@ -43,10 +43,8 @@ settings:
   default:
 
 genes:
-  - COL5A1
-  - BRCA2
-  - CKAP5
-  - ATP11A
+  - FLNC
+  - PRKCA
 
 plots:
   figsize: [2.4, 2]

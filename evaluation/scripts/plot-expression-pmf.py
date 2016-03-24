@@ -11,7 +11,7 @@ def plot_pmf(values, probs, stem=False):
         _, _, baseline = plt.stem(values, probs, markerfmt="ko", basefmt="", linefmt="k-")
         plt.setp(baseline, 'linewidth', 0)
     else:
-        plt.plot(values, probs, "ko", label="")
+        plt.plot(values, probs, "ko", label="", zorder=7, clip_on=False)
 
 
 sns.set(style="ticks", palette="colorblind", context=snakemake.wildcards.context)
@@ -25,16 +25,19 @@ count_exact = raw_counts["exact"]
 count_corrected = raw_counts["corrected"]
 count_total = count_exact + count_corrected
 
-plot_pmf(pmf["expr"], np.exp(pmf["prob"]))
+probs = np.exp(pmf["prob"])
+plot_pmf(pmf["expr"], probs)
 
 ylim = plt.ylim()
 
 ci_lower, ci_upper = est[['expr_ci_lower', 'expr_ci_upper']]
-plt.fill([ci_lower, ci_upper, ci_upper, ci_lower], [0, 0, ylim[1], ylim[1]], "red", lw=0, label="95% CI", alpha=0.5)
-plt.vlines([est['expr_ev']], *ylim, colors="red", label="expected value")
+plt.fill([ci_lower, ci_upper, ci_upper, ci_lower], [0, 0, ylim[1], ylim[1]], "red", lw=0, label="95% CI", alpha=0.5, zorder=0)
+plt.vlines([est['expr_ev']], *ylim, colors="red", label="expected value", zorder=1)
 
-plt.vlines([count_total], *ylim, colors="grey", linestyles="--", label="total count")
-plt.vlines([count_exact], *ylim, colors="grey", linestyles=":", label="exact count")
+plt.vlines([count_total], *ylim, colors="grey", linestyles="--", label="total count", zorder=6)
+plt.vlines([count_exact], *ylim, colors="grey", linestyles=":", label="exact count", zorder=6)
+
+plt.fill_between(pmf["expr"], probs, 1.2,  zorder=2, facecolor="white", edgecolor="white")
 
 plt.ylim(ylim)
 plt.xlabel("expression")
