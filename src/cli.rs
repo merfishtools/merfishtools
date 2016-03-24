@@ -9,6 +9,7 @@ use crossbeam;
 use regex::Regex;
 
 use bio::stats::logprobs::Prob;
+use bio::stats::logprobs;
 
 use io;
 use model;
@@ -120,7 +121,7 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &st
 }
 
 
-pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: Option<String>, min_fc: LogFC, threads: usize) {
+pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: Option<String>, max_fc: LogFC, threads: usize) {
     let mut reader1 = io::pmf::expression::Reader::from_file(group1_path).expect("Invalid input for group 1.");
     let mut reader2 = io::pmf::expression::Reader::from_file(group2_path).expect("Invalid input for group 2.");
     let mut pmf_writer = pmf_path.map(|path| io::pmf::foldchange::Writer::from_file(path));
@@ -132,6 +133,7 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
     let features = group1.features().filter(|f| group2.contains_feature(f)).cloned().collect_vec();
 
     let mut pool = simple_parallel::Pool::new(threads);
+    let mut estimates = Vec::new();
     crossbeam::scope(|scope| {
         for (_, (feature, pmf)) in pool.unordered_map(scope, features, |feature| {
             info!("Calculating {}.", feature);
@@ -150,17 +152,24 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
                 warn!("A PMF value for feature {} cannot be estimated because counts are too high. It will be reported as NaN.", feature);
             }
 
-            est_writer.write(
-                &feature,
-                pmf.differential_expression_pep(min_fc),
-                pmf.expected_value(),
-                pmf.standard_deviation(),
-                pmf.credible_interval()
-            );
-
             if let Some(ref mut pmf_writer) = pmf_writer {
                 pmf_writer.write(&feature, &pmf);
             }
+            estimates.push((feature, pmf.estimate(max_fc)));
         }
     });
+    // calculate FDR and write estimates to STDOUT
+    estimates.sort_by(|&(_, ref a), &(_, ref b)| a.differential_expression_pep.partial_cmp(&b.differential_expression_pep).unwrap());
+    let expected_fds = logprobs::cumsum(estimates.iter().map(|&(_, ref a)| a.differential_expression_pep));
+    for (i, ((feature, estimate), fd)) in estimates.into_iter().zip(expected_fds).enumerate() {
+        let fdr = fd - (i as f64 + 1.0).ln();
+        est_writer.write(
+            &feature,
+            estimate.differential_expression_pep,
+            fdr,
+            estimate.expected_value,
+            estimate.standard_deviation,
+            estimate.credible_interval
+        );
+    }
 }

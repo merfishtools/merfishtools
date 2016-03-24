@@ -13,6 +13,14 @@ pub type FC = rational::Ratio<u64>;
 pub type PMF = model::pmf::PMF<LogFC>;
 
 
+pub struct Estimate {
+    pub differential_expression_pep: LogProb,
+    pub expected_value: f64,
+    pub standard_deviation: f64,
+    pub credible_interval: (f64, f64)
+}
+
+
 /// PMF of log2 fold change of a vs b. Specifically, we calculate log2((mean(a) + 1) / (mean(b) + 1))
 pub fn pmf(a: &model::expressionset::PMF, b: &model::expressionset::PMF) -> PMF {
     let mut pmf = collections::HashMap::new();
@@ -40,9 +48,18 @@ pub fn pmf(a: &model::expressionset::PMF, b: &model::expressionset::PMF) -> PMF 
 
 
 impl PMF {
-    pub fn differential_expression_pep(&self, min_fc: LogFC) -> LogProb {
-        let probs = self.iter().filter(|e| e.value.abs() > min_fc).map(|e| e.prob).collect_vec();
+    pub fn differential_expression_pep(&self, max_fc: LogFC) -> LogProb {
+        let probs = self.iter().filter(|e| e.value.abs() > max_fc).map(|e| e.prob).collect_vec();
         logprobs::ln_1m_exp(logprobs::sum(&probs))
+    }
+
+    pub fn estimate(&self, max_fc: LogFC) -> Estimate {
+        Estimate {
+            differential_expression_pep: self.differential_expression_pep(max_fc),
+            expected_value: self.expected_value(),
+            standard_deviation: self.standard_deviation(),
+            credible_interval: self.credible_interval()
+        }
     }
 }
 
