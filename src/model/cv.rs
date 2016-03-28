@@ -39,13 +39,14 @@ pub fn pmf(pmfs: &[model::expressionset::PMF]) -> model::diffexp::PMF {
 
             let mut p = pmf.entry(cv).or_insert(0.0);
             *p = logprobs::add(*p, prob);
-
-            //pmf.push(model::pmf::Entry { value: cv, prob: prob });
         }
     }
 
     let pmf = pmf.iter().map(|(cv, p)| {
-        model::pmf::Entry { value: cv.numer().to_f64().unwrap() / cv.denom().to_f64().unwrap(), prob: *p }
+        model::pmf::Entry {
+            value: cv.numer().to_f64().unwrap().log2() - cv.denom().to_f64().unwrap().log2(),
+            prob: *p
+        }
     }).collect_vec();
 
     model::diffexp::PMF::new(pmf)

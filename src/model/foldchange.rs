@@ -29,7 +29,7 @@ pub fn pmf(a: &model::expressionset::PMF, b: &model::expressionset::PMF) -> mode
 
     let mut pmf = pmf.iter().filter_map(|(fc, prob)| {
         if *prob >= model::MIN_PROB {
-            Some(model::pmf::Entry { value: (*fc.numer() as f64 + 1.0).log2() - (*fc.denom() as f64 + 1.0).log2(), prob: *prob })
+            Some(model::pmf::Entry { value: (*fc.numer() as f64).log2() - (*fc.denom() as f64).log2(), prob: *prob })
         }
         else {
             None

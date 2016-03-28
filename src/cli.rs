@@ -182,8 +182,8 @@ pub fn multi_differential_expression(group_paths: &[String], pmf_path: Option<St
         io::pmf::expression::Reader::from_file(path).expect(&format!("Invalid input for group {}.", i))
                                                     .pmfs()
     }).collect_vec();
-    let mut pmf_writer = pmf_path.map(|path| io::pmf::diffexp::Writer::from_file(path, "cv"));
-    let mut est_writer = io::estimation::differential_expression::Writer::from_writer(std::io::stdout(), "cv");
+    let mut pmf_writer = pmf_path.map(|path| io::pmf::diffexp::Writer::from_file(path, "log2cv"));
+    let mut est_writer = io::estimation::differential_expression::Writer::from_writer(std::io::stdout(), "log2cv");
 
     // TODO take feature intersection or warn if features are not the same
     let features = groups[0].features();

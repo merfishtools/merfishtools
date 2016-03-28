@@ -157,7 +157,7 @@ fn diffexp(args: Vec<String>) {
     let mut group1_path = "".to_owned();
     let mut group2_path = "".to_owned();
     let mut pmf_path: Option<String> = None;
-    let mut max_fc = 1.0f64.log2();
+    let mut max_fc = 1.0;
 
     {
         let mut ap = ArgumentParser::new();
@@ -182,7 +182,7 @@ Output is formatted into columns: feature, foldchange, posterior probability"#);
         ap.refer(&mut threads)
           .add_option(&["--threads", "-t"], Store, "Number of threads to use (default: 1).");
         ap.refer(&mut max_fc)
-          .add_option(&["--max-null-log2fc"], Store, "Maximum absolute log2 fold change considered as no differential expression (default: 0.0).");
+          .add_option(&["--max-null-log2fc"], Store, "Maximum absolute log2 fold change considered as no differential expression (default: 1.0).");
         ap.refer(&mut group1_path).required()
           .add_argument("group1", Store, "Path to expression PMFs for group of cells.");
         ap.refer(&mut group2_path).required()
@@ -197,7 +197,7 @@ fn multidiffexp(args: Vec<String>) {
     let mut threads = 1;
     let mut group_paths = vec![];
     let mut pmf_path: Option<String> = None;
-    let mut max_cv = 0.0f64;
+    let mut max_cv = 0.1;
 
     {
         let mut ap = ArgumentParser::new();
@@ -209,11 +209,11 @@ Results are provided as columns:
     posterior error probability (PEP) for differential expression
     expected FDR when selecting all features down to the current
     bayes factor (BF) for differential expression
-    expected log2 fold change of first vs second group
-    standard deviation of log2 fold change
-    lower and upper bound of 95% credible interval of log2 fold change
+    expected coefficient of variation (CV)
+    standard deviation of CV
+    lower and upper bound of 95% credible interval of CV
 
-Example: "merfishtools diffexp data1.txt data2.txt > diffexp.txt""#
+Example: "merfishtools multidiffexp data1.txt data2.txt data3.txt > diffexp.txt""#
         );
 
         ap.refer(&mut pmf_path).add_option(&["--pmf"], StoreOption,
@@ -222,10 +222,13 @@ Output is formatted into columns: feature, foldchange, posterior probability"#);
         ap.refer(&mut threads)
           .add_option(&["--threads", "-t"], Store, "Number of threads to use (default: 1).");
         ap.refer(&mut max_cv)
-          .add_option(&["--max-null-cv"], Store, "Maximum coefficient of variation considered as no differential expression (default: 0.0).");
+          .add_option(&["--max-null-cv"], Store, "Maximum log2 coefficient of variation considered as no differential expression (default: 0.13).");
         ap.refer(&mut group_paths).required()
           .add_argument("groups", List, "Paths to expression PMFs for groups of cells.");
         parse_args_or_exit(&ap, args);
+    }
+    if group_paths.len() < 2 {
+        panic!("At least 2 expression PMFs definition the groups to compare must be given.")
     }
     cli::multi_differential_expression(&group_paths, pmf_path, max_cv, threads);
 }
