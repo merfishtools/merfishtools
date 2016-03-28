@@ -11,7 +11,7 @@ def plot_pmf(values, probs, stem=False):
         _, _, baseline = plt.stem(values, probs, markerfmt="ko", basefmt="", linefmt="k-")
         plt.setp(baseline, 'linewidth', 0)
     else:
-        plt.plot(values, probs, "ko", label="", zorder=7, clip_on=False)
+        plt.plot(values, probs, "ko", label="", ms=4, zorder=7, clip_on=False)
 
 
 sns.set(style="ticks", palette="colorblind", context=snakemake.wildcards.context)
