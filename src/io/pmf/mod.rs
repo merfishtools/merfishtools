@@ -1,2 +1,2 @@
 pub mod expression;
-pub mod foldchange;
+pub mod diffexp;

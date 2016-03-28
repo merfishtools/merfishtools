@@ -3,31 +3,19 @@ use std::collections;
 use num::rational;
 use itertools::Itertools;
 use bio::stats::logprobs;
-use bio::stats::logprobs::LogProb;
 
 use model;
 
 
 pub type LogFC = f64;
 pub type FC = rational::Ratio<u64>;
-pub type PMF = model::pmf::PMF<LogFC>;
-
-
-pub struct Estimate {
-    pub differential_expression_pep: LogProb,
-    pub differential_expression_bf: f64,
-    pub expected_value: f64,
-    pub standard_deviation: f64,
-    pub credible_interval: (f64, f64)
-}
 
 
 /// PMF of log2 fold change of a vs b. Specifically, we calculate log2((mean(a) + 1) / (mean(b) + 1))
-pub fn pmf(a: &model::expressionset::PMF, b: &model::expressionset::PMF) -> PMF {
+pub fn pmf(a: &model::expressionset::PMF, b: &model::expressionset::PMF) -> model::diffexp::PMF {
     let mut pmf = collections::HashMap::new();
     for (a, b) in a.iter().cartesian_product(b.iter()) {
-        // add pseudocount
-        let fc = (a.value + rational::Ratio::from_integer(1)) / (b.value + rational::Ratio::from_integer(1));
+        let fc = a.value / b.value;
         let posterior_prob = a.prob + b.prob;
 
         if pmf.contains_key(&fc) {
@@ -39,39 +27,17 @@ pub fn pmf(a: &model::expressionset::PMF, b: &model::expressionset::PMF) -> PMF 
         }
     }
 
-    let mut pmf = pmf.iter().map(|(fc, prob)| {
-        model::pmf::Entry { value: (*fc.numer() as f64 + 1.0).log2() - (*fc.denom() as f64 + 1.0).log2(), prob: *prob }
+    let mut pmf = pmf.iter().filter_map(|(fc, prob)| {
+        if *prob >= model::MIN_PROB {
+            Some(model::pmf::Entry { value: (*fc.numer() as f64 + 1.0).log2() - (*fc.denom() as f64 + 1.0).log2(), prob: *prob })
+        }
+        else {
+            None
+        }
     }).collect_vec();
     pmf.sort_by(|a, b| a.value.partial_cmp(&b.value).unwrap());
 
-    PMF::new(pmf)
-}
-
-
-impl PMF {
-    /// Posterior error probability for differential expression.
-    pub fn differential_expression_pep(&self, max_fc: LogFC) -> LogProb {
-        let probs = self.iter().filter(|e| e.value.abs() > max_fc).map(|e| e.prob).collect_vec();
-        logprobs::ln_1m_exp(logprobs::sum(&probs))
-    }
-
-    /// 2 * ln Bayes factor for differential expression.
-    pub fn differential_expression_bf(&self, max_fc: LogFC) -> f64 {
-        let m0 = self.iter().filter(|e| e.value.abs() <= max_fc).map(|e| e.prob).collect_vec();
-        let m1 = self.iter().filter(|e| e.value.abs() > max_fc).map(|e| e.prob).collect_vec();
-
-        2.0 * (logprobs::sum(&m1) - logprobs::sum(&m0))
-    }
-
-    pub fn estimate(&self, max_fc: LogFC) -> Estimate {
-        Estimate {
-            differential_expression_pep: self.differential_expression_pep(max_fc),
-            differential_expression_bf: self.differential_expression_bf(max_fc),
-            expected_value: self.expected_value(),
-            standard_deviation: self.standard_deviation(),
-            credible_interval: self.credible_interval()
-        }
-    }
+    model::diffexp::PMF::new(pmf)
 }
 
 

@@ -13,6 +13,7 @@ extern crate log;
 extern crate fern;
 extern crate bio;
 extern crate csv;
+#[macro_use]
 extern crate itertools;
 extern crate num;
 extern crate rustc_serialize;
@@ -32,6 +33,7 @@ pub mod cli;
 enum Command {
     exp,
     diffexp,
+    multidiffexp,
     //stats,
     None
 }
@@ -44,6 +46,7 @@ impl FromStr for Command {
         return match src {
             "exp"     => Ok(Command::exp),
             "diffexp" => Ok(Command::diffexp),
+            "multidiffexp" => Ok(Command::multidiffexp),
             //"stats"   => Ok(Command::stats),
             _         => Err(()),
         };
@@ -89,6 +92,7 @@ fn main() {
     match subcommand {
         Command::exp     => exp(args),
         Command::diffexp => diffexp(args),
+        Command::multidiffexp => multidiffexp(args),
         //Command::stats   => stats(args),
         Command::None    => {
             error!("Unknown subcommand.");
@@ -158,13 +162,16 @@ fn diffexp(args: Vec<String>) {
     {
         let mut ap = ArgumentParser::new();
         ap.set_description(
-r#"For given MERFISH data, calculate differentially expressed features (e.g. genes) between groups of cells given as separate input data.
+r#"For given expression PMFs, calculate differentially expressed features (e.g. genes) between groups of cells given as separate input data.
 Results are provided as columns:
 
     feature (e.g. gene, rna)
     posterior error probability (PEP) for differential expression
+    expected FDR when selecting all features down to the current
+    bayes factor (BF) for differential expression
     expected log2 fold change of first vs second group
     standard deviation of log2 fold change
+    lower and upper bound of 95% credible interval of log2 fold change
 
 Example: "merfishtools diffexp data1.txt data2.txt > diffexp.txt""#
         );
@@ -181,9 +188,46 @@ Output is formatted into columns: feature, foldchange, posterior probability"#);
         ap.refer(&mut group2_path).required()
           .add_argument("group2", Store, "Path to expression PMFs for group of cells.");
         parse_args_or_exit(&ap, args);
-
     }
     cli::differential_expression(&group1_path, &group2_path, pmf_path, max_fc, threads);
+}
+
+
+fn multidiffexp(args: Vec<String>) {
+    let mut threads = 1;
+    let mut group_paths = vec![];
+    let mut pmf_path: Option<String> = None;
+    let mut max_cv = 0.0f64;
+
+    {
+        let mut ap = ArgumentParser::new();
+        ap.set_description(
+r#"For given expression PMFs, calculate differentially expressed features (e.g. genes) between groups of cells given as separate input data.
+Results are provided as columns:
+
+    feature (e.g. gene, rna)
+    posterior error probability (PEP) for differential expression
+    expected FDR when selecting all features down to the current
+    bayes factor (BF) for differential expression
+    expected log2 fold change of first vs second group
+    standard deviation of log2 fold change
+    lower and upper bound of 95% credible interval of log2 fold change
+
+Example: "merfishtools diffexp data1.txt data2.txt > diffexp.txt""#
+        );
+
+        ap.refer(&mut pmf_path).add_option(&["--pmf"], StoreOption,
+r#"Path to write PMF (probability mass function) of Log2 fold change to.
+Output is formatted into columns: feature, foldchange, posterior probability"#);
+        ap.refer(&mut threads)
+          .add_option(&["--threads", "-t"], Store, "Number of threads to use (default: 1).");
+        ap.refer(&mut max_cv)
+          .add_option(&["--max-null-cv"], Store, "Maximum coefficient of variation considered as no differential expression (default: 0.0).");
+        ap.refer(&mut group_paths).required()
+          .add_argument("groups", List, "Paths to expression PMFs for groups of cells.");
+        parse_args_or_exit(&ap, args);
+    }
+    cli::multi_differential_expression(&group_paths, pmf_path, max_cv, threads);
 }
 
 
