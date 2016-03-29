@@ -5,22 +5,25 @@ mpl.use("agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+bf_categories = [-np.inf, 0, 2, 6, 10, np.inf]
+bf_labels = [0, 1, 2, 3, 4]
+#bf_labels = ["no evidence", "weak", "positive", "strong", "very strong"]
+
 ests = pd.concat([pd.read_table(f, index_col=0) for f in snakemake.input],
                  keys=["{} vs {}".format(*c) for c in snakemake.params.comparisons])
 
-significant = (ests["diff_pep"] <= 0.05).unstack(0).sum(axis="columns")
-significant = significant[~(significant.index.str.startswith("notarget") | significant.index.str.startswith("blank"))]
-recurrent = significant >= 8
-significant[recurrent].to_csv(snakemake.output.foreground, sep="\t")
-significant[~recurrent].to_csv(snakemake.output.background, sep="\t")
+bf = ests["diff_2lnbf"]
+bf = bf.unstack(0)
+bf = bf[(bf >= 2).any(axis="columns")]
+bf = bf.fillna(-np.inf)
+bf = bf.stack()
+bf = pd.cut(bf, bf_categories, labels=bf_labels, right=False, include_lowest=True)
 
-matrix = ests["log2fc_ev"].unstack(0)
-matrix = matrix[~(matrix.index.str.startswith("notarget") | matrix.index.str.startswith("blank"))]
-
-matrix.abs().sum(axis="columns").sort_values(ascending=False).to_csv(snakemake.output.ranked, sep="\t")
+matrix = bf.unstack(1)
+bf = bf[~(bf.index.str.startswith("notarget") | bf.index.str.startswith("blank"))]
 
 sns.set(style="ticks", palette="colorblind", context=snakemake.wildcards.context)
-plt.figure(figsize=snakemake.config["plots"]["figsize"])
-cg = sns.clustermap(matrix)
-plt.setp(cg.ax_heatmap.yaxis.get_majorticklabels(), rotation=0)
-plt.savefig(snakemake.output.clust, bbox_inches="tight")
+plt.figure(figsize=np.asarray(snakemake.config["plots"]["figsize"]) * 3)
+cg = sns.heatmap(bf)
+#plt.setp(cg.ax_heatmap.yaxis.get_majorticklabels(), rotation=0)
+plt.savefig(snakemake.output[0], bbox_inches="tight")

@@ -126,6 +126,26 @@ rule diffexp:
         "> {output.est}"
 
 
+def multidiffexp_input(wildcards):
+    return expand("normalized_expressions/{dataset}.{expmnt}.all.{settings}.txt",
+                  expmnt=experiments(wildcards.dataset),
+                  **wildcards)
+
+
+rule multidiffexp:
+    input:
+        multidiffexp_input
+    output:
+        pmf="multidiffexp/{dataset}.{settings}.txt",
+        est="multidiffexp/{dataset}.{settings}.est.txt"
+    benchmark:
+        "bench/multidiffexp/{dataset}.{settings}.txt"
+    threads: 8
+    shell:
+        "{merfishtools} multidiffexp -t {threads} --max-null-cv 0.13 "
+        "--pmf {output.pmf} {input} > {output.est}"
+
+
 rule plot_expression_pmf:
     input:
         expr="expressions/{dataset}.{experiment}.{group}.{settings}.txt",
@@ -308,10 +328,7 @@ rule plot_go_term_enrichment:
         expand("diffexp/140genesData.{experiment[0]}.all-vs-{experiment[1]}.all.default.est.txt",
                experiment=comparisons)
     output:
-        clust="results/{context}/comparisons/140genesData.comparisons.svg",
-        foreground="results/{context}/comparisons/foreground.txt",
-        background="results/{context}/comparisons/background.txt",
-        ranked="results/{context}/comparisons/ranked.txt"
+        "results/{context}/comparisons/140genesData.comparisons.svg",
     params:
         comparisons=comparisons
     script:
