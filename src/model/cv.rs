@@ -1,4 +1,5 @@
 use std::collections;
+use std::f64;
 
 use num::traits::ToPrimitive;
 use num::rational;
@@ -19,7 +20,7 @@ pub fn pmf(pmfs: &[model::expressionset::PMF]) -> model::diffexp::PMF {
 
     for groups in combinations {
         let prob = groups.iter().map(|group| group.prob).fold(0.0, |s, p| s + p);
-        if prob >= model::MIN_PROB {
+        if true || prob >= model::MIN_PROB {
             // sample mean
             let mean = groups.iter().map(|group| {
                 *group.value.numer() as f64 / *group.value.denom() as f64
@@ -31,7 +32,7 @@ pub fn pmf(pmfs: &[model::expressionset::PMF]) -> model::diffexp::PMF {
 
             let cv = rational::Ratio::from_float(std / mean).unwrap();
 
-            let mut p = pmf.entry(cv).or_insert(0.0);
+            let mut p = pmf.entry(cv).or_insert(f64::NEG_INFINITY);
             *p = logprobs::add(*p, prob);
         }
     }
