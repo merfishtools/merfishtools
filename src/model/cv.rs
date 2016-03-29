@@ -15,26 +15,20 @@ pub type CV = f64;
 pub fn pmf(pmfs: &[model::expressionset::PMF]) -> model::diffexp::PMF {
     let mut pmf = collections::HashMap::new();
     let combinations = iproduct!(pmfs);
+    let n = pmfs.len() as f64;
 
     for groups in combinations {
         let prob = groups.iter().map(|group| group.prob).fold(0.0, |s, p| s + p);
         if prob >= model::MIN_PROB {
-            // mean
-            let mean = {
-                let summands = groups.iter().map(|group| {
-                    group.prob +
-                    (*group.value.numer() as f64 / *group.value.denom() as f64).ln()
-                }).collect_vec();
-                logprobs::sum(&summands).exp()
-            };
-            // standard deviation
-            let std = {
-                let summands = groups.iter().map(|group| {
-                    group.prob +
-                    (*group.value.numer() as f64 / *group.value.denom() as f64 - mean).ln().powi(2)
-                }).collect_vec();
-                logprobs::sum(&summands).exp().sqrt()
-            };
+            // sample mean
+            let mean = groups.iter().map(|group| {
+                *group.value.numer() as f64 / *group.value.denom() as f64
+            }).fold(0.0, |s, e| s + e) / n;
+            // sample standard deviation
+            let std = (groups.iter().map(|group| {
+                    (*group.value.numer() as f64 / *group.value.denom() as f64 - mean).powi(2)
+            }).fold(0.0, |s, e| s + e) / n).sqrt();
+
             let cv = rational::Ratio::from_float(std / mean).unwrap();
 
             let mut p = pmf.entry(cv).or_insert(0.0);
