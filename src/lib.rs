@@ -13,6 +13,7 @@ extern crate rgsl;
 extern crate ord_subset;
 #[macro_use]
 extern crate approx;
+extern crate fnv;
 
 pub mod model;
 pub mod io;

@@ -21,6 +21,7 @@ crossbeam = "0.1"
 GSL = "0.4.25"
 ord_subset = "1.2.0"
 approx = "0.1.0"
+fnv = "1.0.2"
 
 [[bin]]
 name = "merfishtools"
