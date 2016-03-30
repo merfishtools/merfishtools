@@ -116,6 +116,7 @@ impl MeanVar {
         }
 
         for (k, pmf) in pmfs.iter().enumerate().skip(1) {
+            debug!("Iteration {}", k);
             let k = Ratio::from_integer(k as u32 + 1);
             mem::swap(&mut curr, &mut prev);
 

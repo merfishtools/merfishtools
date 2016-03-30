@@ -7,6 +7,7 @@ pub type CV = f64;
 
 
 pub fn pmf(pmfs: &[model::expressionset::PMF]) -> model::diffexp::PMF {
+    debug!("Calculating CV PMF.");
     let meanvar = model::pmf::MeanVar::new(pmfs);
 
     let mut pmf = meanvar.iter().map(|e| model::pmf::Entry {
@@ -14,7 +15,6 @@ pub fn pmf(pmfs: &[model::expressionset::PMF]) -> model::diffexp::PMF {
         prob: e.prob
     }).collect_vec();
     pmf.sort_by(|a, b| a.value.partial_cmp(&b.value).unwrap());
-
     model::diffexp::PMF::new(pmf)
 }
 
