@@ -15,7 +15,7 @@ pub type PMF = model::pmf::PMF<MeanExpression>;
 const SCALE: u32 = 10;
 
 pub fn pmf(expression_pmfs: &[model::expression::PMF]) -> PMF {
-    // TODO replace with partial_sums function
+    // TODO replace with simpler version of mean_var function
     let max_sum = expression_pmfs.iter()
                                  .map(|pmf| pmf.iter().last().unwrap().value)
                                  .fold(0, |s, e| s + (e * SCALE as f32).round() as usize);

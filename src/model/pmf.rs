@@ -97,6 +97,34 @@ impl PMF<f32> {
 }
 
 
+pub fn sums<F: Fn(&Ratio<u64>) -> Ratio<u64>>(pmfs: &[PMF<Ratio<u64>>], summand: F) -> HashMap<Ratio<u64>, LogProb> {
+    let max_sum = pmfs.iter()
+                      .map(|pmf| pmf.iter().last().unwrap())
+                      .fold(Ratio::zero(), |s, e| s + summand(&e.value));
+
+    let mut curr = HashMap::new();
+    let mut prev = HashMap::new();
+    curr.insert(Ratio::zero(), 0.0);
+
+    for pmf in pmfs.iter() {
+        mem::swap(&mut curr, &mut prev);
+
+        curr.clear();
+        for (s, p) in prev.iter() {
+            for x in pmf.iter() {
+                let s = s + summand(&x.value);
+                if s <= max_sum { // TODO remove this?
+                    let prob = curr.entry(s).or_insert(f64::NEG_INFINITY);
+                    *prob = logprobs::add(*prob, p + x.prob);
+                }
+            }
+        }
+    }
+
+    curr
+}
+
+
 #[derive(Debug)]
 pub struct MeanVar {
     pub mean: f64,
@@ -116,19 +144,22 @@ impl MeanVar {
         }
 
         for (k, pmf) in pmfs.iter().enumerate().skip(1) {
-            debug!("Iteration {}", k);
             let k = Ratio::from_integer(k as u32 + 1);
             mem::swap(&mut curr, &mut prev);
 
             curr.clear();
             for (&(m, s), &p) in prev.iter() {
                 for x in pmf.iter() {
-                    let mk = m + (x.value - m) / k; // TODO prove that this yields the mean
-                    let sk = s + (x.value - m) * (x.value - mk);
-                    let prob = curr.entry((mk, sk)).or_insert(f64::NEG_INFINITY);
-                    *prob = logprobs::add(*prob, p + x.prob);
+                    let p = p + x.prob;
+                    if p >= -100.0 {
+                        let mk = m + (x.value - m) / k;
+                        let sk = s + (x.value - m) * (x.value - mk);
+                        let prob = curr.entry((mk, sk)).or_insert(f64::NEG_INFINITY);
+                        *prob = logprobs::add(*prob, p);
+                    }
                 }
             }
+            println!("currlen {}", curr.len());
         }
 
         let to_f64 = |ratio: Ratio<u32>| *ratio.numer() as f64 / *ratio.denom() as f64;
