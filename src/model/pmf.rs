@@ -144,6 +144,7 @@ impl MeanVar {
         }
 
         for (k, pmf) in pmfs.iter().enumerate().skip(1) {
+            debug!("Iteration {}", k);
             let k = Ratio::from_integer(k as u32 + 1);
             mem::swap(&mut curr, &mut prev);
 
@@ -159,7 +160,6 @@ impl MeanVar {
                     }
                 }
             }
-            println!("currlen {}", curr.len());
         }
 
         let to_f64 = |ratio: Ratio<u32>| *ratio.numer() as f64 / *ratio.denom() as f64;
