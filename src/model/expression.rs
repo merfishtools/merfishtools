@@ -92,7 +92,6 @@ mod tests {
         let pmf = pmf("COL7A1", count, count, &readout, 100);
 
         println!("{:?} {} {:?}", pmf.expected_value(), pmf.map(), pmf);
-        assert!(false);
     }
 }
 /*

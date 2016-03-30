@@ -197,7 +197,7 @@ fn multidiffexp(args: Vec<String>) {
     let mut threads = 1;
     let mut group_paths = vec![];
     let mut pmf_path: Option<String> = None;
-    let mut max_cv = 0.1;
+    let mut max_cv = 1.0;
 
     {
         let mut ap = ArgumentParser::new();
@@ -222,7 +222,7 @@ Output is formatted into columns: feature, foldchange, posterior probability"#);
         ap.refer(&mut threads)
           .add_option(&["--threads", "-t"], Store, "Number of threads to use (default: 1).");
         ap.refer(&mut max_cv)
-          .add_option(&["--max-null-cv"], Store, "Maximum log2 coefficient of variation considered as no differential expression (default: 0.13).");
+          .add_option(&["--max-null-cv"], Store, "Maximum log2 coefficient of variation considered as no differential expression (default: 1.0).");
         ap.refer(&mut group_paths).required()
           .add_argument("groups", List, "Paths to expression PMFs for groups of cells.");
         parse_args_or_exit(&ap, args);

@@ -82,13 +82,14 @@ mod tests {
         let pmf1 = model::expressionset::pmf(&pmfs1);
         let pmf2 = model::expressionset::pmf(&pmfs2);
 
-        let pmf = pmf(&pmf1, &pmf2);
+        let pmf = pmf(&pmf2, &pmf1);
 
         let total = logprobs::sum(&pmf.iter().map(|fc| fc.prob).collect_vec());
         let fc = 2.0f64.powf(pmf.expected_value());
 
         println!("{:?}", total);
         println!("ev={}", fc);
-        assert!(total.approx_eq(&-0.000014479671117229032));
+        assert!(total.approx_eq(&-0.00014206495831814436));
+        assert!(fc >= 9.0);
     }
 }

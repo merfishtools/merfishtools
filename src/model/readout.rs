@@ -263,7 +263,7 @@ mod tests {
         let model = setup_mhd4();
         let p = model.prob_miscall_exact("COL5A1");
         println!("{}", p);
-        assert!(p.approx_eq(&0.003412027461130142));
+        assert!(p.approx_eq(&0.00031018431464819473));
     }
 
     #[test]
@@ -271,7 +271,7 @@ mod tests {
         let model = setup_mhd4();
         let p = model.prob_miscall_mismatch("COL5A1");
         println!("{}", p);
-        assert!(p.approx_eq(&0.03608764734772748));
+        assert!(p.approx_eq(&0.020670338078917206));
     }
 
     #[test]
@@ -290,7 +290,6 @@ mod tests {
         println!("{}", model.prob_miscall_exact("COL7A1"));
         println!("{}", model.prob_miscall_mismatch("COL7A1"));
         println!("{}", model.prob_missed());
-        assert!(false);
     }
 
     #[test]

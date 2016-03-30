@@ -1,10 +1,4 @@
-use std::collections;
-use std::f64;
-
-use num::traits::ToPrimitive;
-use num::rational;
 use itertools::Itertools;
-use bio::stats::logprobs;
 
 use model;
 
@@ -14,35 +8,59 @@ pub type CV = f64;
 
 #[allow(unused_parens)]
 pub fn pmf(pmfs: &[model::expressionset::PMF]) -> model::diffexp::PMF {
-    let mut pmf = collections::HashMap::new();
-    let combinations = iproduct!(pmfs);
-    let n = pmfs.len() as f64;
+    let meanvar = model::pmf::MeanVar::new(pmfs);
 
-    for groups in combinations {
-        let prob = groups.iter().map(|group| group.prob).fold(0.0, |s, p| s + p);
-        if true || prob >= model::MIN_PROB {
-            // sample mean
-            let mean = groups.iter().map(|group| {
-                *group.value.numer() as f64 / *group.value.denom() as f64
-            }).fold(0.0, |s, e| s + e) / n;
-            // sample standard deviation
-            let std = (groups.iter().map(|group| {
-                    (*group.value.numer() as f64 / *group.value.denom() as f64 - mean).powi(2)
-            }).fold(0.0, |s, e| s + e) / n).sqrt();
-
-            let cv = rational::Ratio::from_float(std / mean).unwrap();
-
-            let mut p = pmf.entry(cv).or_insert(f64::NEG_INFINITY);
-            *p = logprobs::add(*p, prob);
-        }
-    }
-
-    let pmf = pmf.iter().map(|(cv, p)| {
-        model::pmf::Entry {
-            value: cv.numer().to_f64().unwrap().log2() - cv.denom().to_f64().unwrap().log2(),
-            prob: *p
-        }
+    let mut pmf = meanvar.iter().map(|e| model::pmf::Entry {
+        value: e.standard_deviation().log2() - e.mean.log2(),
+        prob: e.prob
     }).collect_vec();
+    pmf.sort_by(|a, b| a.value.partial_cmp(&b.value).unwrap());
 
     model::diffexp::PMF::new(pmf)
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use itertools::Itertools;
+    use bio::stats::logprobs;
+
+    use model;
+    use io;
+
+    const GENE: &'static str = "COL5A1";
+
+    fn setup() -> Box<model::readout::Model> {
+        model::readout::new_model(16, 4, 0.04, 0.1, 4, io::codebook::Reader::from_file("evaluation/codebook/140genesData.1.txt", 4).unwrap().codebook())
+    }
+
+    #[test]
+    fn test_pmf() {
+        let readout = setup();
+        let pmfs1 = [
+            model::expression::pmf(GENE, 5, 5, &readout, 100),
+            model::expression::pmf(GENE, 5, 5, &readout, 100),
+            model::expression::pmf(GENE, 5, 5, &readout, 100),
+            model::expression::pmf(GENE, 5, 5, &readout, 100)
+        ];
+        let pmfs2 = [
+            model::expression::pmf(GENE, 50, 50, &readout, 100),
+            model::expression::pmf(GENE, 50, 50, &readout, 100),
+            model::expression::pmf(GENE, 50, 50, &readout, 100),
+            model::expression::pmf(GENE, 50, 50, &readout, 100)
+        ];
+        let pmf1 = model::expressionset::pmf(&pmfs1);
+        let pmf2 = model::expressionset::pmf(&pmfs2);
+        //println!("{} {}", pmfs1[0].expected_value(), pmfs2[0].expected_value());
+
+        let pmf = pmf(&[pmf1, pmf2]);
+
+        let total = logprobs::sum(&pmf.iter().map(|fc| fc.prob).collect_vec());
+
+        assert!(total <= 0.0);
+        assert_relative_eq!(total, 0.0, epsilon = 0.0002);
+        assert_relative_eq!(2.0f64.powf(pmf.expected_value()), 1.14, epsilon = 0.01);
+    }
 }
