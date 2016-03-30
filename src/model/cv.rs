@@ -6,7 +6,6 @@ use model;
 pub type CV = f64;
 
 
-#[allow(unused_parens)]
 pub fn pmf(pmfs: &[model::expressionset::PMF]) -> model::diffexp::PMF {
     let meanvar = model::pmf::MeanVar::new(pmfs);
 
