@@ -222,7 +222,7 @@ Output is formatted into columns: feature, foldchange, posterior probability"#);
         ap.refer(&mut threads)
           .add_option(&["--threads", "-t"], Store, "Number of threads to use (default: 1).");
         ap.refer(&mut max_cv)
-          .add_option(&["--max-null-cv"], Store, "Maximum log2 coefficient of variation considered as no differential expression (default: 1.0).");
+          .add_option(&["--max-null-log2cv"], Store, "Maximum log2 coefficient of variation considered as no differential expression (default: 1.0).");
         ap.refer(&mut group_paths).required()
           .add_argument("groups", List, "Paths to expression PMFs for groups of cells.");
         parse_args_or_exit(&ap, args);
