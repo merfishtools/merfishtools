@@ -161,7 +161,7 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
     });
     // calculate FDR and write estimates to STDOUT
     estimates.sort_by(|&(_, ref a), &(_, ref b)| a.differential_expression_pep.partial_cmp(&b.differential_expression_pep).unwrap());
-    let expected_fds = logprobs::cumsum(estimates.iter().map(|&(_, ref a)| a.differential_expression_pep));
+    let expected_fds = logprobs::cumsum(estimates.iter().map(|&(_, ref a)| a.differential_expression_pep)).collect_vec();
     for (i, ((feature, estimate), fd)) in estimates.into_iter().zip(expected_fds).enumerate() {
         let fdr = fd - (i as f64 + 1.0).ln();
         est_writer.write(
@@ -212,7 +212,7 @@ pub fn multi_differential_expression(group_paths: &[String], pmf_path: Option<St
     });
     // calculate FDR and write estimates to STDOUT
     estimates.sort_by(|&(_, ref a), &(_, ref b)| a.differential_expression_pep.partial_cmp(&b.differential_expression_pep).unwrap());
-    let expected_fds = logprobs::cumsum(estimates.iter().map(|&(_, ref a)| a.differential_expression_pep));
+    let expected_fds = logprobs::cumsum(estimates.iter().map(|&(_, ref a)| a.differential_expression_pep)).collect_vec();
     for (i, ((feature, estimate), fd)) in estimates.into_iter().zip(expected_fds).enumerate() {
         let fdr = fd - (i as f64 + 1.0).ln();
         est_writer.write(
