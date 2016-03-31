@@ -101,8 +101,8 @@ pub struct MeanVar {
 
 
 impl MeanVar {
-    pub fn new(pmfs: &[PMF<Ratio<u32>>]) -> Vec<MeanVar> {
-        let n = Ratio::from_integer(pmfs.len() as u32);
+    pub fn new(pmfs: &[PMF<Ratio<i32>>]) -> Vec<MeanVar> {
+        let n = Ratio::from_integer(pmfs.len() as i32);
         let mut curr = model::dist::PMF::new();
         let mut prev = {
             let mut pmf = model::dist::PMF::new();
@@ -116,7 +116,7 @@ impl MeanVar {
 
         for (k, pmf) in pmfs.iter().enumerate().skip(1) {
             debug!("Iteration {}", k);
-            let k = Ratio::from_integer(k as u32 + 1);
+            let k = Ratio::from_integer(k as i32 + 1);
 
             curr = model::dist::PMF::new();
             for ((m, s), p) in prev.iter_pmf() {
@@ -131,7 +131,7 @@ impl MeanVar {
             prev = curr.to_cdf().sample(1000);
         }
 
-        let to_f64 = |ratio: Ratio<u32>| *ratio.numer() as f64 / *ratio.denom() as f64;
+        let to_f64 = |ratio: Ratio<i32>| *ratio.numer() as f64 / *ratio.denom() as f64;
 
         prev.iter_pmf().filter_map(|((m, s), p)| {
             if p >= model::MIN_PROB {

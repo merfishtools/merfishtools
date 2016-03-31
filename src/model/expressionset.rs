@@ -9,10 +9,10 @@ use bio::stats::logprobs;
 use model;
 
 
-pub type MeanExpression = rational::Ratio<u32>;
+pub type MeanExpression = rational::Ratio<i32>;
 pub type PMF = model::pmf::PMF<MeanExpression>;
 
-const SCALE: u32 = 10;
+const SCALE: i32 = 10;
 
 pub fn pmf(expression_pmfs: &[model::expression::PMF]) -> PMF {
     // TODO replace with simpler version of mean_var function
@@ -48,7 +48,7 @@ pub fn pmf(expression_pmfs: &[model::expression::PMF]) -> PMF {
     PMF::new(curr.iter().enumerate().filter_map(|(s, p)| {
         if *p >= model::MIN_PROB {
             Some(model::pmf::Entry{
-                value: rational::Ratio::new(s as u32, SCALE * expression_pmfs.len() as u32),
+                value: rational::Ratio::new(s as i32, SCALE * expression_pmfs.len() as i32),
                 prob: *p
             })
         }
