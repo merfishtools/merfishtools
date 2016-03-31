@@ -22,6 +22,7 @@ extern crate crossbeam;
 extern crate regex;
 extern crate rgsl;
 extern crate ord_subset;
+#[macro_use]
 extern crate approx;
 
 pub mod model;

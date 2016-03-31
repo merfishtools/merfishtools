@@ -140,9 +140,9 @@ rule multidiffexp:
         est="multidiffexp/{dataset}.{settings}.est.txt"
     benchmark:
         "bench/multidiffexp/{dataset}.{settings}.txt"
-    threads: 8
+    threads: 24
     shell:
-        "{merfishtools} multidiffexp -t {threads} --max-null-cv 0.13 "
+        "{merfishtools} --debug multidiffexp -t {threads} --max-null-log2cv 1.0 "
         "--pmf {output.pmf} {input} > {output.est}"
 
 
