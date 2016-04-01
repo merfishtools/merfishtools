@@ -122,7 +122,7 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &st
 }
 
 
-pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: Option<String>, max_fc: LogFC, threads: usize) {
+pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: Option<String>, max_fc: LogFC, pseudocounts: u32, threads: usize) {
     let mut reader1 = io::pmf::expression::Reader::from_file(group1_path).expect("Invalid input for group 1.");
     let mut reader2 = io::pmf::expression::Reader::from_file(group2_path).expect("Invalid input for group 2.");
     let mut pmf_writer = pmf_path.map(|path| io::pmf::diffexp::Writer::from_file(path, "log2fc"));
@@ -141,8 +141,8 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
             let g1 = group1.get(&feature).unwrap();
             let g2 = group2.get(&feature).unwrap();
             let pmf = model::foldchange::pmf(
-                &model::expressionset::pmf(&g1),
-                &model::expressionset::pmf(&g2)
+                &model::expressionset::pmf(&g1, pseudocounts),
+                &model::expressionset::pmf(&g2, pseudocounts)
             );
             (
                 feature,
@@ -177,7 +177,7 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
 }
 
 
-pub fn multi_differential_expression(group_paths: &[String], pmf_path: Option<String>, max_cv: CV, threads: usize) {
+pub fn multi_differential_expression(group_paths: &[String], pmf_path: Option<String>, max_cv: CV, pseudocounts: u32, threads: usize) {
     let groups = group_paths.iter().enumerate().map(|(i, path)| {
         io::pmf::expression::Reader::from_file(path).expect(&format!("Invalid input for group {}.", i))
                                                     .pmfs()
@@ -193,7 +193,7 @@ pub fn multi_differential_expression(group_paths: &[String], pmf_path: Option<St
     crossbeam::scope(|scope| {
         for (_, (feature, pmf)) in pool.unordered_map(scope, features, |feature| {
             info!("Calculating {}.", feature);
-            let pmfs = groups.iter().map(|group| model::expressionset::pmf(group.get(&feature).unwrap())).collect_vec();
+            let pmfs = groups.iter().map(|group| model::expressionset::pmf(group.get(&feature).unwrap(), pseudocounts)).collect_vec();
             let pmf = model::cv::pmf(&pmfs);
             (
                 feature,

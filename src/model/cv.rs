@@ -50,8 +50,8 @@ mod tests {
             model::expression::pmf(GENE, 50, 50, &readout, 100),
             model::expression::pmf(GENE, 50, 50, &readout, 100)
         ];
-        let pmf1 = model::expressionset::pmf(&pmfs1);
-        let pmf2 = model::expressionset::pmf(&pmfs2);
+        let pmf1 = model::expressionset::pmf(&pmfs1, 0);
+        let pmf2 = model::expressionset::pmf(&pmfs2, 0);
         //println!("{} {}", pmfs1[0].expected_value(), pmfs2[0].expected_value());
 
         let pmf = pmf(&[pmf1, pmf2]);
@@ -60,6 +60,6 @@ mod tests {
 
         assert!(total <= 0.0);
         assert_relative_eq!(total, 0.0, epsilon = 0.0002);
-        assert_relative_eq!(2.0f64.powf(pmf.expected_value()), 1.14, epsilon = 0.02);
+        assert_relative_eq!(pmf.expected_value(), 1.14, epsilon = 0.02);
     }
 }

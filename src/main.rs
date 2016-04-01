@@ -160,6 +160,7 @@ fn diffexp(args: Vec<String>) {
     let mut group2_path = "".to_owned();
     let mut pmf_path: Option<String> = None;
     let mut max_fc = 1.0;
+    let mut pseudocounts = 1;
 
     {
         let mut ap = ArgumentParser::new();
@@ -185,13 +186,15 @@ Output is formatted into columns: feature, foldchange, posterior probability"#);
           .add_option(&["--threads", "-t"], Store, "Number of threads to use (default: 1).");
         ap.refer(&mut max_fc)
           .add_option(&["--max-null-log2fc"], Store, "Maximum absolute log2 fold change considered as no differential expression (default: 1.0).");
+        ap.refer(&mut pseudocounts)
+          .add_option(&["--pseudocounts"], Store, "Pseudocounts to add to means before fold change calculation.");
         ap.refer(&mut group1_path).required()
           .add_argument("group1", Store, "Path to expression PMFs for group of cells.");
         ap.refer(&mut group2_path).required()
           .add_argument("group2", Store, "Path to expression PMFs for group of cells.");
         parse_args_or_exit(&ap, args);
     }
-    cli::differential_expression(&group1_path, &group2_path, pmf_path, max_fc, threads);
+    cli::differential_expression(&group1_path, &group2_path, pmf_path, max_fc, pseudocounts, threads);
 }
 
 
@@ -200,6 +203,7 @@ fn multidiffexp(args: Vec<String>) {
     let mut group_paths = vec![];
     let mut pmf_path: Option<String> = None;
     let mut max_cv = 0.5;
+    let mut pseudocounts = 1;
 
     {
         let mut ap = ArgumentParser::new();
@@ -224,15 +228,17 @@ Output is formatted into columns: feature, foldchange, posterior probability"#);
         ap.refer(&mut threads)
           .add_option(&["--threads", "-t"], Store, "Number of threads to use (default: 1).");
         ap.refer(&mut max_cv)
-          .add_option(&["--max-null-cv"], Store, "Maximum coefficient of variation considered as no differential expression (default: 0.5).");
+          .add_option(&["--max-null-cv"], Store, "Maximum coefficient of variation (CV) considered as no differential expression (default: 0.5).");
+        ap.refer(&mut pseudocounts)
+          .add_option(&["--pseudocounts"], Store, "Pseudocounts to add to means before CV calculation.");
         ap.refer(&mut group_paths).required()
           .add_argument("groups", List, "Paths to expression PMFs for groups of cells.");
         parse_args_or_exit(&ap, args);
     }
     if group_paths.len() < 2 {
-        panic!("At least 2 expression PMFs definition the groups to compare must be given.")
+        panic!("At least 2 expression PMFs definition the groups to compare must be given.");
     }
-    cli::multi_differential_expression(&group_paths, pmf_path, max_cv, threads);
+    cli::multi_differential_expression(&group_paths, pmf_path, max_cv, pseudocounts, threads);
 }
 
 

@@ -79,8 +79,8 @@ mod tests {
             model::expression::pmf(GENE, 50, 50, &readout, 100),
             model::expression::pmf(GENE, 50, 50, &readout, 100)
         ];
-        let pmf1 = model::expressionset::pmf(&pmfs1);
-        let pmf2 = model::expressionset::pmf(&pmfs2);
+        let pmf1 = model::expressionset::pmf(&pmfs1, 0);
+        let pmf2 = model::expressionset::pmf(&pmfs2, 0);
 
         let pmf = pmf(&pmf2, &pmf1);
 

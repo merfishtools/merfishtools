@@ -14,7 +14,7 @@ pub type PMF = model::pmf::PMF<MeanExpression>;
 
 const SCALE: i64 = 10;
 
-pub fn pmf(expression_pmfs: &[model::expression::PMF]) -> PMF {
+pub fn pmf(expression_pmfs: &[model::expression::PMF], pseudocounts: u32) -> PMF {
     // TODO replace with simpler version of mean_var function
     let max_sum = expression_pmfs.iter()
                                  .map(|pmf| pmf.iter().last().unwrap().value)
@@ -48,7 +48,7 @@ pub fn pmf(expression_pmfs: &[model::expression::PMF]) -> PMF {
     PMF::new(curr.iter().enumerate().filter_map(|(s, p)| {
         if *p >= model::MIN_PROB {
             Some(model::pmf::Entry{
-                value: rational::Ratio::new(s as i64, SCALE * expression_pmfs.len() as i64),
+                value: rational::Ratio::new(s as i64, SCALE * expression_pmfs.len() as i64) + rational::Ratio::from_integer(pseudocounts as i64),
                 prob: *p
             })
         }
@@ -92,7 +92,7 @@ mod tests {
             model::expression::pmf(GENE, 3, 1, &readout, 100),
             model::expression::pmf(GENE, 24, 1, &readout, 100)
         ];
-        let pmf = pmf(&pmfs);
+        let pmf = pmf(&pmfs, 0);
 
         let total = logprobs::sum(&pmf.iter().map(|e| e.prob).collect_vec());
         let values = pmf.iter().map(|e| (*e.value.numer() as f64 / *e.value.denom() as f64, e.prob)).collect_vec();
