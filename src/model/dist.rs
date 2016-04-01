@@ -16,7 +16,8 @@ pub struct CDF<T: PartialOrd> {
 impl<T: PartialOrd> CDF<T> {
     pub fn new(mut entries: Vec<(T, LogProb)>) -> Self {
         entries.sort_by(|&(ref a, _), &(ref b, _)| a.partial_cmp(b).unwrap());
-        for i in 1..entries.len() {
+        let mut i = 1;
+        while i < entries.len() {
             if entries[i].0 == entries[i - 1].0 {
                 entries[i - 1].1 = logprobs::add(entries[i - 1].1, entries[i].1);
                 entries.remove(i);
@@ -24,6 +25,7 @@ impl<T: PartialOrd> CDF<T> {
             else {
                 entries[i].1 = logprobs::add(entries[i - 1].1, entries[i].1);
             }
+            i += 1;
         }
         let mut cdf = CDF {
             inner: entries
