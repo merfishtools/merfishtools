@@ -1,7 +1,7 @@
 use std::slice;
 
 use itertools::Itertools;
-use num::traits::{cast, NumCast, Zero, One};
+use num::traits::{cast, NumCast};
 use num::rational::Ratio;
 
 use bio::stats::logprobs::LogProb;
@@ -102,40 +102,40 @@ pub struct MeanVar {
 
 impl MeanVar {
     pub fn new(pmfs: &[PMF<Ratio<i64>>]) -> Vec<MeanVar> {
-        let n = Ratio::from_integer(pmfs.len() as i64);
-        let mut curr = model::dist::PMF::new();
+        let to_f64 = |ratio: Ratio<i64>| *ratio.numer() as f64 / *ratio.denom() as f64;
+        let n = pmfs.len() as f64;
+        let mut curr =Vec::new();
         let mut prev = {
-            let mut pmf = model::dist::PMF::new();
+            let mut pmf = Vec::new();
             for e in pmfs[0].iter() {
-                pmf.add((e.value, Ratio::zero()), e.prob);
+                pmf.push(((to_f64(e.value), 0.0), e.prob));
             }
-            pmf.to_cdf()
+            model::dist::CDF::new(pmf)
         };
 
 
 
         for (k, pmf) in pmfs.iter().enumerate().skip(1) {
             debug!("Iteration {}", k);
-            let k = Ratio::from_integer(k as i64 + 1);
+            let k = k as f64 + 1.0;
 
-            curr = model::dist::PMF::new();
+            curr = Vec::new();
             for ((m, s), p) in prev.iter_pmf() {
                 for x in pmf.iter() {
+                    let v = to_f64(x.value);
                     let p = p + x.prob;
-                    let mk = m + (x.value - m) / k;
-                    let sk = s + (x.value - m) * (x.value - mk);
-                    curr.add((mk, sk), p);
+                    let mk = m + (v - m) / k;
+                    let sk = s + (v - m) * (v - mk);
+                    curr.push(((mk, sk), p));
                 }
             }
             debug!("PMF len={}", curr.len());
-            prev = curr.to_cdf().sample(1000);
+            prev = model::dist::CDF::new(curr).sample(1000);
         }
-
-        let to_f64 = |ratio: Ratio<i64>| *ratio.numer() as f64 / *ratio.denom() as f64;
 
         prev.iter_pmf().filter_map(|((m, s), p)| {
             if p >= model::MIN_PROB {
-                Some(MeanVar { mean: to_f64(m), var: to_f64(s / (n - Ratio::one())), prob: p })
+                Some(MeanVar { mean: m, var: s / (n - 1.0), prob: p })
             }
             else {
                 None
