@@ -113,8 +113,6 @@ impl MeanVar {
             model::dist::CDF::new(pmf)
         };
 
-
-
         for (k, pmf) in pmfs.iter().enumerate().skip(1) {
             debug!("Iteration {}", k);
             let k = k as f64 + 1.0;

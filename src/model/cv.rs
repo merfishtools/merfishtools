@@ -11,7 +11,7 @@ pub fn pmf(pmfs: &[model::expressionset::PMF]) -> model::diffexp::PMF {
     let meanvar = model::pmf::MeanVar::new(pmfs);
 
     let mut pmf = meanvar.iter().map(|e| model::pmf::Entry {
-        value: e.standard_deviation().log2() - e.mean.log2(),
+        value: e.standard_deviation() / e.mean,
         prob: e.prob
     }).collect_vec();
     pmf.sort_by(|a, b| a.value.partial_cmp(&b.value).unwrap());
