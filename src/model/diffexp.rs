@@ -1,3 +1,5 @@
+use std::f64;
+
 use itertools::Itertools;
 use bio::stats::logprobs::LogProb;
 use bio::stats::logprobs;
@@ -22,7 +24,13 @@ impl PMF {
     /// Posterior error probability for differential expression.
     pub fn differential_expression_pep(&self, max_null_value: DiffexpMeasure) -> LogProb {
         let probs = self.iter().filter(|e| e.value.abs() > max_null_value).map(|e| e.prob).collect_vec();
-        logprobs::ln_1m_exp(logprobs::sum(&probs))
+        let s = logprobs::sum(&probs);
+        if s > 0.0 {
+            f64::NEG_INFINITY
+        }
+        else {
+            logprobs::ln_1m_exp(s)
+        }
     }
 
     /// Bayes factor for differential expression.
