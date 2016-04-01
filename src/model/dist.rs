@@ -24,8 +24,8 @@ impl<T: PartialOrd> CDF<T> {
             }
             else {
                 entries[i].1 = logprobs::add(entries[i - 1].1, entries[i].1);
+                i += 1;
             }
-            i += 1;
         }
         let mut cdf = CDF {
             inner: entries
