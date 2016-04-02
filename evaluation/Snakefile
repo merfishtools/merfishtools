@@ -122,13 +122,16 @@ rule diffexp:
         "bench/diffexp/{dataset}.{experiment1}.{group1}-vs-{experiment2}.{group2}.{settings}.txt"
     threads: 8
     shell:
-        "{merfishtools} diffexp -t {threads} --max-null-log2fc 1.0 --pmf {output.pmf} {input} "
+        "{merfishtools} diffexp -t {threads} --pseudocounts 0 "
+        "--max-null-log2fc 1.0 --pmf {output.pmf} {input} "
         "> {output.est}"
 
 
-def multidiffexp_input(wildcards):
-    return expand("normalized_expressions/{dataset}.{expmnt}.all.{settings}.txt",
+def multidiffexp_input(wildcards, matrix=False):
+    suffix = ".matrix" if matrix else ""
+    return expand("normalized_expressions/{dataset}.{expmnt}.all.{settings}{suffix}.txt",
                   expmnt=experiments(wildcards.dataset),
+                  suffix=suffix,
                   **wildcards)
 
 
@@ -142,8 +145,21 @@ rule multidiffexp:
         "bench/multidiffexp/{dataset}.{settings}.txt"
     threads: 24
     shell:
-        "{merfishtools} --debug multidiffexp -t {threads} --max-null-log2cv 1.0 "
+        "{merfishtools} --debug multidiffexp --pseudocounts 1 "
+        "-t {threads} --max-null-cv 0.5 "
         "--pmf {output.pmf} {input} > {output.est}"
+
+
+rule plot_multidiffexp:
+    input:
+       diffexp="multidiffexp/{dataset}.{settings}.est.txt",
+       exprs=partial(multidiffexp_input, matrix=True)
+    output:
+       "results/{context}/{dataset}.{settings}.diffexp.svg"
+    params:
+       expmnts=lambda wildcards: experiments(wildcards.dataset)
+    script:
+       "scripts/plot-multidiffexp.py"
 
 
 rule plot_expression_pmf:
