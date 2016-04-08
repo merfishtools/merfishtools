@@ -2,6 +2,7 @@ use std::f64;
 use std::iter;
 use std::slice;
 
+use num::traits::{cast, NumCast};
 use itertools::Itertools;
 
 use bio::stats::logprobs::{self, LogProb};
@@ -14,7 +15,9 @@ pub struct CDF<T: PartialOrd> {
 
 
 impl<T: PartialOrd> CDF<T> {
-    pub fn new(mut entries: Vec<(T, LogProb)>) -> Self {
+    /// Create CDF from given probability mass function (PMF). The PMF may contain duplicate values
+    /// the probabilities of which are summed during generation of the CDF.
+    pub fn from_pmf(mut entries: Vec<(T, LogProb)>) -> Self {
         entries.sort_by(|&(ref a, _), &(ref b, _)| a.partial_cmp(b).unwrap());
         let mut i = 1;
         while i < entries.len() {
@@ -38,6 +41,11 @@ impl<T: PartialOrd> CDF<T> {
         cdf
     }
 
+    /// Create CDF from iterator. This can be used to replace the values of a CDF.
+    pub fn from_cdf<I: Iterator<Item = (T, LogProb)>>(entries: I) -> Self {
+        CDF { inner: entries.collect_vec() }
+    }
+
     pub fn sample(mut self, n: usize) -> Self {
         if self.inner.len() <= n {
             println!("not sampling");
@@ -54,6 +62,22 @@ impl<T: PartialOrd> CDF<T> {
         }
     }
 
+    pub fn iter(&self) -> slice::Iter<(T, f64)>{
+        self.inner.iter()
+    }
+
+    pub fn iter_pmf<'a>(&'a self) -> CDFPMFIter<'a, T> {
+        fn cdf_to_pmf<'a, G>(last_prob: &mut LogProb, e: &'a (G, LogProb)) -> Option<(&'a G, LogProb)> {
+            let &(ref value, cdf_prob) = e;
+            let prob = logprobs::sub(cdf_prob, *last_prob);
+            *last_prob = cdf_prob;
+            Some((value, prob))
+        }
+        self.inner.iter().scan(f64::NEG_INFINITY, cdf_to_pmf)
+    }
+
+    /// Get cumulative probability for a given value. If the value is not present,
+    /// return the probability of the previous value.
     pub fn get(&self, value: &T) -> Option<LogProb> {
         if self.inner.is_empty() {
             None
@@ -79,7 +103,26 @@ impl<T: PartialOrd> CDF<T> {
     }
 
     pub fn total_prob(&self) -> LogProb {
-        self.inner.last().unwrap().1
+        let &(_, prob) = self.inner.last().unwrap();
+        prob
+    }
+
+    /// Return maximum a posteriori probability estimate (MAP).
+    pub fn map(&self) -> &T {
+        let mut max = self.iter_pmf().next().unwrap();
+        for e in self.iter_pmf() {
+            if e.1 >= max.1 {
+                max = e;
+            }
+        }
+        &max.0
+    }
+
+    pub fn credible_interval(&self) -> (&T, &T) {
+        let lower = self.inner.binary_search_by(|&(_, p)| p.partial_cmp(&0.025f64.ln()).unwrap()).unwrap_or_else(|i| i);
+        let upper = self.inner.binary_search_by(|&(_, p)| p.partial_cmp(&0.975f64.ln()).unwrap()).unwrap_or_else(|i| i - 1);
+
+        (&self.inner[lower].0, &self.inner[upper].0)
     }
 
     pub fn len(&self) -> usize {
@@ -87,19 +130,27 @@ impl<T: PartialOrd> CDF<T> {
     }
 }
 
-impl<T: Clone + PartialOrd> CDF<T> {
-    pub fn iter_pmf(&self) -> CDFPMFIter<T> {
-        fn cdf_to_pmf<G: Clone>(last_prob: &mut LogProb, e: &(G, LogProb)) -> Option<(G, LogProb)> {
-            let &(ref value, cdf_prob) = e;
-            let prob = logprobs::sub(cdf_prob, *last_prob);
-            *last_prob = cdf_prob;
-            Some((value.clone(), prob))
-        }
-        self.inner.iter().scan(f64::NEG_INFINITY, cdf_to_pmf)
+
+impl<T: NumCast + Clone + PartialOrd> CDF<T> {
+    pub fn expected_value(&self) -> f64 {
+        self.iter_pmf().map(|(value, prob)| {
+            cast::<T, f64>(value.clone()).unwrap() * prob.exp()
+        }).fold(0.0f64, |s, e| s + e)
+    }
+
+    pub fn variance(&self) -> f64 {
+        let ev = self.expected_value();
+        self.iter_pmf().map(|(value, prob)| {
+                (cast::<T, f64>(value.clone()).unwrap() - ev).powi(2) * prob.exp()
+        }).fold(0.0, |s, e| s + e)
+    }
+
+    pub fn standard_deviation(&self) -> f64 {
+        self.variance().sqrt()
     }
 }
 
-pub type CDFPMFIter<'a, T> = iter::Scan<slice::Iter<'a, (T, LogProb)>, LogProb, fn(&mut LogProb, &(T, LogProb)) -> Option<(T, LogProb)>>;
+pub type CDFPMFIter<'a, T> = iter::Scan<slice::Iter<'a, (T, LogProb)>, LogProb, fn(&mut LogProb, &'a (T, LogProb)) -> Option<(&'a T, LogProb)>>;
 
 
 #[cfg(test)]
@@ -116,7 +167,7 @@ mod test {
             pmf.push((i, 0.1f64.ln()));
         }
 
-        let cdf = CDF::new(pmf.clone());
+        let cdf = CDF::from_pmf(pmf.clone());
         for (value, prob) in pmf {
             assert_ulps_eq!(prob, cdf.get_pmf(&value).unwrap(), epsilon = 0.0000000000001);
         }

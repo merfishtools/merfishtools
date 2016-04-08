@@ -2,12 +2,9 @@ use std::slice;
 
 use itertools::Itertools;
 use num::traits::{cast, NumCast};
-use num::rational::Ratio;
 
 use bio::stats::logprobs::LogProb;
 use bio::stats::logprobs;
-
-use model;
 
 
 #[derive(Clone, Debug)]
@@ -88,64 +85,5 @@ impl PMF<f32> {
         for e in self.inner.iter_mut() {
             e.value *= scale;
         }
-    }
-}
-
-
-#[derive(Debug)]
-pub struct MeanVar {
-    pub mean: f64,
-    pub var: f64,
-    pub prob: f64
-}
-
-
-impl MeanVar {
-    pub fn new(pmfs: &[PMF<Ratio<i64>>]) -> Vec<MeanVar> {
-        let to_f64 = |ratio: Ratio<i64>| *ratio.numer() as f64 / *ratio.denom() as f64;
-        let n = pmfs.len() as f64;
-        let mut curr =Vec::new();
-        let mut prev = {
-            let mut pmf = Vec::new();
-            for e in pmfs[0].iter() {
-                pmf.push(((to_f64(e.value), 0.0), e.prob));
-            }
-            model::dist::CDF::new(pmf)
-        };
-
-        for (k, pmf) in pmfs.iter().enumerate().skip(1) {
-            debug!("Iteration {}", k);
-            let k = k as f64 + 1.0;
-
-            curr = Vec::new();
-            for ((m, s), p) in prev.iter_pmf() {
-                for x in pmf.iter() {
-                    let v = to_f64(x.value);
-                    let p = p + x.prob;
-                    let mk = m + (v - m) / k;
-                    let sk = s + (v - m) * (v - mk);
-                    curr.push(((mk, sk), p));
-                }
-            }
-            debug!("PMF len={}", curr.len());
-            prev = model::dist::CDF::new(curr).sample(1000);
-        }
-
-        prev.iter_pmf().filter_map(|((m, s), p)| {
-            if p >= model::MIN_PROB {
-                Some(MeanVar { mean: m, var: s / (n - 1.0), prob: p })
-            }
-            else {
-                None
-            }
-        }).collect_vec()
-    }
-
-    pub fn standard_deviation(&self) -> f64 {
-        self.var.sqrt()
-    }
-
-    pub fn coefficient_of_variation(&self) -> f64 {
-        self.standard_deviation() / self.mean
     }
 }

@@ -6,7 +6,7 @@ use csv;
 
 use bio::stats::logprobs::LogProb;
 
-use model::foldchange::LogFC;
+use model;
 
 
 pub struct Writer<W: io::Write> {
@@ -46,10 +46,10 @@ impl<W: io::Write> Writer<W> {
         feature: &str,
         differential_expression_pep: LogProb,
         fdr: LogProb,
-        differential_expression_bf: f64,
-        expected_value: LogFC,
-        standard_deviation: LogFC,
-        credible_interval: (LogFC, LogFC)
+        differential_expression_bf: model::BayesFactor,
+        expected_value: model::diffexp::DiffexpMeasure,
+        standard_deviation: model::diffexp::DiffexpMeasure,
+        credible_interval: (model::diffexp::DiffexpMeasure, model::diffexp::DiffexpMeasure)
     ) {
         self.inner.write([
             feature,

@@ -4,7 +4,7 @@ use std::path::Path;
 
 use csv;
 
-use model::diffexp::PMF;
+use model::diffexp::CDF;
 
 
 pub struct Writer<W: io::Write> {
@@ -30,12 +30,12 @@ impl<W: io::Write> Writer<W> {
         writer
     }
 
-    pub fn write(&mut self, feature: &str, pmf: &PMF) {
-        for e in pmf.iter() {
+    pub fn write(&mut self, feature: &str, cdf: &CDF) {
+        for e in cdf.iter() {
             self.inner.write([
                 feature,
-                &format!("{}", e.value)[..],
-                &format!("{}", e.prob)[..]
+                &format!("{}", e.0)[..],
+                &format!("{}", e.1)[..]
             ].iter()).unwrap();
         }
     }

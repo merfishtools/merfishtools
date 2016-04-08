@@ -28,7 +28,7 @@ impl<W: io::Write> Writer<W> {
         writer
     }
 
-    pub fn write(&mut self, cell: &str, feature: &str, expected_value: f64, standard_deviation: f64, map: f32, credible_interval: (f32, f32)) {
+    pub fn write(&mut self, cell: &str, feature: &str, expected_value: f64, standard_deviation: f64, map: f64, credible_interval: (&f64, &f64)) {
         self.inner.write([
             cell,
             feature,

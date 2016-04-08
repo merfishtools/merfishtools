@@ -1,8 +1,4 @@
-use std::collections;
-
 use num::rational;
-use itertools::Itertools;
-use bio::stats::logprobs;
 
 use model;
 
@@ -10,34 +6,19 @@ use model;
 pub type LogFC = f64;
 pub type FC = rational::Ratio<u64>;
 
+pub type CDF = model::dist::CDF<LogFC>;
 
-/// PMF of log2 fold change of a vs b. Specifically, we calculate log2((mean(a) + 1) / (mean(b) + 1))
-pub fn pmf(a: &model::expressionset::PMF, b: &model::expressionset::PMF) -> model::diffexp::PMF {
-    let mut pmf = collections::HashMap::new();
-    for (a, b) in a.iter().cartesian_product(b.iter()) {
-        let fc = a.value / b.value;
-        let posterior_prob = a.prob + b.prob;
 
-        if pmf.contains_key(&fc) {
-            let p = pmf.get_mut(&fc).unwrap();
-            *p = logprobs::add(*p, posterior_prob);
-        }
-        else {
-            pmf.insert(fc, posterior_prob);
+/// PMF of log2 fold change of a vs b. Specifically, we calculate log2((mean(a) + c) / (mean(b) + c))
+pub fn cdf(a: &model::expressionset::CDF, b: &model::expressionset::CDF) -> CDF {
+    let mut pmf = Vec::new();
+    for (a_mean, a_prob) in a.iter_pmf() {
+        for (b_mean, b_prob) in b.iter_pmf() {
+            let log2fc = (a_mean).log2() - (b_mean).log2();
+            pmf.push((log2fc, a_prob + b_prob));
         }
     }
-
-    let mut pmf = pmf.iter().filter_map(|(fc, prob)| {
-        if *prob >= model::MIN_PROB {
-            Some(model::pmf::Entry { value: (*fc.numer() as f64).log2() - (*fc.denom() as f64).log2(), prob: *prob })
-        }
-        else {
-            None
-        }
-    }).collect_vec();
-    pmf.sort_by(|a, b| a.value.partial_cmp(&b.value).unwrap());
-
-    model::diffexp::PMF::new(pmf)
+    model::dist::CDF::from_pmf(pmf)
 }
 
 
@@ -67,25 +48,25 @@ mod tests {
     #[test]
     fn test_pmf() {
         let readout = setup();
-        let pmfs1 = [
-            model::expression::pmf(GENE, 5, 5, &readout, 100),
-            model::expression::pmf(GENE, 5, 5, &readout, 100),
-            model::expression::pmf(GENE, 5, 5, &readout, 100),
-            model::expression::pmf(GENE, 5, 5, &readout, 100)
+        let cdfs1 = [
+            model::expression::cdf(GENE, 5, 5, &readout, 100),
+            model::expression::cdf(GENE, 5, 5, &readout, 100),
+            model::expression::cdf(GENE, 5, 5, &readout, 100),
+            model::expression::cdf(GENE, 5, 5, &readout, 100)
         ];
-        let pmfs2 = [
-            model::expression::pmf(GENE, 50, 50, &readout, 100),
-            model::expression::pmf(GENE, 50, 50, &readout, 100),
-            model::expression::pmf(GENE, 50, 50, &readout, 100),
-            model::expression::pmf(GENE, 50, 50, &readout, 100)
+        let cdfs2 = [
+            model::expression::cdf(GENE, 50, 50, &readout, 100),
+            model::expression::cdf(GENE, 50, 50, &readout, 100),
+            model::expression::cdf(GENE, 50, 50, &readout, 100),
+            model::expression::cdf(GENE, 50, 50, &readout, 100)
         ];
-        let pmf1 = model::expressionset::pmf(&pmfs1, 0);
-        let pmf2 = model::expressionset::pmf(&pmfs2, 0);
+        let cdf1 = model::expressionset::cdf(&cdfs1, 0.0);
+        let cdf2 = model::expressionset::cdf(&cdfs2, 0.0);
 
-        let pmf = pmf(&pmf2, &pmf1);
+        let cdf = cdf(&cdf2, &cdf1);
 
-        let total = logprobs::sum(&pmf.iter().map(|fc| fc.prob).collect_vec());
-        let fc = 2.0f64.powf(pmf.expected_value());
+        let total = cdf.total_prob();
+        let fc = 2.0f64.powf(cdf.expected_value());
 
         println!("{:?}", total);
         println!("ev={}", fc);

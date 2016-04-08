@@ -55,7 +55,7 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &st
     let codebook = io::codebook::Reader::from_file(codebook_path, dist).unwrap().codebook();
     let model = model::readout::new_model(N, m, p0, p1, dist, codebook);
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
-    let mut pmf_writer = io::pmf::expression::Writer::from_writer(std::io::stdout());
+    let mut cdf_writer = io::cdf::expression::Writer::from_writer(std::io::stdout());
     let mut est_writer = estimate_path.map(|path| io::estimation::expression::Writer::from_file(path));
 
     let cells = Regex::new(cells).ok().expect("Invalid regular expression for cells.");
@@ -93,27 +93,24 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &st
 
     let mut pool = simple_parallel::Pool::new(threads);
     crossbeam::scope(|scope| {
-        for (_, (cell, pmfs)) in pool.unordered_map(scope, counts.into_iter(), |(cell, counts)| {
+        for (_, (cell, cdfs)) in pool.unordered_map(scope, counts.into_iter(), |(cell, counts)| {
             let pmfs = counts.into_iter().map(|(feature, count)| {
-                let pmf = model::expression::pmf(&feature, count.exact + count.corrected, count.exact, &model, window_width);
-                /*if feature == "COL5A1" {
-                    debug!("{:?} {:?}", count, pmf);
-                }*/
-                (feature, pmf)
+                let cdf = model::expression::cdf(&feature, count.exact + count.corrected, count.exact, &model, window_width);
+                (feature, cdf)
             }).collect_vec();
             (cell, pmfs)
         }) {
-            for (feature, pmf) in pmfs {
-                pmf_writer.write(&cell, &feature, &pmf);
+            for (feature, cdf) in cdfs {
+                cdf_writer.write(&cell, &feature, &cdf);
 
                 if let Some(ref mut est_writer) = est_writer {
                     est_writer.write(
                         &cell,
                         &feature,
-                        pmf.expected_value(),
-                        pmf.standard_deviation(),
-                        *pmf.map(),
-                        pmf.credible_interval()
+                        cdf.expected_value(),
+                        cdf.standard_deviation(),
+                        *cdf.map(),
+                        cdf.credible_interval()
                     );
                 }
             }
@@ -122,41 +119,41 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &st
 }
 
 
-pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: Option<String>, max_fc: LogFC, pseudocounts: u32, threads: usize) {
-    let mut reader1 = io::pmf::expression::Reader::from_file(group1_path).expect("Invalid input for group 1.");
-    let mut reader2 = io::pmf::expression::Reader::from_file(group2_path).expect("Invalid input for group 2.");
-    let mut pmf_writer = pmf_path.map(|path| io::pmf::diffexp::Writer::from_file(path, "log2fc"));
+pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: Option<String>, max_fc: LogFC, pseudocounts: f64, threads: usize) {
+    let mut reader1 = io::cdf::expression::Reader::from_file(group1_path).expect("Invalid input for group 1.");
+    let mut reader2 = io::cdf::expression::Reader::from_file(group2_path).expect("Invalid input for group 2.");
+    let mut cdf_writer = pmf_path.map(|path| io::cdf::diffexp::Writer::from_file(path, "log2fc"));
     let mut est_writer = io::estimation::differential_expression::Writer::from_writer(std::io::stdout(), "log2fc");
 
-    let group1 = reader1.pmfs();
-    let group2 = reader2.pmfs();
+    let group1 = reader1.cdfs();
+    let group2 = reader2.cdfs();
 
     let features = group1.features().filter(|f| group2.contains_feature(f)).cloned().collect_vec();
 
     let mut pool = simple_parallel::Pool::new(threads);
     let mut estimates = Vec::new();
     crossbeam::scope(|scope| {
-        for (_, (feature, pmf)) in pool.unordered_map(scope, features, |feature| {
+        for (_, (feature, cdf)) in pool.unordered_map(scope, features, |feature| {
             info!("Calculating {}.", feature);
             let g1 = group1.get(&feature).unwrap();
             let g2 = group2.get(&feature).unwrap();
-            let pmf = model::foldchange::pmf(
-                &model::expressionset::pmf(&g1, pseudocounts),
-                &model::expressionset::pmf(&g2, pseudocounts)
+            let cdf = model::foldchange::cdf(
+                &model::expressionset::cdf(&g1, pseudocounts),
+                &model::expressionset::cdf(&g2, pseudocounts)
             );
             (
                 feature,
-                pmf
+                cdf
             )
         }) {
-            if pmf.iter().any(|fc| fc.prob.is_nan()) {
-                warn!("A PMF value for feature {} cannot be estimated because counts are too high. It will be reported as NaN.", feature);
+            if cdf.iter().any(|&(_, prob)| prob.is_nan()) {
+                warn!("A CDF probability for feature {} cannot be estimated because counts are too high. It will be reported as NaN.", feature);
             }
 
-            if let Some(ref mut pmf_writer) = pmf_writer {
-                pmf_writer.write(&feature, &pmf);
+            if let Some(ref mut cdf_writer) = cdf_writer {
+                cdf_writer.write(&feature, &cdf);
             }
-            estimates.push((feature, pmf.estimate(max_fc)));
+            estimates.push((feature, cdf.estimate(max_fc)));
         }
     });
     // calculate FDR and write estimates to STDOUT
@@ -177,12 +174,12 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
 }
 
 
-pub fn multi_differential_expression(group_paths: &[String], pmf_path: Option<String>, max_cv: CV, pseudocounts: u32, threads: usize) {
+pub fn multi_differential_expression(group_paths: &[String], pmf_path: Option<String>, max_cv: CV, pseudocounts: f64, threads: usize) {
     let groups = group_paths.iter().enumerate().map(|(i, path)| {
-        io::pmf::expression::Reader::from_file(path).expect(&format!("Invalid input for group {}.", i))
-                                                    .pmfs()
+        io::cdf::expression::Reader::from_file(path).expect(&format!("Invalid input for group {}.", i))
+                                                    .cdfs()
     }).collect_vec();
-    let mut pmf_writer = pmf_path.map(|path| io::pmf::diffexp::Writer::from_file(path, "cv"));
+    let mut cdf_writer = pmf_path.map(|path| io::cdf::diffexp::Writer::from_file(path, "cv"));
     let mut est_writer = io::estimation::differential_expression::Writer::from_writer(std::io::stdout(), "cv");
 
     // TODO take feature intersection or warn if features are not the same
@@ -191,23 +188,23 @@ pub fn multi_differential_expression(group_paths: &[String], pmf_path: Option<St
     let mut pool = simple_parallel::Pool::new(threads);
     let mut estimates = Vec::new();
     crossbeam::scope(|scope| {
-        for (_, (feature, pmf)) in pool.unordered_map(scope, features, |feature| {
+        for (_, (feature, cdf)) in pool.unordered_map(scope, features, |feature| {
             info!("Calculating {}.", feature);
-            let pmfs = groups.iter().map(|group| model::expressionset::pmf(group.get(&feature).unwrap(), pseudocounts)).collect_vec();
-            let pmf = model::cv::pmf(&pmfs);
+            let cdfs = groups.iter().map(|group| model::expressionset::cdf(group.get(&feature).unwrap(), pseudocounts)).collect_vec();
+            let cdf = model::cv::cdf(&cdfs);
             (
                 feature,
-                pmf
+                cdf
             )
         }) {
-            if pmf.iter().any(|cv| cv.prob.is_nan()) {
-                warn!("A PMF value for feature {} cannot be estimated due to numerical problems. It will be reported as NaN.", feature);
+            if cdf.iter().any(|&(_, prob)| prob.is_nan()) {
+                warn!("A CDF probability for feature {} cannot be estimated due to numerical problems. It will be reported as NaN.", feature);
             }
 
-            if let Some(ref mut pmf_writer) = pmf_writer {
-                pmf_writer.write(&feature, &pmf);
+            if let Some(ref mut cdf_writer) = cdf_writer {
+                cdf_writer.write(&feature, &cdf);
             }
-            estimates.push((feature, pmf.estimate(max_cv)));
+            estimates.push((feature, cdf.estimate(max_cv)));
         }
     });
     // calculate FDR and write estimates to STDOUT

@@ -1,6 +1,6 @@
 pub mod merfishdata;
 pub mod codebook;
-pub mod pmf;
+pub mod cdf;
 pub mod estimation;
 
 

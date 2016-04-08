@@ -1,21 +1,12 @@
-use itertools::Itertools;
-
 use model;
 
 
 pub type CV = f64;
+pub type CDF = model::dist::CDF<CV>;
 
 
-pub fn pmf(pmfs: &[model::expressionset::PMF]) -> model::diffexp::PMF {
-    debug!("Calculating CV PMF.");
-    let meanvar = model::pmf::MeanVar::new(pmfs);
-
-    let mut pmf = meanvar.iter().map(|e| model::pmf::Entry {
-        value: e.standard_deviation() / e.mean,
-        prob: e.prob
-    }).collect_vec();
-    pmf.sort_by(|a, b| a.value.partial_cmp(&b.value).unwrap());
-    model::diffexp::PMF::new(pmf)
+pub fn cdf(cdfs: &[model::expressionset::CDF]) -> CDF {
+    model::meanvar::cdf(cdfs, |mean, var| var.sqrt() / mean)
 }
 
 
@@ -36,30 +27,30 @@ mod tests {
     }
 
     #[test]
-    fn test_pmf() {
+    fn test_cdf() {
         let readout = setup();
-        let pmfs1 = [
-            model::expression::pmf(GENE, 5, 5, &readout, 100),
-            model::expression::pmf(GENE, 5, 5, &readout, 100),
-            model::expression::pmf(GENE, 5, 5, &readout, 100),
-            model::expression::pmf(GENE, 5, 5, &readout, 100)
+        let cdfs1 = [
+            model::expression::cdf(GENE, 5, 5, &readout, 100),
+            model::expression::cdf(GENE, 5, 5, &readout, 100),
+            model::expression::cdf(GENE, 5, 5, &readout, 100),
+            model::expression::cdf(GENE, 5, 5, &readout, 100)
         ];
-        let pmfs2 = [
-            model::expression::pmf(GENE, 50, 50, &readout, 100),
-            model::expression::pmf(GENE, 50, 50, &readout, 100),
-            model::expression::pmf(GENE, 50, 50, &readout, 100),
-            model::expression::pmf(GENE, 50, 50, &readout, 100)
+        let cdfs2 = [
+            model::expression::cdf(GENE, 50, 50, &readout, 100),
+            model::expression::cdf(GENE, 50, 50, &readout, 100),
+            model::expression::cdf(GENE, 50, 50, &readout, 100),
+            model::expression::cdf(GENE, 50, 50, &readout, 100)
         ];
-        let pmf1 = model::expressionset::pmf(&pmfs1, 0);
-        let pmf2 = model::expressionset::pmf(&pmfs2, 0);
+        let cdf1 = model::expressionset::cdf(&cdfs1, 0.0);
+        let cdf2 = model::expressionset::cdf(&cdfs2, 0.0);
         //println!("{} {}", pmfs1[0].expected_value(), pmfs2[0].expected_value());
 
-        let pmf = pmf(&[pmf1, pmf2]);
+        let cdf = cdf(&[cdf1, cdf2]);
 
-        let total = logprobs::sum(&pmf.iter().map(|fc| fc.prob).collect_vec());
+        let total = cdf.total_prob();
 
         assert!(total <= 0.0);
         assert_relative_eq!(total, 0.0, epsilon = 0.0002);
-        assert_relative_eq!(pmf.expected_value(), 1.14, epsilon = 0.02);
+        assert_relative_eq!(cdf.expected_value(), 1.14, epsilon = 0.02);
     }
 }

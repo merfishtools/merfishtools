@@ -1,61 +1,11 @@
-use std::mem;
-use std::f64;
-
-use num::rational;
-use itertools::Itertools;
-
-use bio::stats::logprobs;
-
 use model;
 
+pub type MeanExpression = f64;
+pub type CDF = model::dist::CDF<MeanExpression>;
 
-pub type MeanExpression = rational::Ratio<i64>;
-pub type PMF = model::pmf::PMF<MeanExpression>;
 
-const SCALE: i64 = 10;
-
-pub fn pmf(expression_pmfs: &[model::expression::PMF], pseudocounts: u32) -> PMF {
-    // TODO replace with simpler version of mean_var function
-    let max_sum = expression_pmfs.iter()
-                                 .map(|pmf| pmf.iter().last().unwrap().value)
-                                 .fold(0, |s, e| s + (e * SCALE as f32).round() as usize);
-
-    let mut curr = vec![f64::NEG_INFINITY; max_sum + 1];
-    let mut prev = vec![f64::NEG_INFINITY; max_sum + 1];
-    curr[0] = 0.0;
-
-    for pmf in expression_pmfs.iter() {
-        mem::swap(&mut curr, &mut prev);
-
-        for p in curr.iter_mut() {
-            *p = f64::NEG_INFINITY;
-        }
-
-        for s in 0..max_sum {
-            let p = prev[s];
-            if p != f64::NEG_INFINITY {
-                for x in pmf.iter() {
-                    let s = s + (x.value * SCALE as f32) as usize;
-                    if s <= max_sum {
-                        let prob = &mut curr[s];
-                        *prob = logprobs::add(*prob, p + x.prob);
-                    }
-                }
-            }
-        }
-    }
-
-    PMF::new(curr.iter().enumerate().filter_map(|(s, p)| {
-        if *p >= model::MIN_PROB {
-            Some(model::pmf::Entry{
-                value: rational::Ratio::new(s as i64, SCALE * expression_pmfs.len() as i64) + rational::Ratio::from_integer(pseudocounts as i64),
-                prob: *p
-            })
-        }
-        else {
-            None
-        }
-    }).collect_vec())
+pub fn cdf(expression_pmfs: &[model::expression::CDF], pseudocounts: f64) -> CDF {
+    model::meanvar::cdf(expression_pmfs, |mean, _| mean + pseudocounts)
 }
 
 
@@ -84,20 +34,18 @@ mod tests {
     }
 
     #[test]
-    fn test_pmf() {
+    fn test_cdf() {
         let readout = setup();
-        let pmfs = [
-            model::expression::pmf(GENE, 5, 1, &readout, 100),
-            model::expression::pmf(GENE, 10, 1, &readout, 100),
-            model::expression::pmf(GENE, 3, 1, &readout, 100),
-            model::expression::pmf(GENE, 24, 1, &readout, 100)
+        let cdfs = [
+            model::expression::cdf(GENE, 5, 1, &readout, 100),
+            model::expression::cdf(GENE, 10, 1, &readout, 100),
+            model::expression::cdf(GENE, 3, 1, &readout, 100),
+            model::expression::cdf(GENE, 24, 1, &readout, 100)
         ];
-        let pmf = pmf(&pmfs, 0);
+        let cdf = cdf(&cdfs, 0.0);
 
-        let total = logprobs::sum(&pmf.iter().map(|e| e.prob).collect_vec());
-        let values = pmf.iter().map(|e| (*e.value.numer() as f64 / *e.value.denom() as f64, e.prob)).collect_vec();
+        let total = cdf.total_prob();
 
-        println!("{:?}", values);
         println!("{:?}", total);
         assert!(total.approx_eq(&-0.000005434252710934118));
     }

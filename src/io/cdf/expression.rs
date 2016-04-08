@@ -8,36 +8,35 @@ use csv;
 
 use bio::stats::logprobs::LogProb;
 
-use model::expression::PMF;
-use model;
+use model::expression::CDF;
 
 
 const HEADER: [&'static str; 4] = ["cell", "feat", "expr", "prob"];
 
 
-pub struct PMFs {
-    inner: collections::HashMap<String, Vec<PMF>>
+pub struct CDFs {
+    inner: collections::HashMap<String, Vec<CDF>>
 }
 
 
-impl PMFs {
+impl CDFs {
     pub fn contains_feature(&self, feature: &str) -> bool {
         self.inner.contains_key(feature)
     }
 
-    pub fn get(&self, feature: &str) -> Option<&Vec<PMF>> {
+    pub fn get(&self, feature: &str) -> Option<&Vec<CDF>> {
         self.inner.get(feature)
     }
 
-    pub fn get_mut(&mut self, feature: &str) -> Option<&mut Vec<PMF>> {
+    pub fn get_mut(&mut self, feature: &str) -> Option<&mut Vec<CDF>> {
         self.inner.get_mut(feature)
     }
 
-    pub fn features(&self) -> collections::hash_map::Keys<String, Vec<PMF>>  {
+    pub fn features(&self) -> collections::hash_map::Keys<String, Vec<CDF>>  {
         self.inner.keys()
     }
 
-    pub fn iter(&self) -> collections::hash_map::Iter<String, Vec<PMF>> {
+    pub fn iter(&self) -> collections::hash_map::Iter<String, Vec<CDF>> {
         self.inner.iter()
     }
 }
@@ -47,7 +46,7 @@ impl PMFs {
 pub struct Record {
     pub cell: String,
     pub feature: String,
-    pub expression: f32,
+    pub expression: f64,
     pub prob: LogProb
 }
 
@@ -78,24 +77,18 @@ impl<R: io::Read> Reader<R> {
         }
     }
 
-    pub fn pmfs(&mut self) -> PMFs {
+    pub fn cdfs(&mut self) -> CDFs {
         let mut features = collections::HashMap::new();
         for (feature, records) in self.inner.decode().map(|res| res.ok().expect("Error reading record")).group_by(
             |rec: &Record| rec.feature.clone()
         ) {
-            let pmf = PMF::new(records.iter().map(|rec| {
-                model::pmf::Entry {
-                    value: rec.expression.clone(),
-                    prob: rec.prob.clone()
-                }
-            }).collect_vec());
-            if !features.contains_key(&feature) {
-                features.insert(feature.clone(), Vec::new());
-            }
-            let pmfs = features.get_mut(&feature).unwrap();
-            pmfs.push(pmf);
+            let cdf = CDF::from_cdf(records.iter().map(|rec| {
+                (rec.expression.clone(), rec.prob.clone())
+            }));
+            let mut cdfs = features.entry(feature).or_insert(Vec::new());
+            cdfs.push(cdf);
         }
-        PMFs { inner: features }
+        CDFs { inner: features }
     }
 }
 
@@ -123,13 +116,13 @@ impl<W: io::Write> Writer<W> {
         writer
     }
 
-    pub fn write(&mut self, cell: &str, feature: &str, pmf: &PMF) {
-        for x in pmf.iter() {
+    pub fn write(&mut self, cell: &str, feature: &str, cdf: &CDF) {
+        for x in cdf.iter() {
             self.inner.write([
                 cell,
                 feature,
-                &format!("{:.0}", x.value)[..],
-                &format!("{}", x.prob)[..]
+                &format!("{:.0}", x.0)[..],
+                &format!("{}", x.1)[..]
             ].iter()).unwrap();
         }
     }

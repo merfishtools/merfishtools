@@ -5,10 +5,10 @@ use bio::stats::logprobs;
 use model;
 
 
-pub type PMF = model::pmf::PMF<f32>;
+pub type CDF = model::dist::CDF<f64>;
 
 
-pub fn pmf(feature: &str, count: u32, count_exact: u32, model: &Box<model::readout::Model>, window_width: u32) -> PMF {
+pub fn cdf(feature: &str, count: u32, count_exact: u32, model: &Box<model::readout::Model>, window_width: u32) -> CDF {
     let readout_model = model::Readout::new(feature, model, window_width);
     let (xmin, xmax) = readout_model.window(count);
     let likelihoods = (xmin..xmax + 1).map(|x| {
@@ -17,14 +17,16 @@ pub fn pmf(feature: &str, count: u32, count_exact: u32, model: &Box<model::reado
     // calculate (marginal / flat_prior)
     let marginal = logprobs::sum(&likelihoods);
 
-    // TODO trim
-    PMF::new(
-        likelihoods.iter().enumerate().map(|(x, lh)| {
-            model::pmf::Entry{
-                value: (xmin + x as u32) as f32,
-                prob: lh - marginal
+    model::dist::CDF::from_pmf(
+        likelihoods.iter().enumerate().filter_map(|(x, lh)| {
+            let prob = lh - marginal;
+            if prob >= model::MIN_PROB {
+                Some(((xmin + x as u32) as f64, prob))
             }
-        }).filter(|e| e.prob >= model::MIN_PROB).collect_vec()
+            else {
+                None
+            }
+        }).collect_vec()
     )
 }
 
@@ -59,29 +61,29 @@ mod tests {
     }
 
     #[test]
-    fn test_pmf() {
+    fn test_cdf() {
         let readout = setup();
-        let pmf = pmf(GENE, 25, 10, &readout, 100);
+        let cdf = cdf(GENE, 25, 10, &readout, 100);
 
-        let total = logprobs::sum(&pmf.iter().map(|e| e.prob).collect_vec());
-        println!("{:?}", pmf);
+        let total = cdf.total_prob();
+        println!("{:?}", cdf);
         println!("{}", total);
         assert!(total.approx_eq(&-0.0000011368907495423741));
     }
 
     #[test]
-    fn test_pmf2() {
+    fn test_cdf2() {
         let readout = setup();
-        let pmf = pmf(GENE, 176, 25, &readout, 100);
+        let cdf = cdf(GENE, 176, 25, &readout, 100);
 
-        let total = logprobs::sum(&pmf.iter().map(|e| e.prob).collect_vec());
-        println!("{:?}", pmf);
+        let total = cdf.total_prob();
+        println!("{:?}", cdf);
         println!("{}", total);
         assert!(total.approx_eq(&-0.0000029387441422557004));
     }
 
     #[test]
-    fn test_pmf3() {
+    fn test_cdf3() {
         let total = 100;
         let calls = 40;
         let miscalls = 8;
@@ -89,9 +91,9 @@ mod tests {
         let count = calls + miscalls;
 
         let readout = setup_mhd2();
-        let pmf = pmf("COL7A1", count, count, &readout, 100);
+        let cdf = cdf("COL7A1", count, count, &readout, 100);
 
-        println!("{:?} {} {:?}", pmf.expected_value(), pmf.map(), pmf);
+        println!("{:?} {} {:?}", cdf.expected_value(), cdf.map(), cdf);
     }
 }
 /*

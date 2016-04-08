@@ -160,7 +160,7 @@ fn diffexp(args: Vec<String>) {
     let mut group2_path = "".to_owned();
     let mut pmf_path: Option<String> = None;
     let mut max_fc = 1.0;
-    let mut pseudocounts = 1;
+    let mut pseudocounts = 1.0;
 
     {
         let mut ap = ArgumentParser::new();
@@ -187,7 +187,7 @@ Output is formatted into columns: feature, foldchange, posterior probability"#);
         ap.refer(&mut max_fc)
           .add_option(&["--max-null-log2fc"], Store, "Maximum absolute log2 fold change considered as no differential expression (default: 1.0).");
         ap.refer(&mut pseudocounts)
-          .add_option(&["--pseudocounts"], Store, "Pseudocounts to add to means before fold change calculation.");
+          .add_option(&["--pseudocounts"], Store, "Pseudocounts to add to means before fold change calculation (default: 1.0).");
         ap.refer(&mut group1_path).required()
           .add_argument("group1", Store, "Path to expression PMFs for group of cells.");
         ap.refer(&mut group2_path).required()
@@ -203,7 +203,7 @@ fn multidiffexp(args: Vec<String>) {
     let mut group_paths = vec![];
     let mut pmf_path: Option<String> = None;
     let mut max_cv = 0.5;
-    let mut pseudocounts = 1;
+    let mut pseudocounts = 1.0;
 
     {
         let mut ap = ArgumentParser::new();
@@ -230,7 +230,7 @@ Output is formatted into columns: feature, foldchange, posterior probability"#);
         ap.refer(&mut max_cv)
           .add_option(&["--max-null-cv"], Store, "Maximum coefficient of variation (CV) considered as no differential expression (default: 0.5).");
         ap.refer(&mut pseudocounts)
-          .add_option(&["--pseudocounts"], Store, "Pseudocounts to add to means before CV calculation.");
+          .add_option(&["--pseudocounts"], Store, "Pseudocounts to add to means before CV calculation (default: 1.0).");
         ap.refer(&mut group_paths).required()
           .add_argument("groups", List, "Paths to expression PMFs for groups of cells.");
         parse_args_or_exit(&ap, args);
