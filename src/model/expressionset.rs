@@ -5,6 +5,8 @@ pub type CDF = model::dist::CDF<MeanExpression>;
 
 
 pub fn cdf(expression_pmfs: &[model::expression::CDF], pseudocounts: f64) -> CDF {
+    let test = model::meanvar::cdf(expression_pmfs, |mean, var| (mean, var));
+    println!("DEBUG {}", test.total_prob());
     model::meanvar::cdf(expression_pmfs, |mean, _| mean + pseudocounts)
 }
 
@@ -37,16 +39,17 @@ mod tests {
     fn test_cdf() {
         let readout = setup();
         let cdfs = [
-            model::expression::cdf(GENE, 5, 1, &readout, 100),
-            model::expression::cdf(GENE, 10, 1, &readout, 100),
-            model::expression::cdf(GENE, 3, 1, &readout, 100),
-            model::expression::cdf(GENE, 24, 1, &readout, 100)
+            model::expression::cdf(GENE, 5, 5, &readout, 100),
+            model::expression::cdf(GENE, 5, 5, &readout, 100),
+            model::expression::cdf(GENE, 5, 5, &readout, 100),
+            model::expression::cdf(GENE, 5, 5, &readout, 100)
         ];
+        println!("{:?}", cdfs[0]);
         let cdf = cdf(&cdfs, 0.0);
+        println!("{:?}", cdf);
 
         let total = cdf.total_prob();
 
-        println!("{:?}", total);
-        assert!(total.approx_eq(&-0.000005434252710934118));
+        assert_relative_eq!(total, 0.0, epsilon = 0.0002);
     }
 }

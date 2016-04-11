@@ -19,19 +19,22 @@ impl<T: PartialOrd> CDF<T> {
     /// the probabilities of which are summed during generation of the CDF.
     pub fn from_pmf(mut entries: Vec<(T, LogProb)>) -> Self {
         entries.sort_by(|&(ref a, _), &(ref b, _)| a.partial_cmp(b).unwrap());
-        let mut i = 1;
-        while i < entries.len() {
-            if entries[i].0 == entries[i - 1].0 {
-                entries[i - 1].1 = logprobs::add(entries[i - 1].1, entries[i].1);
-                entries.remove(i);
+        let mut entries = entries.into_iter();
+        let mut inner = vec![entries.next().unwrap()];
+        for mut e in entries {
+            let p = logprobs::add(inner.last().unwrap().1, e.1);
+            if inner.last().unwrap().0 == e.0 {
+                //println!("equal");
+                inner.last_mut().unwrap().1 = p;
             }
             else {
-                entries[i].1 = logprobs::add(entries[i - 1].1, entries[i].1);
-                i += 1;
+                //println!("unequal");
+                e.1 = p;
+                inner.push(e);
             }
         }
         let mut cdf = CDF {
-            inner: entries
+            inner: inner
         };
 
         if relative_eq!(cdf.total_prob(), 0.0) && cdf.total_prob() > 0.0 {
@@ -48,7 +51,6 @@ impl<T: PartialOrd> CDF<T> {
 
     pub fn sample(mut self, n: usize) -> Self {
         if self.inner.len() <= n {
-            println!("not sampling");
             self
         }
         else {
@@ -162,16 +164,18 @@ mod test {
 
     #[test]
     fn test_cdf() {
-        let mut pmf = Vec::new();
-        for i in 0..10 {
-            pmf.push((i, 0.1f64.ln()));
+        let mut pmf = vec![(0.0, 0.1f64.ln())];
+        for i in 0..9 {
+            pmf.push((i as f64, 0.1f64.ln()));
         }
+        println!("{:?}", pmf);
 
         let cdf = CDF::from_pmf(pmf.clone());
-        for (value, prob) in pmf {
+        println!("{:?}", cdf);
+        for &(value, prob) in pmf.iter().skip(2) {
             assert_ulps_eq!(prob, cdf.get_pmf(&value).unwrap(), epsilon = 0.0000000000001);
         }
         assert_relative_eq!(cdf.total_prob(), 1.0f64.ln());
-        assert_relative_eq!(cdf.get(&1).unwrap(), 0.2f64.ln());
+        assert_relative_eq!(cdf.get(&1.0).unwrap(), 0.3f64.ln(), epsilon = 0.00000001);
     }
 }

@@ -1,4 +1,5 @@
 use num::rational;
+use itertools::Itertools;
 
 use model;
 
@@ -12,13 +13,17 @@ pub type CDF = model::dist::CDF<LogFC>;
 /// PMF of log2 fold change of a vs b. Specifically, we calculate log2((mean(a) + c) / (mean(b) + c))
 pub fn cdf(a: &model::expressionset::CDF, b: &model::expressionset::CDF) -> CDF {
     let mut pmf = Vec::new();
-    for (a_mean, a_prob) in a.iter_pmf() {
-        for (b_mean, b_prob) in b.iter_pmf() {
+    let a_pmf = a.iter_pmf().collect_vec();
+    let b_pmf = b.iter_pmf().collect_vec();
+
+    for (a_mean, a_prob) in a_pmf {
+        for &(b_mean, b_prob) in b_pmf.iter() {
             let log2fc = (a_mean).log2() - (b_mean).log2();
             pmf.push((log2fc, a_prob + b_prob));
         }
     }
-    model::dist::CDF::from_pmf(pmf)
+    let cdf = model::dist::CDF::from_pmf(pmf);
+    cdf
 }
 
 
@@ -46,7 +51,7 @@ mod tests {
     }
 
     #[test]
-    fn test_pmf() {
+    fn test_foldchange_pmf() {
         let readout = setup();
         let cdfs1 = [
             model::expression::cdf(GENE, 5, 5, &readout, 100),
@@ -68,9 +73,8 @@ mod tests {
         let total = cdf.total_prob();
         let fc = 2.0f64.powf(cdf.expected_value());
 
-        println!("{:?}", total);
         println!("ev={}", fc);
-        assert!(total.approx_eq(&-0.00014206495831814436));
+        assert_relative_eq!(total, 0.0, epsilon = 0.0002);
         assert!(fc >= 9.0);
     }
 }
