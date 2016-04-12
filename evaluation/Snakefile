@@ -122,7 +122,7 @@ rule diffexp:
         "bench/diffexp/{dataset}.{experiment1}.{group1}-vs-{experiment2}.{group2}.{settings}.txt"
     threads: 8
     shell:
-        "{merfishtools} diffexp -t {threads} --pseudocounts 0 "
+        "{merfishtools} diffexp -t {threads} --pseudocounts 1 "
         "--max-null-log2fc 1.0 --pmf {output.pmf} {input} "
         "> {output.est}"
 
@@ -176,7 +176,7 @@ rule plot_expression_pmf:
 
 rule plot_foldchange_cdf:
     input:
-        fc_cdf="diffexp/{dataset}.{experiment}.{group1}-vs-{experiment}.{group2}.{settings}.txt",
+        fc="diffexp/{dataset}.{experiment}.{group1}-vs-{experiment}.{group2}.{settings}.txt",
         fc_est="diffexp/{dataset}.{experiment}.{group1}-vs-{experiment}.{group2}.{settings}.est.txt"
     output:
         "results/{context}/foldchange_cdf/{dataset}.{experiment}.{group1}-vs-{group2}.{gene}.{settings}.foldchange_cdf.{legend,(legend|nolegend)}.svg"

@@ -120,6 +120,8 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &st
 
 
 pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: Option<String>, max_fc: LogFC, pseudocounts: f64, threads: usize) {
+    assert!(pseudocounts > 0.0, "Pseudocounts must be > 0.0 for calculating fold changes.");
+
     let mut reader1 = io::cdf::expression::Reader::from_file(group1_path).expect("Invalid input for group 1.");
     let mut reader2 = io::cdf::expression::Reader::from_file(group2_path).expect("Invalid input for group 2.");
     let mut cdf_writer = pmf_path.map(|path| io::cdf::diffexp::Writer::from_file(path, "log2fc"));
