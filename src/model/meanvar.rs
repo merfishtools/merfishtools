@@ -34,7 +34,6 @@ pub fn cdf<T: PartialOrd, F: Fn(f64, f64) -> T>(cdfs: &[model::dist::CDF<f64>], 
     };
 
     for (k, cdf) in cdfs.iter().enumerate().skip(1) {
-        debug!("Iteration {}", k);
         let k = k as f64 + 1.0;
 
         curr = Vec::new();
@@ -46,8 +45,7 @@ pub fn cdf<T: PartialOrd, F: Fn(f64, f64) -> T>(cdfs: &[model::dist::CDF<f64>], 
                 curr.push(((mk, sk), p));
             }
         }
-        debug!("PMF len={}", curr.len());
-        prev = model::dist::CDF::from_pmf(curr).sample(1000);
+        prev = model::dist::CDF::from_pmf(curr).sample(5000);
     }
     let pmf = prev.iter_pmf().map(|(&(m, s), p)| {
         (value(m, s / (n - 1.0)), p)

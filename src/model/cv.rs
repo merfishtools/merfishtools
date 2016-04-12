@@ -43,7 +43,7 @@ mod tests {
         ];
         let cdf1 = model::expressionset::cdf(&cdfs1, 0.0);
         let cdf2 = model::expressionset::cdf(&cdfs2, 0.0);
-        //println!("{} {}", pmfs1[0].expected_value(), pmfs2[0].expected_value());
+        println!("{} {}", cdfs1[0].expected_value(), cdfs2[0].expected_value());
 
         let cdf = cdf(&[cdf1, cdf2]);
 
