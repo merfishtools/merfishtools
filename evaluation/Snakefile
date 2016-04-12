@@ -153,7 +153,8 @@ rule multidiffexp:
 rule plot_multidiffexp:
     input:
        diffexp="multidiffexp/{dataset}.{settings}.est.txt",
-       exprs=partial(multidiffexp_input, matrix=True)
+       exprs=partial(multidiffexp_input, matrix=True),
+       diffexp_pmf="multidiffexp/{dataset}.{settings}.txt"
     output:
        "results/{context}/{dataset}.{settings}.diffexp.svg"
     params:
