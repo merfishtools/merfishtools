@@ -69,9 +69,7 @@ impl<T: PartialOrd> CDF<T> {
     pub fn iter_pmf<'a>(&'a self) -> CDFPMFIter<'a, T> {
         fn cdf_to_pmf<'a, G>(last_prob: &mut LogProb, e: &'a (G, LogProb)) -> Option<(&'a G, LogProb)> {
             let &(ref value, cdf_prob) = e;
-            // last_prob can't be bigger than cdf_prob. If it is
-            // this must be to instability, hence we can set prob to -inf, i.e. 0.
-            let prob = if cdf_prob < *last_prob { f64::NEG_INFINITY } else { logprobs::sub(cdf_prob, *last_prob) };
+            let prob = logprobs::sub(cdf_prob, *last_prob);
             *last_prob = cdf_prob;
             Some((value, prob))
         }

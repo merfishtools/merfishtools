@@ -10,10 +10,8 @@ import merfishtools
 sns.set(style="ticks", palette="colorblind", context=snakemake.wildcards.context)
 plt.figure(figsize=snakemake.config["plots"]["figsize"])
 
-cdf = merfishtools.read_cdf(snakemake.input.fc).loc[idx[
-    0, snakemake.wildcards.gene]]
-est = merfishtools.read_diffexp_estimates(snakemake.input.fc_est).loc[idx[
-    0, snakemake.wildcards.gene]]
+cdf = merfishtools.read_cdf(snakemake.input.fc).loc[idx[:, snakemake.wildcards.gene], :]
+est = merfishtools.read_diffexp_estimates(snakemake.input.fc_est).loc[idx[:, snakemake.wildcards.gene], :].iloc[0]
 
 merfishtools.plot_cdf(cdf, expected_value=est["log2fc_ev"], credible_interval=est[["log2fc_ci_lower", "log2fc_ci_upper"]], legend=snakemake.wildcards.legend == "legend")
 

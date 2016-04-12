@@ -11,19 +11,16 @@ sns.set(style="ticks",
         palette="colorblind",
         context=snakemake.wildcards.context)
 plt.figure(figsize=snakemake.config["plots"]["figsize"])
-
-cdf = merfishtools.read_cdf(snakemake.input.expr).loc[idx[
-    0, snakemake.wildcards.gene]]
-est = merfishtools.read_exp_estimates(snakemake.input.expr_est).loc[idx[
-    0, snakemake.wildcards.gene]]
+cdf = merfishtools.read_cdf(snakemake.input.expr).loc[idx[:, snakemake.wildcards.gene], :]
+est = merfishtools.read_exp_estimates(snakemake.input.expr_est).loc[idx[:, snakemake.wildcards.gene], :].iloc[0]
+print(est)
 raw_counts = pd.read_table(
     snakemake.input.raw_counts,
-    index_col=[0, 1]).loc[idx[0, snakemake.wildcards.gene]]
+    index_col=1).loc[snakemake.wildcards.gene]
 
 count_exact = raw_counts["exact"]
 count_corrected = raw_counts["corrected"]
 count_total = count_exact + count_corrected
-
 merfishtools.plot_pmf(
     cdf,
     expected_value=est["expr_ev"],

@@ -3,11 +3,15 @@ import matplotlib.pyplot as plt
 
 
 def read_exp_estimates(path_or_buffer):
-    return pd.read_table(path_or_buffer, index_col=[0, 1])
+    est = pd.read_table(path_or_buffer, index_col=[0, 1])
+    est.sort_index(inplace=True)
+    return est
 
 
 def read_diffexp_estimates(path_or_buffer):
-    return pd.read_table(path_or_buffer, index_col=0)
+    est = pd.read_table(path_or_buffer, index_col=0)
+    est.sort_index(inplace=True)
+    return est
 
 
 def plot_estimate(ylim, expected_value=None, credible_interval=None, legend=True):
