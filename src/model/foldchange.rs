@@ -22,7 +22,7 @@ pub fn cdf(a: &model::expressionset::CDF, b: &model::expressionset::CDF) -> CDF 
             pmf.push((log2fc, a_prob + b_prob));
         }
     }
-    model::dist::CDF::from_pmf(pmf).sample(100)
+    model::dist::CDF::from_pmf(pmf).reduce().sample(100)
 }
 
 

@@ -48,10 +48,10 @@ impl<T: PartialOrd> CDF<T> {
 
     pub fn reduce(self) -> Self {
         let mut inner = Vec::new();
-        let mut last = None;
+        let mut last = f64::NEG_INFINITY;
         for e in self.inner.into_iter() {
-            if last.is_none() || last.unwrap() != e.1 {
-                last = Some(e.1);
+            if last != e.1 {
+                last = e.1;
                 inner.push(e);
             }
         }
