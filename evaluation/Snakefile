@@ -93,17 +93,17 @@ rule expressions:
         "--estimate {output.est} -t {threads} < {input.data} > {output.pmf}"
 
 
-rule normalize_pmf:
+rule normalize_cdf:
     input:
-        pmf="expressions/{dataset}.{experiment}.{group}.{settings}.txt",
+        cdf="expressions/{dataset}.{experiment}.{group}.{settings}.txt",
         scales="normalized_expressions/{dataset}.{settings}.scale_factors.txt"
     output:
         "normalized_expressions/{dataset}.{experiment}.{group}.{settings,(default)}.txt"
     run:
-        pmf = pd.read_table(input.pmf, index_col=0)
+        cdf = pd.read_table(input.cdf, index_col=0)
         scales = pd.read_table(input.scales, index_col=0, squeeze=True, header=None)
-        pmf["expr"] *= scales[int(wildcards.experiment)]
-        pmf.to_csv(output[0], sep="\t")
+        cdf["expr"] *= scales[int(wildcards.experiment)]
+        cdf.to_csv(output[0], sep="\t")
 
 
 def diffexp_input(wildcards):
@@ -122,7 +122,7 @@ rule diffexp:
         "bench/diffexp/{dataset}.{experiment1}.{group1}-vs-{experiment2}.{group2}.{settings}.txt"
     threads: 8
     shell:
-        "{merfishtools} diffexp -t {threads} --pseudocounts 0 "
+        "{merfishtools} diffexp -t {threads} --pseudocounts 1 "
         "--max-null-log2fc 1.0 --pmf {output.pmf} {input} "
         "> {output.est}"
 
@@ -154,7 +154,7 @@ rule plot_multidiffexp:
     input:
        diffexp="multidiffexp/{dataset}.{settings}.est.txt",
        exprs=partial(multidiffexp_input, matrix=True),
-       diffexp_pmf="multidiffexp/{dataset}.{settings}.txt"
+       diffexp_cdf="multidiffexp/{dataset}.{settings}.txt"
     output:
        "results/{context}/{dataset}.{settings}.diffexp.svg"
     params:
@@ -176,7 +176,7 @@ rule plot_expression_pmf:
 
 rule plot_foldchange_cdf:
     input:
-        fc_cdf="diffexp/{dataset}.{experiment}.{group1}-vs-{experiment}.{group2}.{settings}.txt",
+        fc="diffexp/{dataset}.{experiment}.{group1}-vs-{experiment}.{group2}.{settings}.txt",
         fc_est="diffexp/{dataset}.{experiment}.{group1}-vs-{experiment}.{group2}.{settings}.est.txt"
     output:
         "results/{context}/foldchange_cdf/{dataset}.{experiment}.{group1}-vs-{group2}.{gene}.{settings}.foldchange_cdf.{legend,(legend|nolegend)}.svg"

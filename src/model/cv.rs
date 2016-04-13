@@ -6,6 +6,8 @@ pub type CDF = model::dist::CDF<CV>;
 
 
 pub fn cdf(cdfs: &[model::expressionset::CDF]) -> CDF {
+    //let test = model::meanvar::cdf(cdfs, |mean, var| (var.sqrt(), mean));
+    //debug!("{:?}", test);
     model::meanvar::cdf(cdfs, |mean, var| var.sqrt() / mean)
 }
 
