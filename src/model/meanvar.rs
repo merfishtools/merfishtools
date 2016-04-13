@@ -45,11 +45,7 @@ pub fn cdf<T: PartialOrd, F: Fn(f64, f64) -> T>(cdfs: &[model::dist::CDF<f64>], 
                 curr.push(((mk, sk), p));
             }
         }
-<<<<<<< HEAD
-        prev = model::dist::CDF::from_pmf(curr).sample(5000);
-=======
         prev = model::dist::CDF::from_pmf(curr);
->>>>>>> 9666dca47b671833cd409ff132abbf926a05b595
     }
     let pmf = prev.iter_pmf().map(|(&(m, s), p)| {
         (value(m, s / (n - 1.0)), p)

@@ -20,13 +20,8 @@ impl<T: PartialOrd> CDF<T> {
     pub fn from_pmf(mut entries: Vec<(T, LogProb)>) -> Self {
         entries.sort_by(|&(ref a, _), &(ref b, _)| a.partial_cmp(b).unwrap());
         let mut inner: Vec<(T, LogProb)> = Vec::new();
-        let mut last_prob = f64::NEG_INFINITY;
         for mut e in entries.into_iter() {
-            let p = logprobs::add(last_prob, e.1);
-            if p == last_prob {
-                continue;
-            }
-            last_prob = p;
+            let p = logprobs::add(inner.last().map_or(f64::NEG_INFINITY, |e| e.1), e.1);
             if !inner.is_empty() && inner.last().unwrap().0 == e.0 {
                 inner.last_mut().unwrap().1 = p;
             }
@@ -49,6 +44,18 @@ impl<T: PartialOrd> CDF<T> {
     /// Create CDF from iterator. This can be used to replace the values of a CDF.
     pub fn from_cdf<I: Iterator<Item = (T, LogProb)>>(entries: I) -> Self {
         CDF { inner: entries.collect_vec() }
+    }
+
+    pub fn reduce(self) -> Self {
+        let mut inner = Vec::new();
+        let mut last = None;
+        for e in self.inner.into_iter() {
+            if last.is_none() || last.unwrap() != e.1 {
+                last = Some(e.1);
+                inner.push(e);
+            }
+        }
+        CDF { inner: inner }
     }
 
     pub fn sample(mut self, n: usize) -> Self {
