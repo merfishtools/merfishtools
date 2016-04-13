@@ -185,14 +185,23 @@ pub fn multi_differential_expression(group_paths: &[String], pmf_path: Option<St
     let mut est_writer = io::estimation::differential_expression::Writer::from_writer(std::io::stdout(), "cv");
 
     // TODO take feature intersection or warn if features are not the same
-    let features = groups[0].features();
+    let mut features = Vec::new();
+    for feature in groups[0].features() {
+        let mut common = true;
+        for group in groups[1..].iter() {
+            common &= group.contains_feature(feature);
+        }
+        if common {
+            features.push(feature.clone());
+        }
+    }
 
     let mut pool = simple_parallel::Pool::new(threads);
     let mut estimates = Vec::new();
     crossbeam::scope(|scope| {
         for (_, (feature, cdf)) in pool.unordered_map(scope, features, |feature| {
             info!("Calculating {}.", feature);
-            let cdfs = groups.iter().map(|group| model::expressionset::cdf(group.get(&feature).unwrap(), pseudocounts)).collect_vec();
+            let cdfs = groups.iter().map(|group| model::expressionset::cdf(group.get(&feature).expect("Missing feature."), pseudocounts)).collect_vec();
             let cdf = model::cv::cdf(&cdfs);
             (
                 feature,

@@ -93,17 +93,17 @@ rule expressions:
         "--estimate {output.est} -t {threads} < {input.data} > {output.pmf}"
 
 
-rule normalize_pmf:
+rule normalize_cdf:
     input:
-        pmf="expressions/{dataset}.{experiment}.{group}.{settings}.txt",
+        cdf="expressions/{dataset}.{experiment}.{group}.{settings}.txt",
         scales="normalized_expressions/{dataset}.{settings}.scale_factors.txt"
     output:
         "normalized_expressions/{dataset}.{experiment}.{group}.{settings,(default)}.txt"
     run:
-        pmf = pd.read_table(input.pmf, index_col=0)
+        cdf = pd.read_table(input.cdf, index_col=0)
         scales = pd.read_table(input.scales, index_col=0, squeeze=True, header=None)
-        pmf["expr"] *= scales[int(wildcards.experiment)]
-        pmf.to_csv(output[0], sep="\t")
+        cdf["expr"] *= scales[int(wildcards.experiment)]
+        cdf.to_csv(output[0], sep="\t")
 
 
 def diffexp_input(wildcards):
@@ -144,10 +144,11 @@ rule multidiffexp:
     benchmark:
         "bench/multidiffexp/{dataset}.{settings}.txt"
     threads: 24
-    shell:
-        "{merfishtools} --debug multidiffexp --pseudocounts 1 "
+    run:
+        inputs = expand("<(grep MALAT1 {f})", f=input)
+        shell("{merfishtools} --debug multidiffexp --pseudocounts 1 "
         "-t {threads} --max-null-cv 0.5 "
-        "--pmf {output.pmf} {input} > {output.est}"
+        "--pmf {output.pmf} {inputs} > {output.est}")
 
 
 rule plot_multidiffexp:
