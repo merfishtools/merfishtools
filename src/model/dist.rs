@@ -19,11 +19,15 @@ impl<T: PartialOrd> CDF<T> {
     /// the probabilities of which are summed during generation of the CDF.
     pub fn from_pmf(mut entries: Vec<(T, LogProb)>) -> Self {
         entries.sort_by(|&(ref a, _), &(ref b, _)| a.partial_cmp(b).unwrap());
-        let mut entries = entries.into_iter();
-        let mut inner = vec![entries.next().unwrap()];
-        for mut e in entries {
-            let p = logprobs::add(inner.last().unwrap().1, e.1);
-            if inner.last().unwrap().0 == e.0 {
+        let mut inner: Vec<(T, LogProb)> = Vec::new();
+        let mut last_prob = f64::NEG_INFINITY;
+        for mut e in entries.into_iter() {
+            let p = logprobs::add(last_prob, e.1);
+            if p == last_prob {
+                continue;
+            }
+            last_prob = p;
+            if !inner.is_empty() && inner.last().unwrap().0 == e.0 {
                 inner.last_mut().unwrap().1 = p;
             }
             else {
