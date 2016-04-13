@@ -8,6 +8,7 @@ pub type CDF = model::dist::CDF<CV>;
 pub fn cdf(cdfs: &[model::expressionset::CDF]) -> CDF {
     //let test = model::meanvar::cdf(cdfs, |mean, var| (var.sqrt(), mean));
     //debug!("{:?}", test);
+    println!("{:?}", cdfs);
     model::meanvar::cdf(cdfs, |mean, var| var.sqrt() / mean)
 }
 
@@ -54,5 +55,6 @@ mod tests {
         assert!(total <= 0.0);
         assert_relative_eq!(total, 0.0, epsilon = 0.0002);
         assert_relative_eq!(cdf.expected_value(), 1.14, epsilon = 0.02);
+        assert!(false);
     }
 }
