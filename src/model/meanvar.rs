@@ -35,7 +35,6 @@ pub fn cdf<T: PartialOrd, F: Fn(f64, f64) -> T>(cdfs: &[model::dist::CDF<f64>], 
 
     for (k, cdf) in cdfs.iter().enumerate().skip(1) {
         let k = k as f64 + 1.0;
-        debug!("cell CDF {:?}", cdf);
 
         curr = Vec::new();
         for (&(m, s), p) in prev.iter_pmf() {
