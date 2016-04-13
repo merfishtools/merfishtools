@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from mpl_toolkits.axes_grid.inset_locator import inset_axes
 
+import merfishtools
 
 sns.set(style="ticks", context=snakemake.wildcards.context)
 sns.set_palette("Dark2", n_colors=7)
@@ -17,10 +18,10 @@ plt.figure(figsize=figsize)
 exprs = [pd.read_table(f, index_col=0).stack(0) for f in snakemake.input.exprs]
 exprs = pd.concat(exprs, keys=snakemake.params.expmnts)
 
-diffexp = pd.read_table(snakemake.input.diffexp, index_col=0)
+diffexp = merfishtools.read_diffexp_estimates(snakemake.input.diffexp)
 diffexp.sort_values("cv_ev", inplace=True)
 
-pmfs = pd.read_table(snakemake.input.diffexp_pmf, index_col=0)
+cdfs = merfishtools.read_cdf(snakemake.input.diffexp_cdf)
 
 significant = diffexp[diffexp["diff_fdr"] <= 0.05]
 significant = significant[~significant.index.str.startswith("blank") & ~significant.index.str.startswith("notarget")]
@@ -42,26 +43,15 @@ for i, (gene, gene_exprs) in enumerate(exprs.groupby(level=1)):
 
     # plot cdf
     cdf_ax = inset_axes(ax, width="30%", height=0.5, loc=1)
-    pmf = pmfs.loc[gene]
-    cdf = np.cumsum(np.exp(pmf["prob"]))
-    plt.step(pmf["cv"], cdf, "k-", clip_on=False, zorder=6)
-    ylim = plt.ylim()
+    cdf = cdfs.loc[gene]
     est = significant.loc[gene]
-
-    ev = est["cv_ev"]
-    ci_lower, ci_upper = est[["cv_ci_lower", "cv_ci_upper"]]
-
-    plt.fill([ci_lower, ci_upper, ci_upper, ci_lower], [0, 0, ylim[1], ylim[1]], "red", lw=0, label="95% credible interval", alpha=0.5)
-    plt.vlines([ev], *ylim, colors="red", linestyles="-", label="expected value")
-
-    plt.fill_between(pmf["cv"], cdf, 1.2,  zorder=5, facecolor="white", edgecolor="white", step="pre")
-    plt.ylim(ylim)
-    #plt.xlim((0, plt.xlim()[1]))
+    
+    merfishtools.plot_cdf(cdf, expected_value=est["cv_ev"], credible_interval=est[["cv_ci_lower", "cv_ci_upper"]], legend=False)
+    
     plt.setp(cdf_ax.get_xticklabels(), rotation=45, ha="right")
     cdf_ax.tick_params(pad=1)
     plt.locator_params(nbins=4)
     sns.despine()
-    
 
 plt.tight_layout()
 plt.savefig(snakemake.output[0], bbox_inches="tight")
