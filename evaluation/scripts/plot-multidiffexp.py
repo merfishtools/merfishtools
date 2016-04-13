@@ -55,13 +55,13 @@ for i, (gene, gene_exprs) in enumerate(exprs.groupby(level=1)):
     plt.vlines([ev], *ylim, colors="red", linestyles="-", label="expected value")
 
     plt.fill_between(pmf["cv"], cdf, 1.2,  zorder=5, facecolor="white", edgecolor="white", step="pre")
-    plt.ylim(ylim)
+    plt.ylim(ylim)  
     #plt.xlim((0, plt.xlim()[1]))
     plt.setp(cdf_ax.get_xticklabels(), rotation=45, ha="right")
     cdf_ax.tick_params(pad=1)
     plt.locator_params(nbins=4)
     sns.despine()
-    
+
 
 plt.tight_layout()
 plt.savefig(snakemake.output[0], bbox_inches="tight")

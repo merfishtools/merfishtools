@@ -4,10 +4,8 @@ pub type MeanExpression = f64;
 pub type CDF = model::dist::CDF<MeanExpression>;
 
 
-pub fn cdf(expression_pmfs: &[model::expression::CDF], pseudocounts: f64) -> CDF {
-    let test = model::meanvar::cdf(expression_pmfs, |mean, var| (mean, var));
-    println!("DEBUG {}", test.total_prob());
-    model::meanvar::cdf(expression_pmfs, |mean, _| mean + pseudocounts)
+pub fn cdf(expression_cdfs: &[model::expression::CDF], pseudocounts: f64) -> CDF {
+    model::meanvar::cdf(expression_cdfs, |mean, _| mean + pseudocounts)
 }
 
 
