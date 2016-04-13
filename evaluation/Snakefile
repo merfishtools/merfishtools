@@ -144,11 +144,10 @@ rule multidiffexp:
     benchmark:
         "bench/multidiffexp/{dataset}.{settings}.txt"
     threads: 24
-    run:
-        #inputs = expand("<(grep MALAT1 {f})", f=input)
-        shell("{merfishtools} --debug multidiffexp --pseudocounts 1 "
+    shell:
+        "{merfishtools} --debug multidiffexp --pseudocounts 1 "
         "-t {threads} --max-null-cv 0.5 "
-        "--pmf {output.pmf} {input} > {output.est}")
+        "--pmf {output.pmf} {input} > {output.est}"
 
 
 rule plot_multidiffexp:
