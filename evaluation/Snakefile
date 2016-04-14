@@ -163,6 +163,15 @@ rule plot_multidiffexp:
        "scripts/plot-multidiffexp.py"
 
 
+rule enrichment:
+    input:
+        "multidiffexp/{dataset}.{settings}.est.txt"
+    output:
+        "results/paper/{dataset}.{settings}.go_enrichment.txt"
+    script:
+        "scripts/go-enrichment.R"
+
+
 rule plot_expression_pmf:
     input:
         expr="expressions/{dataset}.{experiment}.{group}.{settings}.txt",
