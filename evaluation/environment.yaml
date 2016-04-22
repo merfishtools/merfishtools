@@ -21,6 +21,7 @@ dependencies:
 - bioconductor-multtest=2.26.0=0
 - bioconductor-org.hs.eg.db=3.2.3=0
 - bioconductor-rbgl=1.46.0=r3.2.2_0
+- bioconductor-rgraphviz=2.14.0=0
 - bioconductor-s4vectors=0.8.7=0
 - bison=3.0.4=2
 - bitarray=0.8.1=py35_0

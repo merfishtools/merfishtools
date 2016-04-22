@@ -167,7 +167,8 @@ rule enrichment:
     input:
         "multidiffexp/{dataset}.{settings}.est.txt"
     output:
-        "results/paper/{dataset}.{settings}.go_enrichment.txt"
+        table="results/paper/{dataset}.{settings}.go_enrichment.txt",
+        graph="results/paper/{dataset}.{settings}.go_enrichment.pdf"
     script:
         "scripts/go-enrichment.R"
 

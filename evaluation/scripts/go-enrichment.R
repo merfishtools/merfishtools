@@ -5,7 +5,6 @@ library("org.Hs.eg.db")
 library("mutoss")
 
 est <- read.table(snakemake@input[[1]], header = TRUE, stringsAsFactors = FALSE)
-print(head(est$feat))
 
 # translate gene names to entrez ids
 ensembl = useMart("ensembl",dataset="hsapiens_gene_ensembl")
@@ -16,8 +15,6 @@ est$entrez <- ids[est$feat, "entrezgene"]
 # define foreground genes
 significant <- est$diff_fdr <= 0.05
 foreground <- est[significant, ]
-
-print(head(foreground$entrez))
 
 # define test parameters
 params <- new("GOHyperGParams",
@@ -31,7 +28,17 @@ params <- new("GOHyperGParams",
 results <- hyperGTest(params)
 goterms <- summary(results)
 
+# correct for multiple testing. We use Benjamini-Yekuteli here, because the performed tests are strongly dependent
 by <- BY(goterms$Pvalue, 0.05)
 goterms$adjPvalue <- by[["adjPValues"]]
 
-write.table(goterms, file = snakemake@output[[1]], row.names = FALSE, quote = FALSE, sep = "\t")
+# Compute the DAG of significant go terms
+graph <- inducedTermGraph(results, id = goterms[goterms$adjPvalue <= 0.05, ]$GOBPID)
+
+# Plot the DAG.
+pdf(snakemake@output[["graph"]])
+plotGOTermGraph(graph, results)
+dev.off()
+
+
+write.table(goterms, file = snakemake@output[["table"]], row.names = FALSE, quote = FALSE, sep = "\t")
