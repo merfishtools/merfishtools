@@ -1,3 +1,8 @@
+// Copyright 2016 Johannes Köster.
+// Licensed under the MIT license (http://opensource.org/licenses/MIT)
+// This file may not be copied, modified, or distributed
+// except according to those terms.
+
 use std::io;
 use std::fs;
 use std::path::Path;
@@ -7,6 +12,7 @@ use csv;
 use itertools::Itertools;
 use bio::alignment::distance;
 
+/// A codebook record.
 #[derive(RustcDecodable)]
 pub struct Record {
     pub feature: String,
@@ -15,6 +21,7 @@ pub struct Record {
 }
 
 
+/// Codebook representation.
 pub struct Codebook {
     inner: HashMap<String, [u32; 4]>
 }
@@ -28,6 +35,7 @@ impl Codebook {
 }
 
 
+/// Reader for codebook definitions.
 pub struct Reader<R: io::Read> {
     inner: csv::Reader<R>,
     dist: u8

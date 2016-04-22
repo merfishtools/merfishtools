@@ -1,3 +1,8 @@
+// Copyright 2016 Johannes Köster.
+// Licensed under the MIT license (http://opensource.org/licenses/MIT)
+// This file may not be copied, modified, or distributed
+// except according to those terms.
+
 use std::io;
 use std::fs;
 use std::path::Path;
@@ -5,6 +10,7 @@ use std::path::Path;
 use csv;
 
 
+/// A 2D position in the microscope.
 #[derive(RustcDecodable)]
 pub struct Position {
     pub x: f32,
@@ -12,6 +18,7 @@ pub struct Position {
 }
 
 
+/// A MERFISH raw data record.
 #[derive(RustcDecodable)]
 pub struct Record {
     pub cell_id: String,
@@ -22,6 +29,7 @@ pub struct Record {
 }
 
 
+/// A reader for MERFISH raw data.
 pub struct Reader<R: io::Read> {
     inner: csv::Reader<R>
 }

@@ -1,3 +1,8 @@
+// Copyright 2016 Johannes Köster.
+// Licensed under the MIT license (http://opensource.org/licenses/MIT)
+// This file may not be copied, modified, or distributed
+// except according to those terms.
+
 use std::io;
 use std::fs;
 use std::path::Path;
@@ -9,6 +14,7 @@ use bio::stats::logprobs::LogProb;
 use model;
 
 
+/// A writer for differential expression estimates.
 pub struct Writer<W: io::Write> {
     inner: csv::Writer<W>
 }

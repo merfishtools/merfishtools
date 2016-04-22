@@ -1,3 +1,8 @@
+// Copyright 2016 Johannes Köster.
+// Licensed under the MIT license (http://opensource.org/licenses/MIT)
+// This file may not be copied, modified, or distributed
+// except according to those terms.
+
 use model;
 
 
@@ -5,6 +10,7 @@ pub type CV = f64;
 pub type CDF = model::dist::CDF<CV>;
 
 
+/// Calculate CDF for differential expression.
 pub fn cdf(cdfs: &[model::expressionset::CDF]) -> CDF {
     model::meanvar::cdf(cdfs, |mean, var| var.sqrt() / mean).reduce().sample(100)
 }
