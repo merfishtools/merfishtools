@@ -1,3 +1,8 @@
+// Copyright 2016 Johannes Köster.
+// Licensed under the MIT license (http://opensource.org/licenses/MIT)
+// This file may not be copied, modified, or distributed
+// except according to those terms.
+
 use std::f64;
 use std::iter;
 use std::slice;
@@ -8,6 +13,7 @@ use itertools::Itertools;
 use bio::stats::logprobs::{self, LogProb};
 
 
+/// Implementation of a cumulative distribution function.
 #[derive(Debug, Clone)]
 pub struct CDF<T: PartialOrd> {
     inner: Vec<(T, LogProb)>

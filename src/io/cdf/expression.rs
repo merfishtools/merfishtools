@@ -1,3 +1,8 @@
+// Copyright 2016 Johannes Köster.
+// Licensed under the MIT license (http://opensource.org/licenses/MIT)
+// This file may not be copied, modified, or distributed
+// except according to those terms.
+
 use std::io;
 use std::fs;
 use std::path::Path;
@@ -14,6 +19,7 @@ use model::expression::CDF;
 const HEADER: [&'static str; 4] = ["cell", "feat", "expr", "prob"];
 
 
+/// A container for feature expression CDFs from multiple cells.
 pub struct CDFs {
     inner: collections::HashMap<String, Vec<CDF>>
 }
@@ -42,6 +48,7 @@ impl CDFs {
 }
 
 
+/// A CDF record.
 #[derive(RustcDecodable, RustcEncodable)]
 pub struct Record {
     pub cell: String,
@@ -51,6 +58,7 @@ pub struct Record {
 }
 
 
+/// A reader for feature expression CDFs.
 pub struct Reader<R: io::Read> {
     inner: csv::Reader<R>
 }

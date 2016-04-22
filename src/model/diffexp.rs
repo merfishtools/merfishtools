@@ -1,3 +1,8 @@
+// Copyright 2016 Johannes Köster.
+// Licensed under the MIT license (http://opensource.org/licenses/MIT)
+// This file may not be copied, modified, or distributed
+// except according to those terms.
+
 use bio::stats::logprobs::LogProb;
 
 use model;
@@ -6,7 +11,7 @@ pub type DiffexpMeasure = f64;
 pub type CDF = model::dist::CDF<DiffexpMeasure>;
 
 
-/// An estimate of differential expression
+/// An estimate of differential expression.
 pub struct Estimate {
     pub differential_expression_pep: LogProb,
     pub differential_expression_bf: f64,
