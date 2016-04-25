@@ -38,6 +38,7 @@ rule all:
         expand("figures/fig_example_{gene}.pdf", gene=config["genes"]),
         "figures/fig_simulation.pdf",
         expand("figures/fig_{dataset}.{type}.clustering.pdf", dataset=datasets, type=types),
+        expand("figures/fig_{dataset}.multidiffexp.pdf", dataset=datasets),
         expand("results/{context}/{dataset}.{type}.default.qqplot.pdf", context="paper", dataset=datasets, type=types)
 
 
@@ -452,23 +453,11 @@ rule figure_clustering:
 
 rule figure_multidiffexp:
     input:
-        a="results/paper/{dataset}.default.diffexp.svg",
-        b="results/paper/{dataset}.default.go_enrichment.svg"
+        "results/paper/{dataset}.default.diffexp.svg",
     output:
         "figures/fig_{dataset}.multidiffexp.svg"
-    run:
-        import svgutils.transform as sg
-        fig = sg.SVGFigure("8in", "5in")
-        a = sg.fromfile(input.a).getroot()
-        b = sg.fromfile(input.b).getroot()
-
-        b.moveto(180, 288)
-
-        la = sg.TextElement(0,10, "a", size=12, weight="bold")
-        lb = sg.TextElement(180, 298, "b", size=12, weight="bold")
-
-        fig.append([a, b, la, lb])
-        fig.save(output[0])
+    shell:
+        "cp {input} {output}"
 
 
 rule convert_svg:
