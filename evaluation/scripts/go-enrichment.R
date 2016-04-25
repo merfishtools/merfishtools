@@ -32,13 +32,4 @@ goterms <- summary(results)
 by <- BY(goterms$Pvalue, 0.05)
 goterms$adjPvalue <- by[["adjPValues"]]
 
-# Compute the DAG of significant go terms
-graph <- inducedTermGraph(results, id = goterms[goterms$adjPvalue <= 0.05, ]$GOBPID)
-
-# Plot the DAG.
-pdf(snakemake@output[["graph"]])
-plotGOTermGraph(graph, results)
-dev.off()
-
-
 write.table(goterms, file = snakemake@output[["table"]], row.names = FALSE, quote = FALSE, sep = "\t")

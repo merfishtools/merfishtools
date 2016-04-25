@@ -167,10 +167,18 @@ rule enrichment:
     input:
         "multidiffexp/{dataset}.{settings}.est.txt"
     output:
-        table="results/paper/{dataset}.{settings}.go_enrichment.txt",
-        graph="results/paper/{dataset}.{settings}.go_enrichment.pdf"
+        table="results/paper/{dataset}.{settings}.go_enrichment.txt"
     script:
         "scripts/go-enrichment.R"
+
+
+rule plot_enrichment:
+    input:
+        "results/paper/{dataset}.{settings}.go_enrichment.txt"
+    output:
+        "results/{context}/{dataset}.{settings}.go_enrichment.svg"
+    script:
+        "scripts/plot-go-enrichment.py"
 
 
 rule plot_expression_pmf:
@@ -439,6 +447,27 @@ rule figure_clustering:
         ld = sg.TextElement(650,10, "d", size=12, weight="bold")
 
         fig.append([a, b, c, d, la, lb, lc, ld])
+        fig.save(output[0])
+
+
+rule figure_multidiffexp:
+    input:
+        a="results/paper/{dataset}.default.diffexp.svg",
+        b="results/paper/{dataset}.default.go_enrichment.svg"
+    output:
+        "figures/fig_{dataset}.multidiffexp.svg"
+    run:
+        import svgutils.transform as sg
+        fig = sg.SVGFigure("8in", "5in")
+        a = sg.fromfile(input.a).getroot()
+        b = sg.fromfile(input.b).getroot()
+
+        b.moveto(180, 288)
+
+        la = sg.TextElement(0,10, "a", size=12, weight="bold")
+        lb = sg.TextElement(180, 298, "b", size=12, weight="bold")
+
+        fig.append([a, b, la, lb])
         fig.save(output[0])
 
 
