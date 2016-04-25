@@ -33,7 +33,7 @@ for i, (gene, gene_exprs) in enumerate(exprs.groupby(level=1)):
     vmax = gene_exprs.quantile(0.95)
     ax = plt.subplot(4, 4, i + 1)
     for _, exp_exprs in gene_exprs.groupby(level=0):
-        sns.kdeplot(exp_exprs, ax=ax, linewidth=1, alpha=0.5)
+        ax = sns.kdeplot(exp_exprs, ax=ax, linewidth=1, alpha=0.5, clip=(0, vmax), clip_on=True)
     if i == n - 1:
         plt.xlabel("gene expression")
     plt.ylabel(gene)

@@ -158,7 +158,7 @@ rule plot_multidiffexp:
        exprs=partial(multidiffexp_input, matrix=True),
        diffexp_cdf="multidiffexp/{dataset}.{settings}.txt"
     output:
-       "results/{context}/{dataset}.{settings}.diffexp.svg"
+       "results/{context}/{dataset}.{settings}.diffexp.pdf"
     params:
        expmnts=lambda wildcards: experiments(wildcards.dataset)
     script:
@@ -454,9 +454,9 @@ rule figure_clustering:
 
 rule figure_multidiffexp:
     input:
-        "results/paper/{dataset}.default.diffexp.svg",
+        "results/paper/{dataset}.default.diffexp.pdf",
     output:
-        "figures/fig_{dataset}.multidiffexp.svg"
+        "figures/fig_{dataset}.multidiffexp.pdf"
     shell:
         "cp {input} {output}"
 
