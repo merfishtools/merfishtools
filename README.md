@@ -6,4 +6,7 @@ On top, they provide Bayesian mechanisms for differential expression analysis ov
 ## Author
 
 [Johannes Köster](https://johanneskoester.bitbucket.org)  
-[X. Shirley Liu Lab, Department of Biostatistics and Computational Biology, Dana-Farber Cancer Institute, Harvard School of Public Health](http://liulab.dfci.harvard.edu)
+[X. Shirley Liu Lab  
+Department of Biostatistics and Computational Biology  
+Dana-Farber Cancer Institute  
+Harvard School of Public Health](http://liulab.dfci.harvard.edu)
