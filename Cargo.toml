@@ -1,6 +1,6 @@
 [package]
 name = "merfishtools"
-version = "1.0.0"
+version = "0.9.1"
 authors = ["Johannes Koester <johannes.koester@tu-dortmund.de>"]
 
 [dependencies]
