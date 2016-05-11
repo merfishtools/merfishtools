@@ -5,6 +5,8 @@
 MERFISHtools implement a Bayesian framework for accurately predicting gene or trascript expression from MERFISH data.
 On top, they provide Bayesian mechanisms for differential expression analysis over two or mutliple conditions.
 
+For further information and installation instructions, visit https://merfishtools.github.io.
+
 ## Author
 
 [Johannes Köster](https://johanneskoester.bitbucket.org)
