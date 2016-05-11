@@ -1,5 +1,6 @@
 # MERFISHtools, a Bayesian framework for gene expression analysis in MERFISH data
 
+[![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat-square)](http://bioconda.github.io/recipes/merfishtools/README.html)
 [![Travis](https://img.shields.io/travis/merfishtools/merfishtools.svg?style=flat-square)](https://travis-ci.org/merfishtools/merfishtools)
 
 MERFISHtools implement a Bayesian framework for accurately predicting gene or trascript expression from MERFISH data.
