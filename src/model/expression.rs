@@ -36,20 +36,12 @@ pub fn cdf(feature: &str, count: u32, count_exact: u32, model: &Box<model::reado
 mod tests {
     #![allow(non_upper_case_globals)]
 
-    use itertools::Itertools;
     use nalgebra::ApproxEq;
-    use bio::stats::logprobs;
-    use bio::stats::logprobs::Prob;
 
     use super::*;
     use model;
     use io;
 
-
-    const N: u8 = 16;
-    const m: u8 = 4;
-    const p0: Prob = 0.04;
-    const p1: Prob = 0.1;
     const GENE: &'static str = "COL5A1";
 
     fn setup() -> Box<model::readout::Model> {
@@ -84,10 +76,8 @@ mod tests {
 
     #[test]
     fn test_cdf3() {
-        let total = 100;
         let calls = 40;
         let miscalls = 8;
-        let missed = 52;
         let count = calls + miscalls;
 
         let readout = setup_mhd2();

@@ -13,20 +13,11 @@ pub fn cdf(expression_cdfs: &[model::expression::CDF], pseudocounts: f64) -> CDF
 mod tests {
     #![allow(non_upper_case_globals)]
 
-    use itertools::Itertools;
-    use nalgebra::ApproxEq;
-    use bio::stats::logprobs;
-    use bio::stats::logprobs::Prob;
-
     use super::*;
     use model;
     use io;
 
 
-    const N: u8 = 16;
-    const m: u8 = 4;
-    const p0: Prob = 0.04;
-    const p1: Prob = 0.1;
     const GENE: &'static str = "COL5A1";
 
     fn setup() -> Box<model::readout::Model> {

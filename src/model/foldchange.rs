@@ -31,18 +31,9 @@ mod tests {
     #![allow(non_upper_case_globals)]
     use super::*;
 
-    use itertools::Itertools;
-    use nalgebra::ApproxEq;
-    use bio::stats::logprobs;
-    use bio::stats::logprobs::Prob;
-
     use model;
     use io;
 
-    const N: u8 = 16;
-    const m: u8 = 4;
-    const p0: Prob = 0.04;
-    const p1: Prob = 0.1;
     const GENE: &'static str = "COL5A1";
 
     fn setup() -> Box<model::readout::Model> {

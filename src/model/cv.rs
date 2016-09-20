@@ -20,9 +20,6 @@ pub fn cdf(cdfs: &[model::expressionset::CDF]) -> CDF {
 mod tests {
     use super::*;
 
-    use itertools::Itertools;
-    use bio::stats::logprobs;
-
     use model;
     use io;
 
