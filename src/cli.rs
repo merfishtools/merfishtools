@@ -56,7 +56,7 @@ struct Counts {
 
 
 /// Estimate expressions.
-pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &str, estimate_path: Option<String>, threads: usize, cells: &str, window_width: u32) {
+pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &str, estimate_path: Option<&str>, threads: usize, cells: &str, window_width: u32) {
     let codebook = io::codebook::Reader::from_file(codebook_path, dist).unwrap().codebook();
     let model = model::readout::new_model(N, m, p0, p1, dist, codebook);
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
@@ -129,7 +129,7 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &st
 
 
 /// Estimate differential expression over two conditions via fold changes.
-pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: Option<String>, max_fc: LogFC, pseudocounts: f64, threads: usize) {
+pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: Option<&str>, max_fc: LogFC, pseudocounts: f64, threads: usize) {
     assert!(pseudocounts > 0.0, "Pseudocounts must be > 0.0 for calculating fold changes.");
 
     let mut reader1 = io::cdf::expression::Reader::from_file(group1_path).expect("Invalid input for group 1.");
@@ -189,7 +189,7 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
 
 
 /// Estimate differential expression over multiple conditions via the coefficient of variation.
-pub fn multi_differential_expression(group_paths: &[String], pmf_path: Option<String>, max_cv: CV, pseudocounts: f64, threads: usize) {
+pub fn multi_differential_expression(group_paths: &[&str], pmf_path: Option<&str>, max_cv: CV, pseudocounts: f64, threads: usize) {
     let groups = group_paths.iter().enumerate().map(|(i, path)| {
         io::cdf::expression::Reader::from_file(path).expect(&format!("Invalid input for group {}.", i))
                                                     .cdfs()

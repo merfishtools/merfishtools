@@ -19,6 +19,7 @@ GSL = "0.4.25"
 ord_subset = "1.2.0"
 approx = "0.1.0"
 fnv = "1.0.2"
+clap = {version = "2.9.*", features = ["yaml", "color", "suggestions"]}
 
 [[bin]]
 name = "merfishtools"
