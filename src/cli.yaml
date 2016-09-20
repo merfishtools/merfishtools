@@ -3,167 +3,170 @@ author: Johannes Köster <johannes.koester@tu-dortmund.de>
 about: MERFISHtools implement a Bayesian framework for accurately predicting gene or transcript expression from MERFISH data. On top, differential expression analysis can be performed for two or multiple conditions, including credible intervals for fold change and coefficient of variation, and controlling the expected false discovery rate.
 
 settings:
-  - SubcommandRequired
+  - SubcommandRequiredElseHelp
 
 global_settings:
   - ColoredHelp
+  - DeriveDisplayOrder
 
 args:
   - verbose:
-    short: v
-    help: Provide verbose output.
+      short: v
+      help: Provide verbose output.
 
 subcommands:
 
   - exp:
-    about: |
-      For given MERFISH data, calculate expressions for each feature (e.g. gene or transcript) in each cell.
-      MERFISH data has to be provided at STDIN in tab separated columns:
+      about: Estimate expressions for each feature (e.g. gene or transcript) in each cell.
+      after_help: |
+        This command estimates expressions for each feature (e.g. gene or transcript) in each cell.
+        MERFISH data has to be provided at STDIN in tab separated columns:
 
-          cell
-          feature
-          hamming_dist
-          cell_position_x
-          cell_position_y
-          rna_position_x
-          rna_position_y
+        cell
+        feature
+        hamming_dist
+        cell_position_x
+        cell_position_y
+        rna_position_x
+        rna_position_y
 
-      Results are provided as PMF (probability mass function) in columns:
+        Results are provided as PMF (probability mass function) in columns:
 
-          cell
-          feature (e.g. gene, rna)
-          expression
-          posterior probability
+        cell
+        feature (e.g. gene, rna)
+        expression
+        posterior probability
 
-      Example usage:
+        Example usage:
 
         merfishtools exp codebook.txt < data.txt > expression.txt
-
-    args:
-      - codebook:
-        required: true
-        value_name: FILE
-        help: |
-          Path to codebook definition consisting of tab separated columns: feature, codeword, expressed.
-          The last column denotes if a codeword is assigned to e.g. a gene for which expression can be expected.
-          Unless you have misidentification probes (see Chen et al. Science 2015), you will have only ones in this column.
-      - estimate:
-        long: estimate
-        short: e
-        value_name: FILE
-        help: |
-          Path to write expected value and standard deviation estimates of expression to.
-          Output is formatted into columns: cell, feature, expected value, standard deviation
-      - N:
-        short: N
-        value_name: INT
-        help: Number of bits in readout, i.e., number of hybridization rounds [16].
-      - m:
-        short: m
-        value_name: INT
-        help: Number of 1-bits in readout [4].
-      - p0:
-        long: p0
-        value_name: FLOAT
-        help: Prior probability of 0->1 error [0.04]
-      - p1:
-        long: p1
-        value_name: FLOAT
-        help: Prior probability of 1->0 error [0.1]
-      - hamming-dist:
-        long: dist
-        value_name: INT
-        help: Minimum hamming distance between encodings [4].
-      - cells:
-        long: cells
-        value_name: REGEX
-        help: Regular expression to select cells from cell column (see above) [.*].
-      - pmf-window-width:
-        long: pmf-window-width
-        value_name: INT
-        help: Width of the window to calculate PMF for [100].
-      - threads:
-        long: threads
-        short: t
-        value_name: INT
-        help: Number of threads to use.
+      settings: ArgRequiredElseHelp
+      args:
+        - codebook:
+            required: true
+            value_name: FILE
+            help: "Path to codebook definition consisting of tab separated columns: feature, codeword, expressed. The last column denotes if a codeword is assigned to e.g. a gene for which expression can be expected. Unless you have misidentification probes (see Chen et al. Science 2015), you will have only ones in this column."
+        - estimate:
+            long: estimate
+            short: e
+            value_name: FILE
+            help: |
+              Path to write expected value and standard deviation estimates of expression to.
+              Output is formatted into columns: cell, feature, expected value, standard deviation
+        - N:
+            short: N
+            value_name: INT
+            help: Number of bits in readout, i.e., number of hybridization rounds [16].
+        - m:
+            short: m
+            value_name: INT
+            help: Number of 1-bits in readout [4].
+        - p0:
+            long: p0
+            value_name: FLOAT
+            help: Prior probability of 0->1 error [0.04]
+        - p1:
+            long: p1
+            value_name: FLOAT
+            help: Prior probability of 1->0 error [0.1]
+        - hamming-dist:
+            long: dist
+            value_name: INT
+            help: Minimum hamming distance between encodings [4].
+        - cells:
+            long: cells
+            value_name: REGEX
+            help: Regular expression to select cells from cell column (see above) [.*].
+        - pmf-window-width:
+            long: pmf-window-width
+            value_name: INT
+            help: Width of the window to calculate PMF for [100].
+        - threads:
+            long: threads
+            short: t
+            value_name: INT
+            help: Number of threads to use.
 
   - diffexp:
-    about: |
-      For given expression PMFs (generated with merfishtools exp), calculate differentially expressed features (e.g. genes or transcripts) between groups of cells given as separate input data.
-      Results are provided as columns:
+      about: Test for differential expression between two groups of cells.
+      after_help: |
+        This command calculates, for given expression PMFs (generated with merfishtools exp), differentially expressed features (e.g. genes or transcripts) between groups of cells given as separate input data.
+        Results are provided as columns:
 
-          feature (e.g. gene, rna)
-          posterior error probability (PEP) for differential expression
-          expected FDR when selecting all features down to the current
-          bayes factor (BF) for differential expression
-          expected log2 fold change of first vs second group
-          standard deviation of log2 fold change
-          lower and upper bound of 95% credible interval of log2 fold change
+        feature (e.g. gene, rna)
+        posterior error probability (PEP) for differential expression
+        expected FDR when selecting all features down to the current
+        bayes factor (BF) for differential expression
+        expected log2 fold change of first vs second group
+        standard deviation of log2 fold change
+        lower and upper bound of 95% credible interval of log2 fold change
 
-      Example usage:
+        Example usage:
 
         merfishtools diffexp data1.txt data2.txt > diffexp.txt
-    args:
-      - group1:
-        required: true
-        help: Path to expression PMFs for group of cells.
-      - group2:
-        required: true
-        help: Path to expression PMFs for group of cells.
-      - max-null-log2fc:
-        long: max-null-log2fc
-        value_name: FLOAT
-        help: Maximum absolute log2 fold change considered as no differential expression [1.0].
-      - pseudocounts:
-        long: pseudocounts
-        value_name: FLOAT
-        help: Pseudocounts to add to means before fold change calculation [1.0].
-      - cdf:
-        long: cdf
-        value_name: FILE
-        help: Path to write CDFs of log2 fold changes to.
-      - threads:
-        long: threads
-        short: t
-        value_name: INT
-        help: Number of threads to use.
+      settings: ArgRequiredElseHelp
+      args:
+        - group1:
+            required: true
+            help: Path to expression PMFs for group of cells.
+        - group2:
+            required: true
+            help: Path to expression PMFs for group of cells.
+        - max-null-log2fc:
+            long: max-null-log2fc
+            value_name: FLOAT
+            help: Maximum absolute log2 fold change considered as no differential expression [1.0].
+        - pseudocounts:
+            long: pseudocounts
+            value_name: FLOAT
+            help: Pseudocounts to add to means before fold change calculation [1.0].
+        - cdf:
+            long: cdf
+            value_name: FILE
+            help: Path to write CDFs of log2 fold changes to.
+        - threads:
+            long: threads
+            short: t
+            value_name: INT
+            help: Number of threads to use.
 
   - multidiffexp:
-    about: |
-      For given expression PMFs (obtained with merfishtools exp), calculate differentially expressed features (e.g. genes or transcripts) between groups of cells given as separate input data.
-      Results are provided as columns:
+      about: Test for differential expression between multiple groups of cells.
+      after_help: |
+        This command calculates, for given expression PMFs (obtained with merfishtools exp), differentially expressed features (e.g. genes or transcripts) between groups of cells given as separate input data.
+        Results are provided as columns:
 
-          feature (e.g. gene, rna)
-          posterior error probability (PEP) for differential expression
-          expected FDR when selecting all features down to the current
-          bayes factor (BF) for differential expression
-          expected coefficient of variation (CV)
-          standard deviation of CV
-          lower and upper bound of 95% credible interval of CV
+        feature (e.g. gene, rna)
+        posterior error probability (PEP) for differential expression
+        expected FDR when selecting all features down to the current
+        bayes factor (BF) for differential expression
+        expected coefficient of variation (CV)
+        standard deviation of CV
+        lower and upper bound of 95% credible interval of CV
 
-      Example
+        Example usage:
 
-      merfishtools multidiffexp data1.txt data2.txt data3.txt > diffexp.txt
-    args:
-      - groups:
-        required: true
-        multiple: true
-        help: Paths to expression PMFs for groups of cells.
-      - max-null-cv:
-        long: max-null-cv
-        value_name: FLOAT
-        help: Maximum coefficient of variation (CV) considered as no differential expression [0.5].
-      - pseudocounts:
-        long: pseudocounts
-        value_name: FLOAT
-        help: Pseudocounts to add to means before CV calculation [1.0].
-      - cdf:
-        long: cdf
-        value_name: FILE
-        help: Path to write CDFs of CVs to.
-      - threads:
-        long: threads
-        short: t
-        value_name: INT
-        help: Number of threads to use.
+        merfishtools multidiffexp data1.txt data2.txt data3.txt > diffexp.txt
+      settings: ArgRequiredElseHelp
+      args:
+        - groups:
+            required: true
+            multiple: true
+            help: Paths to expression PMFs for groups of cells.
+        - max-null-cv:
+            long: max-null-cv
+            value_name: FLOAT
+            help: Maximum coefficient of variation (CV) considered as no differential expression [0.5].
+        - pseudocounts:
+            long: pseudocounts
+            value_name: FLOAT
+            help: Pseudocounts to add to means before CV calculation [1.0].
+        - cdf:
+            long: cdf
+            value_name: FILE
+            help: Path to write CDFs of CVs to.
+        - threads:
+            long: threads
+            short: t
+            value_name: INT
+            help: Number of threads to use.
