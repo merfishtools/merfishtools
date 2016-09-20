@@ -9,8 +9,7 @@ use std;
 use std::collections;
 
 use itertools::Itertools;
-use simple_parallel;
-use crossbeam;
+use cue;
 use regex::Regex;
 
 use bio::stats::logprobs::Prob;
@@ -97,15 +96,19 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &st
         }
     }
 
-    let mut pool = simple_parallel::Pool::new(threads);
-    crossbeam::scope(|scope| {
-        for (_, (cell, cdfs)) in pool.unordered_map(scope, counts.into_iter(), |(cell, counts)| {
-            let pmfs = counts.into_iter().map(|(feature, count)| {
+
+    cue::pipeline(
+        "exp",
+        threads,
+        counts.into_iter(),
+        |(cell, counts)| {
+            let cdfs = counts.into_iter().map(|(feature, count)| {
                 let cdf = model::expression::cdf(&feature, count.exact + count.corrected, count.exact, &model, window_width);
                 (feature, cdf)
             }).collect_vec();
-            (cell, pmfs)
-        }) {
+            (cell, cdfs)
+        },
+        |(cell, cdfs)| {
             for (feature, cdf) in cdfs {
                 cdf_writer.write(&cell, &feature, &cdf);
 
@@ -121,7 +124,7 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &st
                 }
             }
         }
-    });
+    );
 }
 
 
@@ -139,10 +142,13 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
 
     let features = group1.features().filter(|f| group2.contains_feature(f)).cloned().collect_vec();
 
-    let mut pool = simple_parallel::Pool::new(threads);
     let mut estimates = Vec::new();
-    crossbeam::scope(|scope| {
-        for (_, (feature, cdf)) in pool.unordered_map(scope, features, |feature| {
+
+    cue::pipeline(
+        "diffexp",
+        threads,
+        features.iter(),
+        |feature| {
             info!("Calculating {}.", feature);
             let g1 = group1.get(&feature).unwrap();
             let g2 = group2.get(&feature).unwrap();
@@ -150,11 +156,9 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
                 &model::expressionset::cdf(&g1, pseudocounts),
                 &model::expressionset::cdf(&g2, pseudocounts)
             );
-            (
-                feature,
-                cdf
-            )
-        }) {
+            (feature, cdf)
+        },
+        |(feature, cdf)| {
             if cdf.iter().any(|&(_, prob)| prob.is_nan()) {
                 warn!("A CDF probability for feature {} cannot be estimated because counts are too high. It will be reported as NaN.", feature);
             }
@@ -164,7 +168,8 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
             }
             estimates.push((feature, cdf.estimate(max_fc)));
         }
-    });
+    );
+
     // calculate FDR and write estimates to STDOUT
     estimates.sort_by(|&(_, ref a), &(_, ref b)| a.differential_expression_pep.partial_cmp(&b.differential_expression_pep).unwrap());
     let expected_fds = logprobs::cumsum(estimates.iter().map(|&(_, ref a)| a.differential_expression_pep)).collect_vec();
@@ -204,18 +209,24 @@ pub fn multi_differential_expression(group_paths: &[String], pmf_path: Option<St
         }
     }
 
-    let mut pool = simple_parallel::Pool::new(threads);
     let mut estimates = Vec::new();
-    crossbeam::scope(|scope| {
-        for (_, (feature, cdf)) in pool.unordered_map(scope, features, |feature| {
+
+    cue::pipeline(
+        "multidiffexp",
+        threads,
+        features.iter(),
+        |feature| {
             info!("Calculating {}.", feature);
-            let cdfs = groups.iter().map(|group| model::expressionset::cdf(group.get(&feature).expect("Missing feature."), pseudocounts)).collect_vec();
+            let cdfs = groups.iter().map(|group| {
+                model::expressionset::cdf(
+                    group.get(&feature).expect("Missing feature."),
+                    pseudocounts
+                )
+            }).collect_vec();
             let cdf = model::cv::cdf(&cdfs);
-            (
-                feature,
-                cdf
-            )
-        }) {
+            (feature, cdf)
+        },
+        |(feature, cdf)| {
             if cdf.iter().any(|&(_, prob)| prob.is_nan()) {
                 warn!("A CDF probability for feature {} cannot be estimated due to numerical problems. It will be reported as NaN.", feature);
             }
@@ -225,7 +236,8 @@ pub fn multi_differential_expression(group_paths: &[String], pmf_path: Option<St
             }
             estimates.push((feature, cdf.estimate(max_cv)));
         }
-    });
+    );
+
     // calculate FDR and write estimates to STDOUT
     estimates.sort_by(|&(_, ref a), &(_, ref b)| a.differential_expression_pep.partial_cmp(&b.differential_expression_pep).unwrap());
     let expected_fds = logprobs::cumsum(estimates.iter().map(|&(_, ref a)| a.differential_expression_pep)).collect_vec();

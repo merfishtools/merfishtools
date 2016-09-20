@@ -233,12 +233,12 @@ mod tests {
     use io;
 
     fn setup_mhd4() -> Box<Model> {
-        new_model(16, 4, 0.04, 0.1, 4, io::codebook::Reader::from_file("evaluation/codebook/simulated-MHD4.txt", 4).unwrap().codebook())
+        new_model(16, 4, 0.04, 0.1, 4, io::codebook::Reader::from_file("test/codebook/simulated-MHD4.txt", 4).unwrap().codebook())
     }
 
 
     fn setup_mhd2() -> Box<Model> {
-        new_model(14, 4, 0.04, 0.1, 2, io::codebook::Reader::from_file("evaluation/codebook/simulated-MHD2.txt", 2).unwrap().codebook())
+        new_model(14, 4, 0.04, 0.1, 2, io::codebook::Reader::from_file("test/codebook/simulated-MHD2.txt", 2).unwrap().codebook())
     }
 
 
