@@ -19,6 +19,9 @@ extern crate ord_subset;
 #[macro_use]
 extern crate approx;
 extern crate fnv;
+extern crate bit_set;
+extern crate rand;
 
 pub mod model;
 pub mod io;
+pub mod codebook;
