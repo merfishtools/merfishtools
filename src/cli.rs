@@ -8,6 +8,7 @@
 use std;
 use std::collections;
 
+use csv;
 use itertools::Itertools;
 use cue;
 use regex::Regex;
@@ -19,6 +20,7 @@ use io;
 use model;
 use model::foldchange::LogFC;
 use model::cv::CV;
+use codebook;
 
 
 pub struct Selection {
@@ -252,5 +254,22 @@ pub fn multi_differential_expression(group_paths: &[&str], pmf_path: Option<&str
             estimate.standard_deviation,
             estimate.credible_interval
         );
+    }
+}
+
+
+pub fn gen_codebook(n: u8, m: u8, dist: u8) {
+    let mut reader = std::io::stdin();
+    let mut writer = csv::Writer::from_writer(std::io::stdout()).unwrap();
+    let words = codebook::generate(n, m, dist).into_iter();
+
+    loop {
+        match reader.next(), words.next() {
+            (Some(transcript), Some(w)) => {
+                writer.write(&[transcript, format!("{:016b}", w)]).unwrap();
+            },
+            (None, Some(_)) => return,
+            (Some(transcript), None) => panic!("Given parameters do not allow enough codewords.")
+        }
     }
 }

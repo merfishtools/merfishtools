@@ -170,3 +170,36 @@ subcommands:
             short: t
             value_name: INT
             help: Number of threads to use.
+
+    gen-codebook:
+      about: Generate MERFISH codebook with given parameters.
+      after_help: |
+        This command generates a random codebook with the given parameters.
+
+        Example usage:
+
+        merfishtools gen-codebook -N 16 -m 6 --dist 4
+      settings: ArgRequiredElseHelp
+      args:
+        - bits:
+            required: true
+            value_name: INT
+            short: N
+            long: bits
+            help: Number of bits (0-255).
+        - onebits:
+            required: true
+            value_name: INT
+            short: m
+            long: onebits
+            help: Number of 1-bits (0-255).
+        - dist:
+            required: true
+            value_name: INT
+            short: d
+            long: dist
+            help: Minimum distance between any pair of generated code words (0-255).
+        - seed:
+            value_name: INT
+            long: seed
+            help: Fix random seed to given value.

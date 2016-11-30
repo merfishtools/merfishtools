@@ -87,10 +87,11 @@ impl<R: io::Read> Reader<R> {
 
     pub fn cdfs(&mut self) -> CDFs {
         let mut features = collections::HashMap::new();
-        for ((_, feature), records) in self.inner.decode().map(|res| res.ok().expect("Error reading record")).group_by(
+        let mut groups = self.inner.decode().map(|res| res.ok().expect("Error reading record")).group_by(
             |rec: &Record| (rec.cell.clone(), rec.feature.clone())
-        ) {
-            let cdf = CDF::from_cdf(records.iter().map(|rec| {
+        );
+        for ((_, feature), records) in groups.into_iter() {
+            let cdf = CDF::from_cdf(records.map(|rec| {
                 (rec.expression.clone(), rec.prob.clone())
             }));
             let mut cdfs = features.entry(feature).or_insert(Vec::new());

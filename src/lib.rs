@@ -21,6 +21,7 @@ extern crate approx;
 extern crate fnv;
 extern crate bit_set;
 extern crate rand;
+extern crate ndarray;
 
 pub mod model;
 pub mod io;

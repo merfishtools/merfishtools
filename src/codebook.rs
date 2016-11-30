@@ -1,135 +1,61 @@
+
+use std::collections::VecDeque;
 use bit_set::BitSet;
 use rand;
 use rand::Rng;
 
+use itertools::Itertools;
+use ndarray::prelude::*;
 
-pub struct Generator {
-    n: u8,
-    m: u8,
-    dist: u8,
-    is_valid: BitSet,
-    visited: BitSet,
-    queue: Vec<u16>
-}
 
-impl Generator {
-    pub fn new(n: u8, m: u8, dist: u8) -> Self {
-        assert!(n <= 16);
-        assert!(dist % 2 == 0);
-        Generator {
-            n: n,
-            m: m,
-            dist: dist,
-            is_valid: BitSet::with_capacity(Self::calc_max_value(n, m) as usize + 1),
-            visited: BitSet::new(),
-            queue: Vec::new()
-        }
-    }
-
-    fn calc_max_value(n: u8, m: u8) -> u16 {
-        let ones = (1 << m as u16) - 1;
-        let max = ones << (n - m);
-        max
-        //(2usize.pow(n as u32) - 1) as u16
-    }
-
-    fn max_value(&self) -> u16 {
-        Self::calc_max_value(self.n, self.m)
-    }
-
-    pub fn generate(&mut self) {
-        self.is_valid.clear();
-        self.queue.clear();
-        let mut rng = rand::thread_rng();
-
-        // step 1: initialize bitset and queue with one entry for each possible codeword
-        for w in 0..self.max_value() + 1 {
-            let valid = w.count_ones() == self.m as u32;
-            if valid {
-                self.queue.push(w);
-                self.is_valid.insert(w as usize);
-            }
-        }
-        println!("{:?}", self.is_valid);
-        // step 2: shuffle queue
-        rng.shuffle(&mut self.queue);
-
-        let first = self.queue[self.queue.len() - 1];
-        while let Some(w) = self.queue.pop() {
-            // step 3: take random word
-            if !self.is_valid.contains(w as usize) {
-                // if word has been marked as invalid, skip it
-                continue;
-            }
-
-            // step 4: mark neighborhood as invalid
-            let dist = self.dist;
-            println!("w={:016b}, first={:016b}", w, first);
-            self.visited.clear();
-            self.mark_neighborhood(w, dist - 1);
-            assert!(self.is_valid.contains(first as usize));
-        }
-    }
-
-    pub fn iter(&self) -> CodebookIterator {
-        CodebookIterator { is_valid: &self.is_valid, w: 1 << self.m - 1, max_value: self.max_value() }
-    }
-
-    fn mark_neighborhood(&mut self, w: u16, max_dist: u8) {
-        if max_dist < 2 {
-            return;
-        }
-        self.visited.insert(w as usize);
-
-        for i in 0..self.n {
-            // swap two bits in order to keep m constant
-            // find 1-bit to remove
-            let ibit = 1 << i;
-            if w & ibit == 0 {
-                // continue if no 1-bit is removed
-                continue;
-            }
-            for j in 0..self.n {
-                // find 1-bit to add
-                let jbit = 1 << j;
-                if w & jbit > 0 {
-                    // continue if no 1-bit would be added
-                    continue;
-                }
-                let mut neighbor = w;
-                neighbor ^= ibit;
-                neighbor ^= jbit;
-                if !self.visited.contains(neighbor as usize) {
-                    self.is_valid.remove(neighbor as usize);
-                    self.mark_neighborhood(neighbor, max_dist - 2);
-                }
-            }
-        }
-    }
+pub fn count_ones<'a, I: Iterator<Item=&'a u8>>(bits: I) -> u8 {
+    bits.fold(0, |count, &b| count + b)
 }
 
 
-pub struct CodebookIterator<'a> {
-    is_valid: &'a BitSet,
-    w: u16,
-    max_value: u16
+pub fn generate_mhd4(m: u8) -> Vec<Vec<u8>> {
+    let gen_mat = Array::from_shape_vec((11, 16), vec![
+        1,0,1,0,1,1,0,0,0,0,0,0,0,0,0,0,
+        1,1,1,1,1,0,1,0,0,0,0,0,0,0,0,0,
+        1,1,0,1,0,0,0,1,0,0,0,0,0,0,0,0,
+        0,1,1,0,1,0,0,0,1,0,0,0,0,0,0,0,
+        1,0,0,1,1,0,0,0,0,1,0,0,0,0,0,0,
+        1,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,
+        0,1,1,1,0,0,0,0,0,0,0,1,0,0,0,0,
+        0,0,1,1,1,0,0,0,0,0,0,0,1,0,0,0,
+        1,0,1,1,0,0,0,0,0,0,0,0,0,1,0,0,
+        0,1,0,1,1,0,0,0,0,0,0,0,0,0,1,0,
+        1,1,0,0,1,0,0,0,0,0,0,0,0,0,0,1
+    ]).unwrap();
+
+    let mut words = Vec::new();
+    for i in 0..2u32.pow(11) - 1 {
+        let mut vec = Vec::new();
+        for j in 0..11 {
+            vec.push(((i >> j) & 1) as u8);
+        }
+        let vec = Array::from_shape_vec((1, 11), vec).unwrap();
+        let word = vec.dot(&gen_mat) % 2;
+
+        if count_ones(word.iter()) == m {
+            assert_eq!(word.shape(), &[1, 16]);
+            words.push(word.into_raw_vec());
+            //println!("{}", word.iter().map(|b| format!("{}", b)).join(""));
+        }
+    }
+
+    words
 }
 
 
-impl<'a> Iterator for CodebookIterator<'a> {
-    type Item = u16;
-
-    fn next(&mut self) -> Option<u16> {
-        while self.w < self.max_value {
-            let valid = self.is_valid.contains(self.w as usize);
-            let w = self.w;
-            self.w += 1;
-            if valid {
-                return Some(w);
-            }
+pub fn generate_mhd2(n: u8, m: u8) -> Vec<Vec<u8>> {
+    (0..n as usize).combinations(m as usize).map(|bits| {
+        let mut word = vec![0; n as usize];
+        for i in bits {
+            word[i] = 1;
         }
-        None
-    }
+        word
+    }).collect_vec()
 }
 
 
@@ -138,31 +64,53 @@ mod tests {
     use super::*;
     use itertools::Itertools;
 
-    #[test]
-    fn test_generate() {
-        let dist = 4;
-        let m = 6;
-        let n = 16;
-        let mut generator = Generator::new(n, m, dist);
-        generator.generate();
+    fn hamming_dist<'a, I: Iterator<Item=&'a u8>>(a: I, b: I) -> u8 {
+        a.zip(b).fold(0, |d, (&a, &b)| d + (if a != b {1} else {0}))
+    }
 
-        let words = generator.iter().collect_vec();
-        println!("{}", words.len());
-        assert!(words.len() > 0);
+
+    fn test_words(words: &[Vec<u8>], n: u8, m: u8, dist: u8) {
         for w in words.iter() {
-            assert_eq!(w.count_ones() as u8, m);
+            assert_eq!(count_ones(w.iter()) as u8, m);
+            assert_eq!(w.len(), n as usize);
+
         }
+
         let mut is_tight = false;
         for (a, b) in words.iter().cartesian_product(words.iter()) {
             if a == b {
                 continue;
             }
-            let d = (a ^ b).count_ones() as u8;
-            assert!(d >= dist);
-            if d == 4 {
+
+            let d = hamming_dist(a.iter(), b.iter());
+            assert!(d >= dist, format!("{} < {}", d, dist));
+            if d == dist {
                 is_tight = true;
             }
         }
         assert!(is_tight);
+    }
+
+
+    #[test]
+    fn test_generate_mhd2() {
+        let dist = 2;
+        let m = 4;
+        let n = 14;
+        let words = generate_mhd2(n, m);
+        assert_eq!(words.len(), 1001);
+        test_words(&words, n, m, dist);
+    }
+
+
+    #[test]
+    fn test_generate_mhd4() {
+        let dist = 4;
+        let m = 6;
+        let n = 16;
+        let words = generate_mhd4(m);
+        println!("{}", words.len());
+        assert_eq!(words.len(), 448);
+        test_words(&words, n, m, dist);
     }
 }

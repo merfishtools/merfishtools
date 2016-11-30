@@ -85,5 +85,14 @@ fn main() {
         let threads = value_t!(matches, "threads", usize).unwrap_or(1);
 
         cli::multi_differential_expression(&group_paths.collect_vec(), cdf_path, max_cv, pseudocounts, threads);
+    } else if let Some(matches) = matches.subcommand_matches("gen-codebook") {
+        let n = value_t!(matches, "bits", u8).unwrap();
+        let m = value_t!(matches, "onebits", u8).unwrap();
+        let dist = value_t!(matches, "dist", u8).unwrap();
+        let seed = value_t!(matches, "seed", usize).unwrap();
+
+        
+
+
     }
 }
