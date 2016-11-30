@@ -266,14 +266,18 @@ pub fn gen_codebook(words: &[codebook::Word]) -> Result<(), Box<Error>> {
     let mut writer = csv::Writer::from_writer(std::io::stdout());
     let mut words = words.iter();
 
-    loop {
+    for i in 1.. {
         match (reader.next(), words.next()) {
             (Some(transcript), Some(w)) => {
                 writer.write([try!(transcript), format!("{:?}", w)].into_iter()).unwrap();
             },
-            (None, Some(_)) => return Ok(()),
-            (Some(_), None) => panic!("Given parameters do not allow enough codewords."),
-            (None, None) => return Ok(())
+            (None, Some(_)) => break,
+            (Some(_), None) => {
+                error!("Not enough code words. Generated codebook for the first {} transcripts.", i);
+                break
+            },
+            (None, None) => break
         }
     }
+    Ok(())
 }
