@@ -171,14 +171,14 @@ subcommands:
             value_name: INT
             help: Number of threads to use.
 
-    gen-codebook:
-      about: Generate MERFISH codebook with given parameters.
+    gen-mhd4:
+      about: Generate MERFISH MHD4 codebook with given parameters.
       after_help: |
-        This command generates a random codebook with the given parameters.
+        This command generates a codebook with the given parameters.
 
         Example usage:
 
-        merfishtools gen-codebook -N 16 -m 6 --dist 4
+        merfishtools gen-mhd4 -m 6 > codebook.tsv
       settings: ArgRequiredElseHelp
       args:
         - bits:
@@ -186,20 +186,39 @@ subcommands:
             value_name: INT
             short: N
             long: bits
-            help: Number of bits (0-255).
+            help: Number of bits.
         - onebits:
             required: true
             value_name: INT
             short: m
             long: onebits
-            help: Number of 1-bits (0-255).
+            help: Number of 1-bits.
         - dist:
             required: true
             value_name: INT
             short: d
             long: dist
-            help: Minimum distance between any pair of generated code words (0-255).
-        - seed:
+            help: Minimum distance between any pair of generated code words (2 or 4).
+
+    gen-mhd2:
+      about: Generate MERFISH MHD2 codebook with given parameters.
+      after_help: |
+        This command generates a codebook with the given parameters.
+
+        Example usage:
+
+        merfishtools gen-mhd2 -m 8 -n 16 > codebook.tsv
+      settings: ArgRequiredElseHelp
+      args:
+        - bits:
+            required: true
             value_name: INT
-            long: seed
-            help: Fix random seed to given value.
+            short: N
+            long: bits
+            help: Number of bits.
+        - onebits:
+            required: true
+            value_name: INT
+            short: m
+            long: onebits
+            help: Number of 1-bits.

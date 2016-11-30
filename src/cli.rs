@@ -7,6 +7,8 @@
 
 use std;
 use std::collections;
+use std::io::prelude::*;
+use std::error::Error;
 
 use csv;
 use itertools::Itertools;
@@ -258,18 +260,20 @@ pub fn multi_differential_expression(group_paths: &[&str], pmf_path: Option<&str
 }
 
 
-pub fn gen_codebook(n: u8, m: u8, dist: u8) {
-    let mut reader = std::io::stdin();
-    let mut writer = csv::Writer::from_writer(std::io::stdout()).unwrap();
-    let words = codebook::generate(n, m, dist).into_iter();
+pub fn gen_codebook(words: &[codebook::Word]) -> Result<(), Box<Error>> {
+    let stdin = std::io::stdin();
+    let mut reader = stdin.lock().lines();
+    let mut writer = csv::Writer::from_writer(std::io::stdout());
+    let mut words = words.iter();
 
     loop {
-        match reader.next(), words.next() {
+        match (reader.next(), words.next()) {
             (Some(transcript), Some(w)) => {
-                writer.write(&[transcript, format!("{:016b}", w)]).unwrap();
+                writer.write([try!(transcript), format!("{:?}", w)].into_iter()).unwrap();
             },
-            (None, Some(_)) => return,
-            (Some(transcript), None) => panic!("Given parameters do not allow enough codewords.")
+            (None, Some(_)) => return Ok(()),
+            (Some(_), None) => panic!("Given parameters do not allow enough codewords."),
+            (None, None) => return Ok(())
         }
     }
 }
