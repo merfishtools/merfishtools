@@ -13,6 +13,7 @@ pub fn count_ones<'a, I: Iterator<Item=&'a u8>>(bits: I) -> u8 {
 }
 
 
+/// Generate MHD4 code with m 1-bits.
 pub fn generate_mhd4(m: u8) -> Vec<Vec<u8>> {
     let gen_mat = Array::from_shape_vec((11, 16), vec![
         1,0,1,0,1,1,0,0,0,0,0,0,0,0,0,0,
@@ -48,6 +49,7 @@ pub fn generate_mhd4(m: u8) -> Vec<Vec<u8>> {
 }
 
 
+/// Generate MHD2 code with n bits in total and m 1-bits.
 pub fn generate_mhd2(n: u8, m: u8) -> Vec<Vec<u8>> {
     (0..n as usize).combinations(m as usize).map(|bits| {
         let mut word = vec![0; n as usize];
