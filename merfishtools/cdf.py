@@ -15,7 +15,7 @@ def read_cdf(path_or_buffer):
 
 def plot_cdf(cdf, expected_value=None, credible_interval=None, legend=True):
     probs = np.exp(cdf.iloc[:, 1])
-    plt.step(cdf.iloc[:, 0], probs, "k-", label="", clip_on=False, zorder=6)
+    plt.step(cdf.iloc[:, 0], probs, "k-", label="", clip_on=False, zorder=2)
     ylim = plt.ylim()
     plot_estimate(ylim, expected_value, credible_interval, legend=legend)
     if credible_interval is not None or expected_value is not None:
@@ -26,7 +26,7 @@ def plot_cdf(cdf, expected_value=None, credible_interval=None, legend=True):
 def plot_pmf(cdf, expected_value=None, credible_interval=None, legend=True):
     probs = np.exp(cdf.iloc[:, 1])
     probs[1:] = probs[1:] - probs[:-1]
-    plt.plot(cdf.iloc[:, 0], probs, "ko", label="", ms=4, clip_on=False, zorder=6)
+    plt.plot(cdf.iloc[:, 0], probs, "ko", label="", ms=4, clip_on=False, zorder=2)
     ylim = plt.ylim()
     plot_estimate(ylim, expected_value, credible_interval, legend=legend)
     if credible_interval is not None or expected_value is not None:
@@ -35,5 +35,5 @@ def plot_pmf(cdf, expected_value=None, credible_interval=None, legend=True):
 
 
 def _mask_estimate(ylim, x, y, step=None):
-    plt.fill_between(x, y, ylim[1],  zorder=5, facecolor="white", edgecolor="white", step=step)
+    plt.fill_between(x, y, ylim[1],  zorder=1, facecolor="white", edgecolor="white", step=step, clip_on=True)
     plt.ylim(ylim)

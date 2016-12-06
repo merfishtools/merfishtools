@@ -265,11 +265,12 @@ pub fn gen_codebook(words: &[codebook::Word]) -> Result<(), Box<Error>> {
     let mut reader = stdin.lock().lines();
     let mut writer = csv::Writer::from_writer(std::io::stdout());
     let mut words = words.iter();
+    writer.write(["feat", "codeword", "expressed"].iter()).unwrap();
 
     for i in 1.. {
         match (reader.next(), words.next()) {
             (Some(transcript), Some(w)) => {
-                writer.write([try!(transcript), format!("{:?}", w)].into_iter()).unwrap();
+                writer.write([try!(transcript), format!("{:?}", w), "1".to_owned()].into_iter()).unwrap();
             },
             (None, Some(_)) => break,
             (Some(_), None) => {
