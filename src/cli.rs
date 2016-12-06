@@ -263,7 +263,7 @@ pub fn multi_differential_expression(group_paths: &[&str], pmf_path: Option<&str
 pub fn gen_codebook(words: &[codebook::Word]) -> Result<(), Box<Error>> {
     let stdin = std::io::stdin();
     let mut reader = stdin.lock().lines();
-    let mut writer = csv::Writer::from_writer(std::io::stdout());
+    let mut writer = csv::Writer::from_writer(std::io::stdout()).delimiter('\t');
     let mut words = words.iter();
     writer.write(["feat", "codeword", "expressed"].iter()).unwrap();
 
