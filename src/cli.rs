@@ -269,8 +269,13 @@ pub fn gen_codebook(words: &[codebook::Word]) -> Result<(), Box<Error>> {
 
     for i in 1.. {
         match (reader.next(), words.next()) {
-            (Some(transcript), Some(w)) => {
-                writer.write([try!(transcript), format!("{:?}", w), "1".to_owned()].into_iter()).unwrap();
+            (Some(feature), Some(w)) => {
+                let feature = try!(feature);
+                if feature.len() == 0 {
+                    // TODO proper error handling
+                    panic!("Empty feature found. All features provided at STDIN have to be non-empty.");
+                }
+                writer.write([feature, format!("{:?}", w), "1".to_owned()].into_iter()).unwrap();
             },
             (None, Some(_)) => break,
             (Some(_), None) => {
