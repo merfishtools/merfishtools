@@ -35,5 +35,5 @@ def plot_pmf(cdf, expected_value=None, credible_interval=None, legend=True):
 
 
 def _mask_estimate(ylim, x, y, step=None):
-    plt.fill_between(x, y, ylim[1],  zorder=1, facecolor="white", edgecolor="white", step=step, clip_on=True)
+    plt.fill_between(x, y, ylim[1],  zorder=2, facecolor="white", edgecolor="white", step=step)
     plt.ylim(ylim)
