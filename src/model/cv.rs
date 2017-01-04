@@ -30,6 +30,10 @@ mod tests {
         model::readout::new_model(16, 4, 0.04, 0.1, 4, io::codebook::Reader::from_file("test/codebook/140genesData.1.txt", 4).unwrap().codebook())
     }
 
+    fn setup_mhd2() -> Box<model::readout::Model> {
+        model::readout::new_model(14, 4, 0.04, 0.1, 2, io::codebook::Reader::from_file("test/codebook/1001genesData.txt", 2).unwrap().codebook())
+    }
+
     #[test]
     fn test_cdf() {
         let readout = setup();
@@ -82,5 +86,71 @@ mod tests {
         let cdf = cdf(&[cdf1, cdf2]);
 
         assert_relative_eq!(*cdf.map(), 0.0);
+    }
+
+    #[test]
+    fn test_ahnak2() {
+        let gene = "AHNAK2";
+        let readout = setup_mhd2();
+        // let mut cdfs1 = vec![
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 2, 2, &readout, 100),
+        //     model::expression::cdf(gene, 3, 3, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 2, 2, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 6, 6, &readout, 100),
+        //     model::expression::cdf(gene, 2, 2, &readout, 100),
+        //     model::expression::cdf(gene, 4, 4, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        // ];
+        // cdfs1.
+        // let mut cdfs2 = vec![
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 1, 1, &readout, 100),
+        //     model::expression::cdf(gene, 2, 2, &readout, 100)
+        // ];
+        let cdfs1 = io::cdf::expression::Reader::from_file("../merfishtools-evaluation/normalized_expressions/1001genesData.1.all.default.txt").unwrap().cdfs();
+        let cdfs2 = io::cdf::expression::Reader::from_file("../merfishtools-evaluation/normalized_expressions/1001genesData.2.all.default.txt").unwrap().cdfs();
+        let cdfs3 = io::cdf::expression::Reader::from_file("../merfishtools-evaluation/normalized_expressions/1001genesData.3.all.default.txt").unwrap().cdfs();
+
+        let cdfs1 = cdfs1.get("AHNAK2").unwrap();
+        let cdfs2 = cdfs2.get("AHNAK2").unwrap();
+        let cdfs3 = cdfs3.get("AHNAK2").unwrap();
+
+        let cdf1 = model::expressionset::cdf(&cdfs1, 1.0);
+        let cdf2 = model::expressionset::cdf(&cdfs2, 1.0);
+        let cdf3 = model::expressionset::cdf(&cdfs3, 1.0);
+        println!("{} {} {}", cdf1.map(), cdf2.map(), cdf3.map());
+        println!("{} {} {}", cdf1.expected_value(), cdf2.expected_value(), cdf3.expected_value());
+
+        let cdf = cdf(&[cdf1, cdf2]);
+        println!("{}", cdf.map());
+        println!("{}", cdf.expected_value());
+
+        println!("{:?}", cdf.estimate(0.5));
+
+        assert!(false);
     }
 }

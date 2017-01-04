@@ -12,6 +12,7 @@ pub type CDF = model::dist::CDF<DiffexpMeasure>;
 
 
 /// An estimate of differential expression.
+#[derive(Debug)]
 pub struct Estimate {
     pub differential_expression_pep: LogProb,
     pub differential_expression_bf: f64,
