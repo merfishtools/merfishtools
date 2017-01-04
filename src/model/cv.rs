@@ -131,9 +131,9 @@ mod tests {
         //     model::expression::cdf(gene, 1, 1, &readout, 100),
         //     model::expression::cdf(gene, 2, 2, &readout, 100)
         // ];
-        let cdfs1 = io::cdf::expression::Reader::from_file("../merfishtools-evaluation/normalized_expressions/1001genesData.1.all.default.txt").unwrap().cdfs();
-        let cdfs2 = io::cdf::expression::Reader::from_file("../merfishtools-evaluation/normalized_expressions/1001genesData.2.all.default.txt").unwrap().cdfs();
-        let cdfs3 = io::cdf::expression::Reader::from_file("../merfishtools-evaluation/normalized_expressions/1001genesData.3.all.default.txt").unwrap().cdfs();
+        let cdfs1 = io::cdf::expression::Reader::from_file("test/expression_cdf/1.txt").unwrap().cdfs();
+        let cdfs2 = io::cdf::expression::Reader::from_file("test/expression_cdf/2.txt").unwrap().cdfs();
+        let cdfs3 = io::cdf::expression::Reader::from_file("test/expression_cdf/3.txt").unwrap().cdfs();
 
         let cdfs1 = cdfs1.get("AHNAK2").unwrap();
         let cdfs2 = cdfs2.get("AHNAK2").unwrap();
