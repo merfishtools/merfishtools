@@ -30,10 +30,6 @@ mod tests {
         model::readout::new_model(16, 4, 0.04, 0.1, 4, io::codebook::Reader::from_file("test/codebook/140genesData.1.txt", 4).unwrap().codebook())
     }
 
-    fn setup_mhd2() -> Box<model::readout::Model> {
-        model::readout::new_model(14, 4, 0.04, 0.1, 2, io::codebook::Reader::from_file("test/codebook/1001genesData.txt", 2).unwrap().codebook())
-    }
-
     #[test]
     fn test_cdf() {
         let readout = setup();
@@ -90,8 +86,6 @@ mod tests {
 
     #[test]
     fn test_ahnak2() {
-        let gene = "AHNAK2";
-        let readout = setup_mhd2();
         // let mut cdfs1 = vec![
         //     model::expression::cdf(gene, 1, 1, &readout, 100),
         //     model::expression::cdf(gene, 1, 1, &readout, 100),
