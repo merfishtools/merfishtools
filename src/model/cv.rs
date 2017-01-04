@@ -12,7 +12,7 @@ pub type CDF = model::dist::CDF<CV>;
 
 /// Calculate CDF for differential expression.
 pub fn cdf(cdfs: &[model::expressionset::CDF]) -> CDF {
-    model::meanvar::cdf(cdfs, |mean, var| var.sqrt() / mean).reduce().sample(100)
+        model::meanvar::cdf(cdfs, |mean, var| var.sqrt() / mean).reduce().sample(100)
 }
 
 
@@ -86,45 +86,6 @@ mod tests {
 
     #[test]
     fn test_ahnak2() {
-        // let mut cdfs1 = vec![
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 2, 2, &readout, 100),
-        //     model::expression::cdf(gene, 3, 3, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 2, 2, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 6, 6, &readout, 100),
-        //     model::expression::cdf(gene, 2, 2, &readout, 100),
-        //     model::expression::cdf(gene, 4, 4, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        // ];
-        // cdfs1.
-        // let mut cdfs2 = vec![
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 1, 1, &readout, 100),
-        //     model::expression::cdf(gene, 2, 2, &readout, 100)
-        // ];
         let cdfs1 = io::cdf::expression::Reader::from_file("test/expression_cdf/1.txt").unwrap().cdfs();
         let cdfs2 = io::cdf::expression::Reader::from_file("test/expression_cdf/2.txt").unwrap().cdfs();
         let cdfs3 = io::cdf::expression::Reader::from_file("test/expression_cdf/3.txt").unwrap().cdfs();
@@ -139,12 +100,12 @@ mod tests {
         println!("{} {} {}", cdf1.map(), cdf2.map(), cdf3.map());
         println!("{} {} {}", cdf1.expected_value(), cdf2.expected_value(), cdf3.expected_value());
 
-        let cdf = cdf(&[cdf1, cdf2]);
+        let cdf = cdf(&[cdf1, cdf2, cdf3]);
         println!("{}", cdf.map());
         println!("{}", cdf.expected_value());
 
         println!("{:?}", cdf.estimate(0.5));
 
-        assert!(false);
+        // TODO add proper test case
     }
 }

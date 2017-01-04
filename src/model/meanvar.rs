@@ -52,3 +52,26 @@ pub fn cdf<T: PartialOrd, F: Fn(f64, f64) -> T>(cdfs: &[model::dist::CDF<f64>], 
     }).collect_vec();
     model::dist::CDF::from_pmf(pmf)
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use model::dist::CDF;
+
+    #[test]
+    fn test_cdf() {
+        let cdf1 = CDF::from_pmf(vec![(6.0, -1.0), (70.0, -0.45867514538708193)]);
+        let cdf2 = CDF::from_pmf(vec![(3.0, -1.0), (70.0, -0.45867514538708193)]);
+        let cdf3 = CDF::from_pmf(vec![(3.0, -1.0), (70.0, -0.45867514538708193)]);
+        println!("{}", cdf1.map());
+        println!("{}", cdf2.map());
+
+        let cdf = cdf(&[cdf1, cdf2, cdf3], |mean, _| mean);
+
+        println!("{:?}", cdf);
+        println!("{}", cdf.map());
+        println!("{}", cdf.expected_value());
+        assert_eq!(*cdf.map(), 70.0);
+    }
+}
