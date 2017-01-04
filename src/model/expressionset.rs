@@ -5,7 +5,8 @@ pub type CDF = model::dist::CDF<MeanExpression>;
 
 
 pub fn cdf(expression_cdfs: &[model::expression::CDF], pseudocounts: f64) -> CDF {
-    model::meanvar::cdf(expression_cdfs, |mean, _| mean + pseudocounts).reduce().sample(1000)
+    let cdf = model::meanvar::cdf(expression_cdfs, |mean, _| mean + pseudocounts);
+    cdf.reduce().sample(1000)
 }
 
 

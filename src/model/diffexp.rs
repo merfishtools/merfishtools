@@ -17,6 +17,7 @@ pub struct Estimate {
     pub differential_expression_bf: f64,
     pub expected_value: DiffexpMeasure,
     pub standard_deviation: DiffexpMeasure,
+    pub map: DiffexpMeasure,
     pub credible_interval: (DiffexpMeasure, DiffexpMeasure)
 }
 
@@ -42,6 +43,7 @@ impl CDF {
             differential_expression_bf: self.differential_expression_bf(max_fc),
             expected_value: self.expected_value(),
             standard_deviation: self.standard_deviation(),
+            map: *self.map(),
             credible_interval: (*ci_lower, *ci_upper)
         }
     }

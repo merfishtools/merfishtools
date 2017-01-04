@@ -40,6 +40,7 @@ impl<W: io::Write> Writer<W> {
             "diff_bf",
             &format!("{}_ev", measure_label)[..],
             &format!("{}_sd", measure_label)[..],
+            &format!("{}_map", measure_label)[..],
             &format!("{}_ci_lower", measure_label)[..],
             &format!("{}_ci_upper", measure_label)[..]
         ].iter()).unwrap();
@@ -55,6 +56,7 @@ impl<W: io::Write> Writer<W> {
         differential_expression_bf: model::BayesFactor,
         expected_value: model::diffexp::DiffexpMeasure,
         standard_deviation: model::diffexp::DiffexpMeasure,
+        map: model::diffexp::DiffexpMeasure,
         credible_interval: (model::diffexp::DiffexpMeasure, model::diffexp::DiffexpMeasure)
     ) {
         self.inner.write([
@@ -63,7 +65,8 @@ impl<W: io::Write> Writer<W> {
             &format!("{:.*e}", 2, fdr.exp())[..],
             &format!("{:.*}", 2, differential_expression_bf)[..],
             &format!("{:.*}", 2, expected_value)[..],
-            &format!("{:.*}", 4, standard_deviation)[..],
+            &format!("{:.*}", 2, standard_deviation)[..],
+            &format!("{:.*}", 2, map)[..],
             &format!("{:.*}", 2, credible_interval.0)[..],
             &format!("{:.*}", 2, credible_interval.1)[..]
         ].iter()).unwrap();

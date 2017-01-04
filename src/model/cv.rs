@@ -19,6 +19,7 @@ pub fn cdf(cdfs: &[model::expressionset::CDF]) -> CDF {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use itertools::Itertools;
 
     use model;
     use io;
@@ -56,5 +57,30 @@ mod tests {
         assert!(total <= 0.0);
         assert_relative_eq!(total, 0.0, epsilon = 0.0002);
         assert_relative_eq!(cdf.expected_value(), 1.14, epsilon = 0.02);
+    }
+
+    #[test]
+    fn test_zero_cv() {
+        let readout = setup();
+        let cdfs1 = [
+            model::expression::cdf(GENE, 5, 5, &readout, 100),
+            //model::expression::cdf(GENE, 5, 5, &readout, 100),
+            //model::expression::cdf(GENE, 5, 5, &readout, 100),
+            //model::expression::cdf(GENE, 5, 5, &readout, 100)
+        ];
+        let cdfs2 = [
+            model::expression::cdf(GENE, 5, 5, &readout, 100),
+            //model::expression::cdf(GENE, 5, 5, &readout, 100),
+            //model::expression::cdf(GENE, 5, 5, &readout, 100),
+            //model::expression::cdf(GENE, 5, 5, &readout, 100)
+        ];
+        let cdf1 = model::expressionset::cdf(&cdfs1, 0.0);
+        let cdf2 = model::expressionset::cdf(&cdfs2, 0.0);
+        println!("{} {}", cdfs1[0].expected_value(), cdfs2[0].expected_value());
+        println!("{:?}", cdf1.iter_pmf().collect_vec());
+
+        let cdf = cdf(&[cdf1, cdf2]);
+
+        assert_relative_eq!(*cdf.map(), 0.0);
     }
 }

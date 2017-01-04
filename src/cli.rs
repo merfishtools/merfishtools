@@ -186,6 +186,7 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
             estimate.differential_expression_bf,
             estimate.expected_value,
             estimate.standard_deviation,
+            estimate.map,
             estimate.credible_interval
         );
     }
@@ -254,6 +255,7 @@ pub fn multi_differential_expression(group_paths: &[&str], pmf_path: Option<&str
             estimate.differential_expression_bf,
             estimate.expected_value,
             estimate.standard_deviation,
+            estimate.map,
             estimate.credible_interval
         );
     }
