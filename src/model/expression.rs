@@ -10,7 +10,7 @@ pub type CDF = model::dist::CDF<f64>;
 
 pub fn cdf(feature: &str, count: u32, count_exact: u32, model: &Box<model::readout::Model>, window_width: u32) -> CDF {
     let readout_model = model::Readout::new(feature, model, window_width);
-    let (xmin, xmax) = readout_model.window(count);
+    let (xmin, xmax) = readout_model.window(count, count_exact);
     let likelihoods = (xmin..xmax + 1).map(|x| {
         readout_model.likelihood(x, count, count_exact)
     }).collect_vec();
@@ -71,7 +71,7 @@ mod tests {
         let total = cdf.total_prob();
         println!("{:?}", cdf);
         println!("{}", total);
-        assert!(total.approx_eq(&-0.0000029387441422557004));
+        assert!(total.approx_eq(&-0.0000013200381359975914));
     }
 
     #[test]

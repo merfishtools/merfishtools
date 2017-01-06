@@ -172,11 +172,23 @@ impl Readout {
         }
     }
 
-    pub fn window(&self, count: u32) -> (u32, u32) {
+    pub fn window(&self, count: u32, count_exact: u32) -> (u32, u32) {
         let prob_call = 1.0 - self.prob_miscall;
         //let n_0 = (count - count_exact) as f64 / (self.prob_call_mismatch * (1.0 - self.prob_miscall) + self.prob_miscall_mismatch);
         //let n_1 = count_exact as f64 / (self.prob_call_exact * (1.0 - self.prob_miscall) + self.prob_miscall_exact);
-        let n = count as f64 / (self.prob_call_exact * prob_call +  self.prob_call_mismatch * prob_call + self.prob_miscall_exact + self.prob_miscall_mismatch);
+        //let n = count as f64 / (self.prob_call_exact * prob_call +  self.prob_call_mismatch * prob_call + self.prob_miscall_exact + self.prob_miscall_mismatch);
+
+        let n = {
+            let n_exact = count_exact as f64 / (self.prob_call_exact * prob_call + self.prob_miscall_exact);
+            let p = self.prob_call_mismatch * prob_call + self.prob_miscall_mismatch;
+            if p > 0.0 {
+                let n_mismatch = (count - count_exact) as f64 / p;
+                n_exact + n_mismatch
+            } else {
+                n_exact
+            }
+        };
+
         let x = (n * self.prob_call_exact * prob_call + n * self.prob_call_mismatch * prob_call + n * self.prob_missed).round() as i32;
 
         (cmp::max(x - self.margin as i32, 0) as u32, x as u32 + self.margin)
@@ -313,7 +325,7 @@ mod tests {
     fn test_window() {
         let model = setup_mhd4();
         let readout = Readout::new("COL5A1", &model, 100);
-        let (lower, upper) = readout.window(175);
+        let (lower, upper) = readout.window(175, 75);
         println!("{} {}", lower, upper);
         assert!(readout.likelihood(lower, 175, 25).exp().approx_eq(&0.0));
         assert!(readout.likelihood(upper, 175, 25).exp().approx_eq(&0.0));
