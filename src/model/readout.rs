@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 
 use std::cmp;
+use std::mem;
 
 use rgsl::randist::multinomial::multinomial_pdf;
 
@@ -176,22 +177,38 @@ impl Readout {
         let prob_call = 1.0 - self.prob_miscall;
         //let n_0 = (count - count_exact) as f64 / (self.prob_call_mismatch * (1.0 - self.prob_miscall) + self.prob_miscall_mismatch);
         //let n_1 = count_exact as f64 / (self.prob_call_exact * (1.0 - self.prob_miscall) + self.prob_miscall_exact);
-        //let n = count as f64 / (self.prob_call_exact * prob_call +  self.prob_call_mismatch * prob_call + self.prob_miscall_exact + self.prob_miscall_mismatch);
+        //let n_ = count as f64 / (self.prob_call_exact * prob_call +  self.prob_call_mismatch * prob_call + self.prob_miscall_exact + self.prob_miscall_mismatch);
 
-        let n = {
-            let n_exact = count_exact as f64 / (self.prob_call_exact * prob_call + self.prob_miscall_exact);
+        // estimate n from exact readouts
+        let n_0 = count_exact as f64 / (self.prob_call_exact * prob_call + self.prob_miscall_exact);
+        let n_1 = {
+            // estimate n from corrected readouts
             let p = self.prob_call_mismatch * prob_call + self.prob_miscall_mismatch;
             if p > 0.0 {
-                let n_mismatch = (count - count_exact) as f64 / p;
-                n_exact + n_mismatch
+                let n_1 = (count - count_exact) as f64 / p;
+                n_1
             } else {
-                n_exact
+                n_0
             }
         };
 
-        let x = (n * self.prob_call_exact * prob_call + n * self.prob_call_mismatch * prob_call + n * self.prob_missed).round() as i32;
+        let est_x = |n: f64| {
+            (
+                n * self.prob_call_exact * prob_call +
+                n * self.prob_call_mismatch * prob_call +
+                n * self.prob_missed
+            ).round() as i32
+        };
 
-        (cmp::max(x - self.margin as i32, 0) as u32, x as u32 + self.margin)
+        // estimate lower and upper bound of x
+        // with MHD2, this is the same and the estimate is equivalent to the MAP
+        let mut x_0 = est_x(n_0);
+        let mut x_1 = est_x(n_1);
+        if x_0 > x_1 {
+            mem::swap(&mut x_0, &mut x_1);
+        }
+
+        (cmp::max(x_0 - self.margin as i32, 0) as u32, x_1 as u32 + self.margin)
     }
 
     pub fn likelihood(&self, x: u32, count: u32, count_exact: u32) -> LogProb {
@@ -327,7 +344,10 @@ mod tests {
         let readout = Readout::new("COL5A1", &model, 100);
         let (lower, upper) = readout.window(175, 75);
         println!("{} {}", lower, upper);
-        assert!(readout.likelihood(lower, 175, 25).exp().approx_eq(&0.0));
-        assert!(readout.likelihood(upper, 175, 25).exp().approx_eq(&0.0));
+        for x in lower..upper {
+            println!("{}={}", x, readout.likelihood(x, 175, 75));
+        }
+        assert!(readout.likelihood(lower, 175, 75).exp().approx_eq(&0.0));
+        assert!(readout.likelihood(upper, 175, 75).exp().approx_eq(&0.0));
     }
 }

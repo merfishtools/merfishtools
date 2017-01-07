@@ -71,7 +71,7 @@ mod tests {
         let total = cdf.total_prob();
         println!("{:?}", cdf);
         println!("{}", total);
-        assert!(total.approx_eq(&-0.0000013200381359975914));
+        assert!(total.approx_eq(&-0.0000035876739698048574));
     }
 
     #[test]

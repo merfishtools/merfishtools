@@ -6,7 +6,6 @@
 use std::f64;
 use std::iter;
 use std::slice;
-use std::cmp;
 
 use num::traits::{cast, NumCast};
 use itertools::Itertools;
