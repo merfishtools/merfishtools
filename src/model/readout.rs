@@ -154,13 +154,14 @@ pub struct Readout {
     prob_missed: Prob,
     prob_nocall: Prob,
     prob_miscall: Prob,
+    prob_call: Prob,
     margin: u32
 }
 
 
 impl Readout {
     pub fn new(feature: &str, model: &Box<Model>, window_width: u32) -> Self {
-
+        let prob_miscall = model.prob_miscall(feature);
         Readout {
             prob_call_exact: model.prob_call_exact(),
             prob_call_mismatch: model.prob_call_mismatch(),
@@ -168,22 +169,27 @@ impl Readout {
             prob_miscall_mismatch: model.prob_miscall_mismatch(feature),
             prob_missed: model.prob_missed(),
             prob_nocall: model.prob_nocall(feature),
-            prob_miscall: model.prob_miscall(feature),
+            prob_miscall: prob_miscall,
+            prob_call: 1.0 - prob_miscall,
             margin: window_width / 2
         }
     }
 
-    pub fn window(&self, count: u32, count_exact: u32) -> (u32, u32) {
-        let prob_call = 1.0 - self.prob_miscall;
-        //let n_0 = (count - count_exact) as f64 / (self.prob_call_mismatch * (1.0 - self.prob_miscall) + self.prob_miscall_mismatch);
-        //let n_1 = count_exact as f64 / (self.prob_call_exact * (1.0 - self.prob_miscall) + self.prob_miscall_exact);
-        //let n_ = count as f64 / (self.prob_call_exact * prob_call +  self.prob_call_mismatch * prob_call + self.prob_miscall_exact + self.prob_miscall_mismatch);
+    fn est_x(&self, n: f64) -> i32 {
+        (
+            n * self.prob_call_exact * self.prob_call +
+            n * self.prob_call_mismatch * self.prob_call +
+            n * self.prob_missed * self.prob_call
+        ).round() as i32
+    }
 
+    /// Upper and lower bound for MAP
+    pub fn map_bounds(&self, count: u32, count_exact: u32) -> (u32, u32) {
         // estimate n from exact readouts
-        let n_0 = count_exact as f64 / (self.prob_call_exact * prob_call + self.prob_miscall_exact);
+        let n_0 = count_exact as f64 / (self.prob_call_exact * self.prob_call + self.prob_miscall_exact);
         let n_1 = {
             // estimate n from corrected readouts
-            let p = self.prob_call_mismatch * prob_call + self.prob_miscall_mismatch;
+            let p = self.prob_call_mismatch * self.prob_call + self.prob_miscall_mismatch;
             if p > 0.0 {
                 let n_1 = (count - count_exact) as f64 / p;
                 n_1
@@ -192,23 +198,28 @@ impl Readout {
             }
         };
 
-        let est_x = |n: f64| {
-            (
-                n * self.prob_call_exact * prob_call +
-                n * self.prob_call_mismatch * prob_call +
-                n * self.prob_missed
-            ).round() as i32
-        };
-
         // estimate lower and upper bound of x
         // with MHD2, this is the same and the estimate is equivalent to the MAP
-        let mut x_0 = est_x(n_0);
-        let mut x_1 = est_x(n_1);
+        let mut x_0 = self.est_x(n_0);
+        let mut x_1 = self.est_x(n_1);
         if x_0 > x_1 {
             mem::swap(&mut x_0, &mut x_1);
         }
 
-        (cmp::max(x_0 - self.margin as i32, 0) as u32, x_1 as u32 + self.margin)
+        (x_0 as u32, x_1 as u32)
+    }
+
+    /// Prior window for calculating expression PMF
+    pub fn window(&self, count: u32, count_exact: u32) -> (u32, u32) {
+        let n_avg = count as f64 / (
+            self.prob_call_exact * self.prob_call +
+            self.prob_call_mismatch * self.prob_call +
+            self.prob_miscall_exact +
+            self.prob_miscall_mismatch
+        );
+        let x = self.est_x(n_avg);
+
+        (cmp::max(x - self.margin as i32, 0) as u32, x as u32 + self.margin)
     }
 
     pub fn likelihood(&self, x: u32, count: u32, count_exact: u32) -> LogProb {
@@ -217,11 +228,10 @@ impl Readout {
         assert!(count >= count_exact);
 
         let mut summands = Vec::new();
-        let prob_call = 1.0 - self.prob_miscall; // Pr(E=e) = 1 - Pr(E!=e)
         let probs = [
-            self.prob_call_exact * prob_call, // Pr(H=0, E=e) = Pr(H=0 | E=e) * Pr(E=e)
-            self.prob_call_mismatch * prob_call,
-            self.prob_missed * prob_call,
+            self.prob_call_exact * self.prob_call, // Pr(H=0, E=e) = Pr(H=0 | E=e) * Pr(E=e)
+            self.prob_call_mismatch * self.prob_call,
+            self.prob_missed * self.prob_call,
             self.prob_miscall_exact,
             self.prob_miscall_mismatch
         ];
