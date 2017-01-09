@@ -139,7 +139,10 @@ impl<T: PartialOrd> CDF<T> {
     pub fn credible_interval(&self) -> (&T, &T) {
         let lower = self.inner.binary_search_by(|&(_, p)| p.partial_cmp(&0.025f64.ln()).unwrap()).unwrap_or_else(|i| if i > 0 { i - 1 } else { 0 });
         let lower_p = self.inner[lower].1;
-        let upper = self.inner.binary_search_by(|&(_, p)| logprobs::sub(p, lower_p).partial_cmp(&0.95f64.ln()).unwrap()).unwrap_or_else(|i| i);
+        let mut upper = self.inner.binary_search_by(|&(_, p)| logprobs::sub(p, lower_p).partial_cmp(&0.95f64.ln()).unwrap()).unwrap_or_else(|i| i);
+        if upper == self.inner.len() {
+            upper -= 1;
+        }
 
         (&self.inner[lower].0, &self.inner[upper].0)
     }
