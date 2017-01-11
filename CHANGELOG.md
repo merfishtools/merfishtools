@@ -2,6 +2,11 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.1.0] - 2016-01-11
+- Added MAP estimate for CV and fold change.
+- Added subcommand to generate codebooks with Hamming distance 4 and 2.
+- Improved credible intervals in corner cases.
+
 ## [1.0.0] - 2016-09-20
 - Improved command line interface.
 - Improved parallelization.
