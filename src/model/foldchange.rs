@@ -44,16 +44,16 @@ mod tests {
     fn test_foldchange_pmf() {
         let readout = setup();
         let cdfs1 = [
-            model::expression::cdf(GENE, 5, 5, &readout, 100),
-            model::expression::cdf(GENE, 5, 5, &readout, 100),
-            model::expression::cdf(GENE, 5, 5, &readout, 100),
-            model::expression::cdf(GENE, 5, 5, &readout, 100)
+            model::expression::cdf(GENE, 5, 5, &readout, 100).0,
+            model::expression::cdf(GENE, 5, 5, &readout, 100).0,
+            model::expression::cdf(GENE, 5, 5, &readout, 100).0,
+            model::expression::cdf(GENE, 5, 5, &readout, 100).0
         ];
         let cdfs2 = [
-            model::expression::cdf(GENE, 50, 50, &readout, 100),
-            model::expression::cdf(GENE, 50, 50, &readout, 100),
-            model::expression::cdf(GENE, 50, 50, &readout, 100),
-            model::expression::cdf(GENE, 50, 50, &readout, 100)
+            model::expression::cdf(GENE, 50, 50, &readout, 100).0,
+            model::expression::cdf(GENE, 50, 50, &readout, 100).0,
+            model::expression::cdf(GENE, 50, 50, &readout, 100).0,
+            model::expression::cdf(GENE, 50, 50, &readout, 100).0
         ];
         let cdf1 = model::expressionset::cdf(&cdfs1, 0.0);
         let cdf2 = model::expressionset::cdf(&cdfs2, 0.0);

@@ -59,13 +59,16 @@ struct Counts {
 }*/
 
 
+
+
+
 /// Estimate expressions.
-pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &str, estimate_path: Option<&str>, threads: usize, cells: &str, window_width: u32) {
+pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &str, estimate_path: Option<&str>, threads: usize, cells: &str, window_width: u32, print_naive: bool) {
     let codebook = io::codebook::Reader::from_file(codebook_path, dist).unwrap().codebook();
     let model = model::readout::new_model(N, m, p0, p1, dist, codebook);
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
     let mut cdf_writer = io::cdf::expression::Writer::from_writer(std::io::stdout());
-    let mut est_writer = estimate_path.map(|path| io::estimation::expression::Writer::from_file(path));
+    let mut est_writer = estimate_path.map(|path| io::estimation::expression::Writer::from_file(path, print_naive));
 
     let cells = Regex::new(cells).ok().expect("Invalid regular expression for cells.");
 
@@ -107,13 +110,14 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &st
         counts.into_iter(),
         |(cell, counts)| {
             let cdfs = counts.into_iter().map(|(feature, count)| {
-                let cdf = model::expression::cdf(&feature, count.exact + count.corrected, count.exact, &model, window_width);
-                (feature, cdf)
+                let (cdf, naive_estimate) = model::expression::cdf(&feature, count.exact + count.corrected, count.exact, &model, window_width);
+
+                (feature, cdf, naive_estimate)
             }).collect_vec();
             (cell, cdfs)
         },
         |(cell, cdfs)| {
-            for (feature, cdf) in cdfs {
+            for (feature, cdf, naive_estimate) in cdfs {
                 cdf_writer.write(&cell, &feature, &cdf);
 
                 if let Some(ref mut est_writer) = est_writer {
@@ -123,7 +127,8 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &st
                         cdf.expected_value(),
                         cdf.standard_deviation(),
                         *cdf.map(),
-                        cdf.credible_interval()
+                        cdf.credible_interval(),
+                        naive_estimate
                     );
                 }
             }

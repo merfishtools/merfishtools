@@ -175,12 +175,12 @@ impl Readout {
         }
     }
 
-    fn est_x(&self, n: f64) -> i32 {
+    fn est_x(&self, n: f64) -> u32 {
         (
             n * self.prob_call_exact * self.prob_call +
             n * self.prob_call_mismatch * self.prob_call +
             n * self.prob_missed * self.prob_call
-        ).round() as i32
+        ).round() as u32
     }
 
     /// Upper and lower bound for MAP
@@ -209,17 +209,21 @@ impl Readout {
         (x_0 as u32, x_1 as u32)
     }
 
-    /// Prior window for calculating expression PMF
-    pub fn window(&self, count: u32, count_exact: u32) -> (u32, u32) {
+    pub fn naive_estimate(&self, count: u32) -> u32 {
         let n_avg = count as f64 / (
             self.prob_call_exact * self.prob_call +
             self.prob_call_mismatch * self.prob_call +
             self.prob_miscall_exact +
             self.prob_miscall_mismatch
         );
-        let x = self.est_x(n_avg);
+        self.est_x(n_avg) as u32
+    }
 
-        (cmp::max(x - self.margin as i32, 0) as u32, x as u32 + self.margin)
+    /// Prior window for calculating expression PMF
+    pub fn window(&self, count: u32, count_exact: u32) -> (u32, u32) {
+        let x = self.naive_estimate(count);
+
+        (cmp::max(x as i32 - self.margin as i32, 0) as u32, x + self.margin)
     }
 
     pub fn likelihood(&self, x: u32, count: u32, count_exact: u32) -> LogProb {

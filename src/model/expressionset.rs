@@ -29,10 +29,10 @@ mod tests {
     fn test_cdf() {
         let readout = setup();
         let cdfs = [
-            model::expression::cdf(GENE, 5, 5, &readout, 100),
-            model::expression::cdf(GENE, 5, 5, &readout, 100),
-            model::expression::cdf(GENE, 5, 5, &readout, 100),
-            model::expression::cdf(GENE, 5, 5, &readout, 100)
+            model::expression::cdf(GENE, 5, 5, &readout, 100).0,
+            model::expression::cdf(GENE, 5, 5, &readout, 100).0,
+            model::expression::cdf(GENE, 5, 5, &readout, 100).0,
+            model::expression::cdf(GENE, 5, 5, &readout, 100).0
         ];
         println!("{:?}", cdfs[0]);
         let cdf = cdf(&cdfs, 0.0);

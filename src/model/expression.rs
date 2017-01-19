@@ -8,7 +8,10 @@ use model;
 pub type CDF = model::dist::CDF<f64>;
 
 
-pub fn cdf(feature: &str, count: u32, count_exact: u32, model: &Box<model::readout::Model>, window_width: u32) -> CDF {
+/// Calculate CDF of expression.
+///
+/// Returns a tuple of CDF and the naive estimate.
+pub fn cdf(feature: &str, count: u32, count_exact: u32, model: &Box<model::readout::Model>, window_width: u32) -> (CDF, u32) {
     let readout_model = model::Readout::new(feature, model, window_width);
     let (xmin, xmax) = readout_model.window(count, count_exact);
     let likelihoods = (xmin..xmax + 1).map(|x| {
@@ -17,7 +20,7 @@ pub fn cdf(feature: &str, count: u32, count_exact: u32, model: &Box<model::reado
     // calculate (marginal / flat_prior)
     let marginal = logprobs::sum(&likelihoods);
 
-    model::dist::CDF::from_pmf(
+    (model::dist::CDF::from_pmf(
         likelihoods.iter().enumerate().filter_map(|(x, lh)| {
             let prob = lh - marginal;
             if prob >= model::MIN_PROB {
@@ -27,7 +30,7 @@ pub fn cdf(feature: &str, count: u32, count_exact: u32, model: &Box<model::reado
                 None
             }
         }).collect_vec()
-    )
+    ), readout_model.naive_estimate(count))
 }
 
 
@@ -55,7 +58,7 @@ mod tests {
     #[test]
     fn test_cdf() {
         let readout = setup();
-        let cdf = cdf(GENE, 25, 10, &readout, 100);
+        let (cdf, _) = cdf(GENE, 25, 10, &readout, 100);
 
         let total = cdf.total_prob();
         println!("{:?}", cdf);
@@ -66,7 +69,7 @@ mod tests {
     #[test]
     fn test_cdf2() {
         let readout = setup();
-        let cdf = cdf(GENE, 176, 25, &readout, 100);
+        let (cdf, _) = cdf(GENE, 176, 25, &readout, 100);
 
         let total = cdf.total_prob();
         println!("{:?}", cdf);
@@ -81,7 +84,7 @@ mod tests {
         let count = calls + miscalls;
 
         let readout = setup_mhd2();
-        let cdf = cdf("COL7A1", count, count, &readout, 100);
+        let (cdf, _) = cdf("COL7A1", count, count, &readout, 100);
 
         println!("{:?} {} {:?}", cdf.expected_value(), cdf.map(), cdf);
     }

@@ -72,8 +72,9 @@ fn main() {
         let cells = matches.value_of("cells").unwrap_or(".*");
         let window_width = value_t!(matches, "pmf-window-width", u32).unwrap_or(100);
         let threads = value_t!(matches, "threads", usize).unwrap_or(1);
+        let print_naive = matches.is_present("print-naive");
 
-        cli::expression(N, m, p0, p1, dist, &codebook_path, estimate_path, threads, &cells, window_width);
+        cli::expression(N, m, p0, p1, dist, &codebook_path, estimate_path, threads, &cells, window_width, print_naive);
     } else if let Some(matches) = matches.subcommand_matches("diffexp") {
         let group1_path = matches.value_of("group1").unwrap();
         let group2_path = matches.value_of("group2").unwrap();

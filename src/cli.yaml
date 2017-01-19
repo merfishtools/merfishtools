@@ -86,6 +86,9 @@ subcommands:
             short: t
             value_name: INT
             help: Number of threads to use.
+        - print-naive:
+            long: print-naive
+            help: Also print naive expression estimate.
 
   - diffexp:
       about: Test for differential expression between two groups of cells.
