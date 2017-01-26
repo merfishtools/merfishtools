@@ -67,12 +67,13 @@ impl<R: io::Read> Reader<R> {
     }
 
     pub fn codebook(&mut self) -> Codebook {
-        let records = self.inner.decode::<Record>().map(|record| record.unwrap()).collect_vec();
+        let records = self.inner.decode::<Record>().filter_map(|record| {
+            let record = record.unwrap();
+            if record.expressed == 1 { Some(record) } else { None }
+        }).collect_vec();
         let mut inner = HashMap::new();
         for record in records.iter() {
-            if record.expressed == 1 {
-                inner.insert(record.feature.clone(), [0; 4]);
-            }
+            inner.insert(record.feature.clone(), [0; 4]);
         }
         for a in records.iter() {
             let codeword = a.codeword.as_bytes();
@@ -81,7 +82,7 @@ impl<R: io::Read> Reader<R> {
                 if b.feature != a.feature {
                     let dist = distance::hamming(codeword, b.codeword.as_bytes()).unwrap();
                     assert!(dist >= self.dist as u32, "Unexpected hamming distance {} (>={} allowed).", dist, self.dist);
-                    if dist <= 4 && b.expressed == 1 {
+                    if dist <= 4 {
                         neighbors[(dist - 1) as usize] += 1;
                     }
                 }
