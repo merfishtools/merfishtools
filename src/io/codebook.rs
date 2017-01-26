@@ -6,7 +6,7 @@
 use std::io;
 use std::fs;
 use std::path::Path;
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map};
 
 use csv;
 use itertools::Itertools;
@@ -31,6 +31,14 @@ impl Codebook {
     pub fn neighbors(&self, feature: &str, dist: u8) -> u32 {
         self.inner.get(feature)
                   .expect(&format!("Error: Feature {} not in codebook.", feature))[dist as usize - 1]
+    }
+
+    pub fn features(&self) -> hash_map::Keys<String, [u32; 4]> {
+        self.inner.keys()
+    }
+
+    pub fn contains(&self, feature: &str) -> bool {
+        self.inner.contains(feature)
     }
 }
 
@@ -62,7 +70,9 @@ impl<R: io::Read> Reader<R> {
         let records = self.inner.decode::<Record>().map(|record| record.unwrap()).collect_vec();
         let mut inner = HashMap::new();
         for record in records.iter() {
-            inner.insert(record.feature.clone(), [0; 4]);
+            if record.expressed == 1 {
+                inner.insert(record.feature.clone(), [0; 4]);
+            }
         }
         for a in records.iter() {
             let codeword = a.codeword.as_bytes();

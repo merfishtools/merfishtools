@@ -65,7 +65,6 @@ struct Counts {
 /// Estimate expressions.
 pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &str, estimate_path: Option<&str>, threads: usize, cells: &str, window_width: u32, print_naive: bool) {
     let codebook = io::codebook::Reader::from_file(codebook_path, dist).unwrap().codebook();
-    let model = model::readout::new_model(N, m, p0, p1, dist, codebook);
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
     let mut cdf_writer = io::cdf::expression::Writer::from_writer(std::io::stdout());
     let mut est_writer = estimate_path.map(|path| io::estimation::expression::Writer::from_file(path, print_naive));
@@ -73,11 +72,10 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &st
     let cells = Regex::new(cells).ok().expect("Invalid regular expression for cells.");
 
     let mut counts = collections::HashMap::new();
-    let mut features = collections::HashSet::new();
     for record in reader.records().filter_map(|res| {
             let rec = res.unwrap();
-            features.insert(rec.feature.clone());
-            if cells.is_match(&rec.cell_id) {
+            // consider record if it is contained in the codebook and has a valid cell id
+            if cells.is_match(&rec.cell_id) && codebook.contains(&rec.feature) {
                 Some(rec)
             }
             else {
@@ -97,12 +95,14 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &st
             panic!("Hamming distance of greater than 1 is unsupported at the moment.")
         }
     }
+    // add missing features from codebook
     for (_, cell_counts) in counts.iter_mut() {
-        for feature in features.iter() {
+        for feature in codebook.features() {
             cell_counts.entry(feature.clone()).or_insert(Counts{ exact: 0, corrected: 0});
         }
     }
 
+    let model = model::readout::new_model(N, m, p0, p1, dist, codebook);
 
     cue::pipeline(
         "exp",
