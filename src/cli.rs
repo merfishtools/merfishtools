@@ -272,7 +272,7 @@ pub fn gen_codebook(words: &[codebook::Word]) -> Result<(), Box<Error>> {
     let mut reader = stdin.lock().lines();
     let mut writer = csv::Writer::from_writer(std::io::stdout()).delimiter(b'\t');
     let mut words = words.iter();
-    writer.write(["feat", "codeword", "expressed"].iter()).unwrap();
+    writer.write(["feat", "codeword"].iter()).unwrap();
 
     for i in 1.. {
         match (reader.next(), words.next()) {
@@ -282,7 +282,7 @@ pub fn gen_codebook(words: &[codebook::Word]) -> Result<(), Box<Error>> {
                     // TODO proper error handling
                     panic!("Empty feature found. All features provided at STDIN have to be non-empty.");
                 }
-                writer.write([feature, format!("{:?}", w), "1".to_owned()].into_iter()).unwrap();
+                writer.write([feature, format!("{:?}", w)].into_iter()).unwrap();
             },
             (None, Some(_)) => break,
             (Some(_), None) => {
