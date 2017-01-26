@@ -45,7 +45,7 @@ subcommands:
         - codebook:
             required: true
             value_name: FILE
-            help: "Path to codebook definition consisting of tab separated columns: feature, codeword, expressed. The last column denotes if a codeword is assigned to e.g. a gene for which expression can be expected. Unless you have misidentification probes (see Chen et al. Science 2015), you will have only ones in this column."
+            help: "Path to codebook definition consisting of tab separated columns: feature, codeword. Misidentification probes (see Chen et al. Science 2015) should not be contained in the codebook."
         - estimate:
             long: estimate
             short: e

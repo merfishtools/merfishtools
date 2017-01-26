@@ -16,8 +16,7 @@ use bio::alignment::distance;
 #[derive(RustcDecodable)]
 pub struct Record {
     pub feature: String,
-    pub codeword: String,
-    pub expressed: u8
+    pub codeword: String
 }
 
 
@@ -67,10 +66,7 @@ impl<R: io::Read> Reader<R> {
     }
 
     pub fn codebook(&mut self) -> Codebook {
-        let records = self.inner.decode::<Record>().filter_map(|record| {
-            let record = record.unwrap();
-            if record.expressed == 1 { Some(record) } else { None }
-        }).collect_vec();
+        let records = self.inner.decode::<Record>().map(|record| record.unwrap()).collect_vec();
         let mut inner = HashMap::new();
         for record in records.iter() {
             inner.insert(record.feature.clone(), [0; 4]);
