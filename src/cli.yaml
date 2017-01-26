@@ -184,14 +184,10 @@ subcommands:
 
         merfishtools gen-mhd4 -m 8 < transcript-names.txt > codebook.tsv
 
-        The output file codebook.tsv will contain the three columns
+        The output file codebook.tsv will contain the columns
 
         feature (e.g. gene or transcript)
         codeword
-        expressed
-
-        The expressed column allows you to encode that a transcript is not
-        expected to be expressed (e.g. a control).
       settings: ArgRequiredElseHelp
       args:
         - onebits:
@@ -210,14 +206,10 @@ subcommands:
 
         merfishtools gen-mhd2 -m 8 -N 16 < transcript-names.txt > codebook.tsv
 
-        The output file codebook.tsv will contain the three columns
+        The output file codebook.tsv will contain the columns
 
         feature (e.g. gene or transcript)
         codeword
-        expressed
-
-        The expressed column allows you to encode that a transcript is not
-        expected to be expressed (e.g. a control).
       settings: ArgRequiredElseHelp
       args:
         - bits:
