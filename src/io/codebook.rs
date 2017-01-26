@@ -38,7 +38,7 @@ impl Codebook {
     }
 
     pub fn contains(&self, feature: &str) -> bool {
-        self.inner.contains(feature)
+        self.inner.contains_key(feature)
     }
 }
 
