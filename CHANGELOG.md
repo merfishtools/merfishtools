@@ -2,6 +2,10 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [1.2.0] - 2016-01-11
+- Added ability to print naive expression estimates.
+- Simplified codebook format.
+
 ## [1.1.0] - 2016-01-11
 - Added MAP estimate for CV and fold change.
 - Added subcommand to generate codebooks with Hamming distance 4 and 2.
