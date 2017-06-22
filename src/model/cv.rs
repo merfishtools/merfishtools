@@ -27,7 +27,7 @@ mod tests {
     const GENE: &'static str = "COL5A1";
 
     fn setup() -> Box<model::readout::Model> {
-        model::readout::new_model(16, 4, 0.04, 0.1, 4, io::codebook::Reader::from_file("test/codebook/140genesData.1.txt", 4).unwrap().codebook())
+        model::readout::new_model(16, 4, 0.04, 0.1, 4, io::codebook::Codebook::from_file("test/codebook/140genesData.1.txt", 4).unwrap())
     }
 
     #[test]

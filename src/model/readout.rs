@@ -86,6 +86,7 @@ impl Model for MHD4 {
 
     /// Probability to see an exact readout given that we have a miscall.
     fn prob_miscall_exact(&self, feature: &str) -> Prob {
+        println!("{}", self.params().codebook.neighbors(feature, 4).len());
         self.params().codebook.neighbors(feature, 4).len() as f64 * self.xi(2, 2)
     }
 
@@ -276,12 +277,12 @@ mod tests {
     use io;
 
     fn setup_mhd4() -> Box<Model> {
-        new_model(16, 4, 0.04, 0.1, 4, io::codebook::Reader::from_file("test/codebook/simulated-MHD4.txt", 4).unwrap().codebook())
+        new_model(16, 4, 0.04, 0.1, 4, io::codebook::Codebook::from_file("test/codebook/simulated-MHD4.txt", 4).unwrap())
     }
 
 
     fn setup_mhd2() -> Box<Model> {
-        new_model(14, 4, 0.04, 0.1, 2, io::codebook::Reader::from_file("test/codebook/simulated-MHD2.txt", 2).unwrap().codebook())
+        new_model(14, 4, 0.04, 0.1, 2, io::codebook::Codebook::from_file("test/codebook/simulated-MHD2.txt", 2).unwrap())
     }
 
 

@@ -6,7 +6,7 @@
 use std::io;
 use std::fs;
 use std::path::Path;
-use std::collections::{HashMap, hash_map};
+use std::collections::{HashMap, hash_map, HashSet};
 use num::CheckedAdd;
 
 use csv;
@@ -17,6 +17,7 @@ use petgraph::visit;
 use bio::alignment::distance;
 
 
+#[derive(Debug)]
 pub struct Record {
     pub name: String,
     pub codeword: BitVec<u32>
@@ -128,22 +129,35 @@ impl Codebook {
             self.min_dist
         );
 
-        let mut neighbors = Vec::new();
+        let feature = *self.index.get(feature).unwrap();
 
-        visit::depth_first_search(
-            &self.graph,
-            Some(*self.index.get(feature).unwrap()),
-            |event| {
-                if let visit::DfsEvent::Discover(n, visit::Time(steps)) = event {
-                    if steps as u8 * self.min_dist == dist {
-                        neighbors.push(self.graph.node_weight(n).unwrap());
-                        return visit::Control::Break(n);
-                    }
-                }
-                visit::Control::Continue
-            }
-        );
+        let mut visited = HashSet::new();
+        let mut neighbors = Vec::new();
+        self.dfs(feature, 0, &mut visited, &mut neighbors, dist);
+        println!("{:?}", neighbors);
 
         neighbors
+    }
+
+    fn dfs<'a>(
+        &'a self,
+        node: NodeIndex<u32>,
+        d: u8,
+        visited: &mut HashSet<NodeIndex<u32>>,
+        neighbors: &mut Vec<&'a Record>,
+        dist: u8) {
+        if visited.contains(&node) {
+            return;
+        }
+        visited.insert(node);
+
+        if d == dist {
+            neighbors.push(self.graph.node_weight(node).unwrap());
+            return;
+        }
+
+        for n in self.graph.neighbors(node) {
+            self.dfs(n, d + self.min_dist, visited, neighbors, dist);
+        }
     }
 }
