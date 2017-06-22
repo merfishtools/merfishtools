@@ -63,11 +63,8 @@ fn main() {
     }
 
     if let Some(matches) = matches.subcommand_matches("exp") {
-        let N = value_t!(matches, "N", u8).unwrap_or(16);
-        let m = value_t!(matches, "m", u8).unwrap_or(4);
         let p0 = value_t!(matches, "p0", f64).unwrap_or(0.04);
         let p1 = value_t!(matches, "p1", f64).unwrap_or(0.1);
-        let dist = value_t!(matches, "hamming-dist", u8).unwrap_or(4);
         let estimate_path = matches.value_of("estimate");
         let codebook_path = matches.value_of("codebook").unwrap();
         let cells = matches.value_of("cells").unwrap_or(".*");
@@ -75,7 +72,7 @@ fn main() {
         let threads = value_t!(matches, "threads", usize).unwrap_or(1);
         let print_naive = matches.is_present("print-naive");
 
-        cli::expression(N, m, p0, p1, dist, &codebook_path, estimate_path, threads, &cells, window_width, print_naive);
+        cli::expression(p0, p1, &codebook_path, estimate_path, threads, &cells, window_width, print_naive);
     } else if let Some(matches) = matches.subcommand_matches("diffexp") {
         let group1_path = matches.value_of("group1").unwrap();
         let group2_path = matches.value_of("group2").unwrap();

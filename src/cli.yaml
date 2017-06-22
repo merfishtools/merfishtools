@@ -53,14 +53,6 @@ subcommands:
             help: |
               Path to write expected value and standard deviation estimates of expression to.
               Output is formatted into columns: cell, feature, expected value, standard deviation
-        - N:
-            short: N
-            value_name: INT
-            help: Number of bits in readout, i.e., number of hybridization rounds [16].
-        - m:
-            short: m
-            value_name: INT
-            help: Number of 1-bits in readout [4].
         - p0:
             long: p0
             value_name: FLOAT
@@ -69,10 +61,6 @@ subcommands:
             long: p1
             value_name: FLOAT
             help: Prior probability of 1->0 error [0.1]
-        - hamming-dist:
-            long: dist
-            value_name: INT
-            help: Minimum hamming distance between encodings [4].
         - cells:
             long: cells
             value_name: REGEX

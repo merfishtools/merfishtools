@@ -3,8 +3,6 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::io;
-use std::fs;
 use std::path::Path;
 use std::collections::{HashMap, hash_map, HashSet};
 use num::CheckedAdd;
@@ -13,8 +11,6 @@ use csv;
 use itertools::Itertools;
 use bit_vec::BitVec;
 use petgraph::prelude::*;
-use petgraph::visit;
-use bio::alignment::distance;
 
 
 /// A codebook record.
@@ -58,7 +54,8 @@ impl Record {
 }
 
 
-/// Codebook representation.
+/// Codebook representation.\
+#[allow(non_snake_case)]
 pub struct Codebook {
     index: HashMap<String, NodeIndex<u32>>,
     graph: UnGraph<Record, ()>,
@@ -73,6 +70,7 @@ pub struct Codebook {
 
 impl Codebook {
     /// Read from a given file path.
+    #[allow(non_snake_case)]
     pub fn from_file<P: AsRef<Path>>(path: P) -> csv::Result<Self> {
         let mut rdr = (csv::Reader::from_file(path)?).delimiter(b'\t');
 
@@ -87,6 +85,7 @@ impl Codebook {
                 let rec = Record::new(feature.clone(), codeword.as_bytes());
                 let n = rec.codeword.len();
                 let m_ = rec.codeword.iter().filter(|b| *b).count();
+
                 if let Some(N) = N {
                     assert!(n == N, "unexpected codeword length: {} vs {}", n, N);
                 } else {
