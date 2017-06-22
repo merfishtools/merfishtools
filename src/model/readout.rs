@@ -86,12 +86,12 @@ impl Model for MHD4 {
 
     /// Probability to see an exact readout given that we have a miscall.
     fn prob_miscall_exact(&self, feature: &str) -> Prob {
-        self.params().codebook.neighbors(feature, 4) as f64 * self.xi(2, 2)
+        self.params().codebook.neighbors(feature, 4).len() as f64 * self.xi(2, 2)
     }
 
     /// Probability to see a readout with one mismatch given that we have a miscall.
     fn prob_miscall_mismatch(&self, feature: &str) -> Prob {
-        let n = self.params().codebook.neighbors(feature, 4) as f64;
+        let n = self.params().codebook.neighbors(feature, 4).len() as f64;
 
         n * 2 as f64 * self.xi(2, 1) + n * 2 as f64 * self.xi(1, 2) +
         n * (self.params().m - 2) as f64 * self.xi(3, 2) + n * (self.params().N - self.params().m - 2) as f64 * self.xi(2, 3)
@@ -122,8 +122,8 @@ impl Model for MHD2 {
 
     /// Probability to see an exact readout given that we have a miscall.
     fn prob_miscall_exact(&self, feature: &str) -> Prob {
-        self.params().codebook.neighbors(feature, 2) as f64 * self.xi(1, 1) +
-        self.params().codebook.neighbors(feature, 4) as f64 * self.xi(2, 2)
+        self.params().codebook.neighbors(feature, 2).len() as f64 * self.xi(1, 1) +
+        self.params().codebook.neighbors(feature, 4).len() as f64 * self.xi(2, 2)
     }
 
     /// Probability to see a readout with one mismatch given that we have a miscall.

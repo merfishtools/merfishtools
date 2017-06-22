@@ -7,6 +7,7 @@ use std::io;
 use std::fs;
 use std::path::Path;
 use std::collections::{HashMap, hash_map};
+use num::CheckedAdd;
 
 use csv;
 use itertools::Itertools;
@@ -41,10 +42,12 @@ impl Record {
         }
     }
 
-    pub fn dist(&self, other: &Record) -> u32 {
+    pub fn dist(&self, other: &Record) -> u8 {
         let mut dist = 0;
         for (a, b) in self.codeword.blocks().zip(other.codeword.blocks()) {
-            dist += (a ^ b).count_ones();
+            dist = dist.checked_add(&((a ^ b).count_ones() as u8)).expect(
+                "bug: overflow when calculating hamming distance"
+            );
         }
         dist
     }
@@ -55,14 +58,14 @@ impl Record {
 pub struct Codebook {
     index: HashMap<String, NodeIndex<u32>>,
     graph: UnGraph<Record, ()>,
-    min_dist: u32
+    min_dist: u8
 }
 
 
 
 impl Codebook {
     /// Read from a given file path.
-    pub fn from_file<P: AsRef<Path>>(path: P, min_dist: u32) -> csv::Result<Self> {
+    pub fn from_file<P: AsRef<Path>>(path: P, min_dist: u8) -> csv::Result<Self> {
         let mut rdr = (csv::Reader::from_file(path)?).delimiter(b'\t');
 
         let mut graph = Graph::default();
@@ -70,9 +73,9 @@ impl Codebook {
             let mut index = HashMap::new();
             for rec in rdr.decode() {
                 let (feature, codeword): (String, String) = rec?;
-                let idx = graph.add_node(Record::new(feature, codeword.as_bytes()));
+                let idx = graph.add_node(Record::new(feature.clone(), codeword.as_bytes()));
                 index.insert(
-                    feature.to_owned(),
+                    feature,
                     idx
                 );
             }
@@ -80,11 +83,14 @@ impl Codebook {
         };
 
         for &a in index.values() {
-            let rec_a = graph.node_weight(a).unwrap();
             for &b in index.values() {
                 if a != b {
-                    let rec_b = graph.node_weight(b).unwrap();
-                    let d = rec_a.dist(&rec_b);
+                    let d = {
+                        let rec_a = graph.node_weight(a).unwrap();
+                        let rec_b = graph.node_weight(b).unwrap();
+                        rec_a.dist(&rec_b)
+                    };
+
                     if d == min_dist {
                         graph.add_edge(a, b, ());
                     } else if d < min_dist {
@@ -115,7 +121,7 @@ impl Codebook {
         self.index.contains_key(feature)
     }
 
-    pub fn neighbors(&self, feature: &str, dist: u32) -> Vec<&Record> {
+    pub fn neighbors(&self, feature: &str, dist: u8) -> Vec<&Record> {
         assert!(
             dist % self.min_dist == 0,
             "unsupported distance: only multiples of {} allowed",
@@ -129,7 +135,7 @@ impl Codebook {
             Some(*self.index.get(feature).unwrap()),
             |event| {
                 if let visit::DfsEvent::Discover(n, visit::Time(steps)) = event {
-                    if steps as u32 * self.min_dist == dist {
+                    if steps as u8 * self.min_dist == dist {
                         neighbors.push(self.graph.node_weight(n).unwrap());
                         return visit::Control::Break(n);
                     }
