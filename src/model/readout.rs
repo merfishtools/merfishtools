@@ -12,8 +12,6 @@ use bio::stats::logprobs;
 use io::codebook::Codebook;
 
 pub struct Params {
-    N: u8,
-    m: u8,
     p0: Prob,
     p1: Prob,
     codebook: Codebook
@@ -27,12 +25,12 @@ pub trait Model: Sync {
     /// Probability to make exactly i 1->0 and j 0->1 errors.
     fn xi(&self, i: u8, j: u8) -> Prob {
         self.params().p1.powi(i as i32) * self.params().p0.powi(j as i32) *
-        (1.0 - self.params().p1).powi((self.params().m - i) as i32) * (1.0 - self.params().p0).powi((self.params().N - self.params().m - j) as i32)
+        (1.0 - self.params().p1).powi((self.params().codebook.m - i) as i32) * (1.0 - self.params().p0).powi((self.params().codebook.N - self.params().codebook.m - j) as i32)
     }
 
     /// Number of possibilities to select i ones and j zeros.
     fn psi(&self, i: u8, j: u8) -> f64 {
-        combinations(self.params().m as u64, i as u64) * combinations((self.params().N - self.params().m) as u64, j as u64)
+        combinations(self.params().codebook.m as u64, i as u64) * combinations((self.params().codebook.N - self.params().codebook.m) as u64, j as u64)
     }
 
     /// Probability to see an exact readout given that we have a call.
@@ -81,7 +79,7 @@ impl Model for MHD4 {
 
     /// Probability to see a readout with one mismatch given that we have a call.
     fn prob_call_mismatch(&self) -> Prob {
-        (self.params().m as f64 * self.xi(1, 0) + (self.params().N - self.params().m) as f64 * self.xi(0, 1))
+        (self.params().codebook.m as f64 * self.xi(1, 0) + (self.params().codebook.N - self.params().codebook.m) as f64 * self.xi(0, 1))
     }
 
     /// Probability to see an exact readout given that we have a miscall.
@@ -95,7 +93,7 @@ impl Model for MHD4 {
         let n = self.params().codebook.neighbors(feature, 4).len() as f64;
 
         n * 2 as f64 * self.xi(2, 1) + n * 2 as f64 * self.xi(1, 2) +
-        n * (self.params().m - 2) as f64 * self.xi(3, 2) + n * (self.params().N - self.params().m - 2) as f64 * self.xi(2, 3)
+        n * (self.params().codebook.m - 2) as f64 * self.xi(3, 2) + n * (self.params().codebook.N - self.params().codebook.m - 2) as f64 * self.xi(2, 3)
     }
 }
 
@@ -135,9 +133,9 @@ impl Model for MHD2 {
 }
 
 
-pub fn new_model(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook: Codebook) -> Box<Model> {
-    let params = Params { N: N, m: m, p0: p0, p1: p1, codebook: codebook};
-    let model: Box<Model> = match dist {
+pub fn new_model(p0: Prob, p1: Prob, codebook: Codebook) -> Box<Model> {
+    let params = Params {p0: p0, p1: p1, codebook: codebook};
+    let model: Box<Model> = match params.codebook.min_dist {
         4 => Box::new(MHD4 { params: params }),
         2 => Box::new(MHD2 { params: params }),
         _ => panic!("Hamming distances other than 2 and 4 are unsupported at the moment.")
@@ -277,12 +275,12 @@ mod tests {
     use io;
 
     fn setup_mhd4() -> Box<Model> {
-        new_model(16, 4, 0.04, 0.1, 4, io::codebook::Codebook::from_file("test/codebook/simulated-MHD4.txt", 4).unwrap())
+        new_model(0.04, 0.1, io::codebook::Codebook::from_file("test/codebook/simulated-MHD4.txt").unwrap())
     }
 
 
     fn setup_mhd2() -> Box<Model> {
-        new_model(14, 4, 0.04, 0.1, 2, io::codebook::Codebook::from_file("test/codebook/simulated-MHD2.txt", 2).unwrap())
+        new_model(0.04, 0.1, io::codebook::Codebook::from_file("test/codebook/simulated-MHD2.txt").unwrap())
     }
 
 

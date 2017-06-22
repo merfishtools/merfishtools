@@ -48,11 +48,11 @@ mod tests {
     const GENE: &'static str = "COL5A1";
 
     fn setup() -> Box<model::readout::Model> {
-        model::readout::new_model(16, 4, 0.04, 0.1, 4, io::codebook::Codebook::from_file("test/codebook/140genesData.1.txt", 4).unwrap())
+        model::readout::new_model(0.04, 0.1, io::codebook::Codebook::from_file("test/codebook/140genesData.1.txt").unwrap())
     }
 
     fn setup_mhd2() -> Box<model::readout::Model> {
-        model::readout::new_model(14, 4, 0.04, 0.1, 2, io::codebook::Codebook::from_file("test/codebook/simulated-MHD2.txt", 2).unwrap())
+        model::readout::new_model(0.04, 0.1, io::codebook::Codebook::from_file("test/codebook/simulated-MHD2.txt").unwrap())
     }
 
     #[test]

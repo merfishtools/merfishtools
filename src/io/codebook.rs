@@ -62,22 +62,43 @@ impl Record {
 pub struct Codebook {
     index: HashMap<String, NodeIndex<u32>>,
     graph: UnGraph<Record, ()>,
-    min_dist: u8
+    pub min_dist: u8,
+    // Number of bits in the codewords.
+    pub N: u8,
+    // Number of 1-bits in the codewords.
+    pub m: u8
 }
 
 
 
 impl Codebook {
     /// Read from a given file path.
-    pub fn from_file<P: AsRef<Path>>(path: P, min_dist: u8) -> csv::Result<Self> {
+    pub fn from_file<P: AsRef<Path>>(path: P) -> csv::Result<Self> {
         let mut rdr = (csv::Reader::from_file(path)?).delimiter(b'\t');
 
+        let mut N = None;
+        let mut m = None;
         let mut graph = Graph::default();
         let index = {
             let mut index = HashMap::new();
             for rec in rdr.decode() {
                 let (feature, codeword): (String, String) = rec?;
-                let idx = graph.add_node(Record::new(feature.clone(), codeword.as_bytes()));
+
+                let rec = Record::new(feature.clone(), codeword.as_bytes());
+                let n = rec.codeword.len();
+                let m_ = rec.codeword.iter().filter(|b| *b).count();
+                if let Some(N) = N {
+                    assert!(n == N, "unexpected codeword length: {} vs {}", n, N);
+                } else {
+                    N = Some(n);
+                }
+                if let Some(m) = m {
+                    assert!(m == m_, "unexpected number of 1-bits: {} vs {}", m_, m);
+                } else {
+                    m = Some(m_);
+                }
+
+                let idx = graph.add_node(rec);
                 index.insert(
                     feature,
                     idx
@@ -86,28 +107,27 @@ impl Codebook {
             index
         };
 
-        for &a in index.values() {
-            for &b in index.values() {
-                if a != b {
-                    let d = {
-                        let rec_a = graph.node_weight(a).unwrap();
-                        let rec_b = graph.node_weight(b).unwrap();
-                        rec_a.dist(&rec_b)
-                    };
+        let dist = |a, b, graph: &UnGraph<Record, ()>| {
+            let rec_a = graph.node_weight(a).unwrap();
+            let rec_b = graph.node_weight(b).unwrap();
+            rec_a.dist(&rec_b)
+        };
 
-                    if d == min_dist {
-                        graph.add_edge(a, b, ());
-                    } else if d < min_dist {
-                        panic!("unexpected hamming distance {} (given minimum {})", d, min_dist);
-                    }
-                }
+        let min_dist = index.values().tuple_combinations().map(|(&a, &b)| dist(a, b, &graph)).min().unwrap();
+
+        for (&a, &b) in index.values().tuple_combinations() {
+            let d = dist(a, b, &graph);
+            if d == min_dist {
+                graph.add_edge(a, b, ());
             }
         }
 
         Ok(Codebook {
             graph: graph,
             index: index,
-            min_dist: min_dist
+            min_dist: min_dist,
+            N: N.unwrap() as u8,
+            m: m.unwrap() as u8
         })
     }
 

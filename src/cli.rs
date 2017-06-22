@@ -63,8 +63,8 @@ struct Counts {
 
 
 /// Estimate expressions.
-pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &str, estimate_path: Option<&str>, threads: usize, cells: &str, window_width: u32, print_naive: bool) {
-    let codebook = io::codebook::Codebook::from_file(codebook_path, dist).unwrap();
+pub fn expression(p0: Prob, p1: Prob, codebook_path: &str, estimate_path: Option<&str>, threads: usize, cells: &str, window_width: u32, print_naive: bool) {
+    let codebook = io::codebook::Codebook::from_file(codebook_path).unwrap();
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
     let mut cdf_writer = io::cdf::expression::Writer::from_writer(std::io::stdout());
     let mut est_writer = estimate_path.map(|path| io::estimation::expression::Writer::from_file(path, print_naive));
@@ -102,7 +102,7 @@ pub fn expression(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &st
         }
     }
 
-    let model = model::readout::new_model(N, m, p0, p1, dist, codebook);
+    let model = model::readout::new_model(p0, p1, codebook);
 
     cue::pipeline(
         "exp",
