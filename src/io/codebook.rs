@@ -17,6 +17,7 @@ use petgraph::visit;
 use bio::alignment::distance;
 
 
+/// A codebook record.
 #[derive(Debug)]
 pub struct Record {
     pub name: String,
@@ -25,6 +26,7 @@ pub struct Record {
 
 
 impl Record {
+    /// Create new record.
     pub fn new(name: String, codeword: &[u8]) -> Self {
         let mut _codeword = BitVec::with_capacity(codeword.len());
         for &b in codeword {
@@ -43,6 +45,7 @@ impl Record {
         }
     }
 
+    /// Get distance to other codeword.
     pub fn dist(&self, other: &Record) -> u8 {
         let mut dist = 0;
         for (a, b) in self.codeword.blocks().zip(other.codeword.blocks()) {
