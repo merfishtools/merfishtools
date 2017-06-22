@@ -10,80 +10,134 @@ use std::collections::{HashMap, hash_map};
 
 use csv;
 use itertools::Itertools;
+use bit_vec::BitVec;
+use petgraph::prelude::*;
+use petgraph::visit;
 use bio::alignment::distance;
 
-/// A codebook record.
-#[derive(RustcDecodable)]
+
 pub struct Record {
-    pub feature: String,
-    pub codeword: String
+    pub name: String,
+    pub codeword: BitVec<u32>
+}
+
+
+impl Record {
+    pub fn new(name: String, codeword: &[u8]) -> Self {
+        let mut _codeword = BitVec::with_capacity(codeword.len());
+        for &b in codeword {
+            if b == b'1' {
+                _codeword.push(true);
+            } else if b == b'0' {
+                _codeword.push(false)
+            } else {
+                panic!("invalid codeword {:?}", codeword)
+            }
+        }
+
+        Record {
+            name: name,
+            codeword: _codeword
+        }
+    }
+
+    pub fn dist(&self, other: &Record) -> u32 {
+        let mut dist = 0;
+        for (a, b) in self.codeword.blocks().zip(other.codeword.blocks()) {
+            dist += (a ^ b).count_ones();
+        }
+        dist
+    }
 }
 
 
 /// Codebook representation.
 pub struct Codebook {
-    inner: HashMap<String, [u32; 4]>
+    index: HashMap<String, NodeIndex<u32>>,
+    graph: UnGraph<Record, ()>,
+    min_dist: u32
 }
+
 
 
 impl Codebook {
-    pub fn neighbors(&self, feature: &str, dist: u8) -> u32 {
-        self.inner.get(feature)
-                  .expect(&format!("Error: Feature {} not in codebook.", feature))[dist as usize - 1]
-    }
-
-    pub fn features(&self) -> hash_map::Keys<String, [u32; 4]> {
-        self.inner.keys()
-    }
-
-    pub fn contains(&self, feature: &str) -> bool {
-        self.inner.contains_key(feature)
-    }
-}
-
-
-/// Reader for codebook definitions.
-pub struct Reader<R: io::Read> {
-    inner: csv::Reader<R>,
-    dist: u8
-}
-
-
-impl Reader<fs::File> {
     /// Read from a given file path.
-    pub fn from_file<P: AsRef<Path>>(path: P, dist: u8) -> io::Result<Self> {
-        fs::File::open(path).map(|f| Reader::from_reader(f, dist))
-    }
-}
+    pub fn from_file<P: AsRef<Path>>(path: P, min_dist: u32) -> csv::Result<Self> {
+        let mut rdr = (csv::Reader::from_file(path)?).delimiter(b'\t');
 
+        let mut graph = Graph::default();
+        let index = {
+            let mut index = HashMap::new();
+            for rec in rdr.decode() {
+                let (feature, codeword): (String, String) = rec?;
+                let idx = graph.add_node(Record::new(feature, codeword.as_bytes()));
+                index.insert(
+                    feature.to_owned(),
+                    idx
+                );
+            }
+            index
+        };
 
-impl<R: io::Read> Reader<R> {
-    pub fn from_reader(rdr: R, dist: u8) -> Self {
-        Reader {
-            inner: csv::Reader::from_reader(rdr).delimiter(b'\t'),
-            dist: dist
-        }
-    }
-
-    pub fn codebook(&mut self) -> Codebook {
-        let records = self.inner.decode::<Record>().map(|record| record.unwrap()).collect_vec();
-        let mut inner = HashMap::new();
-        for record in records.iter() {
-            inner.insert(record.feature.clone(), [0; 4]);
-        }
-        for a in records.iter() {
-            let codeword = a.codeword.as_bytes();
-            let neighbors = inner.get_mut(&a.feature).unwrap();
-            for b in records.iter() {
-                if b.feature != a.feature {
-                    let dist = distance::hamming(codeword, b.codeword.as_bytes()).unwrap();
-                    assert!(dist >= self.dist as u32, "Unexpected hamming distance {} (>={} allowed).", dist, self.dist);
-                    if dist <= 4 {
-                        neighbors[(dist - 1) as usize] += 1;
+        for &a in index.values() {
+            let rec_a = graph.node_weight(a).unwrap();
+            for &b in index.values() {
+                if a != b {
+                    let rec_b = graph.node_weight(b).unwrap();
+                    let d = rec_a.dist(&rec_b);
+                    if d == min_dist {
+                        graph.add_edge(a, b, ());
+                    } else if d < min_dist {
+                        panic!("unexpected hamming distance {} (given minimum {})", d, min_dist);
                     }
                 }
             }
         }
-        Codebook { inner: inner }
+
+        Ok(Codebook {
+            graph: graph,
+            index: index,
+            min_dist: min_dist
+        })
+    }
+
+    pub fn get(&self, feature: &str) -> &Record {
+        self.graph.node_weight(
+            *self.index.get(feature).expect("bug: feature not in codebook")
+        ).unwrap()
+    }
+
+    pub fn features(&self) -> hash_map::Keys<String, NodeIndex<u32>> {
+        self.index.keys()
+    }
+
+    pub fn contains(&self, feature: &str) -> bool {
+        self.index.contains_key(feature)
+    }
+
+    pub fn neighbors(&self, feature: &str, dist: u32) -> Vec<&Record> {
+        assert!(
+            dist % self.min_dist == 0,
+            "unsupported distance: only multiples of {} allowed",
+            self.min_dist
+        );
+
+        let mut neighbors = Vec::new();
+
+        visit::depth_first_search(
+            &self.graph,
+            Some(*self.index.get(feature).unwrap()),
+            |event| {
+                if let visit::DfsEvent::Discover(n, visit::Time(steps)) = event {
+                    if steps as u32 * self.min_dist == dist {
+                        neighbors.push(self.graph.node_weight(n).unwrap());
+                        return visit::Control::Break(n);
+                    }
+                }
+                visit::Control::Continue
+            }
+        );
+
+        neighbors
     }
 }

@@ -23,7 +23,8 @@ fnv = "1.0.*"
 clap = {version = "2.19.*", features = ["yaml", "color", "suggestions"]}
 rand = "0.3"
 ndarray = "0.7"
-bit-vec = "0.4.*"
+bit-vec = "0.4"
+petgraph = "0.4"
 
 [[bin]]
 name = "merfishtools"

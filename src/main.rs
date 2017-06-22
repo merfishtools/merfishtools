@@ -24,6 +24,7 @@ extern crate clap;
 extern crate ndarray;
 extern crate bit_vec;
 extern crate bit_set;
+extern crate petgraph;
 
 use std::process;
 
