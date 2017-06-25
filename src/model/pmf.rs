@@ -3,8 +3,7 @@ use std::slice;
 use itertools::Itertools;
 use num::traits::{cast, NumCast};
 
-use bio::stats::logprobs::LogProb;
-use bio::stats::logprobs;
+use bio::stats::LogProb;
 
 
 #[derive(Clone, Debug)]
@@ -32,7 +31,7 @@ impl<T: Clone + Sized> PMF<T> {
     }
 
     pub fn cdf(&self) -> Vec<LogProb> {
-        logprobs::cumsum(self.inner.iter().map(|e| e.prob)).collect_vec()
+        LogProb::ln_cumsum_exp(self.inner.iter().map(|e| e.prob)).collect_vec()
     }
 
     /// Return maximum a posteriori probability estimate (MAP).

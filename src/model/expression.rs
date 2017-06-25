@@ -1,11 +1,12 @@
 use itertools::Itertools;
 
-use bio::stats::logprobs;
+use bio::stats::LogProb;
+use bio::stats::probs;
 
 use model;
 
 
-pub type CDF = model::dist::CDF<f64>;
+pub type CDF = probs::cdf::CDF<f64>;
 
 
 /// Calculate CDF of expression.
@@ -18,9 +19,9 @@ pub fn cdf(feature: &str, count: u32, count_exact: u32, model: &Box<model::reado
         readout_model.likelihood(x, count, count_exact)
     }).collect_vec();
     // calculate (marginal / flat_prior)
-    let marginal = logprobs::sum(&likelihoods);
+    let marginal = LogProb::ln_sum_exp(&likelihoods);
 
-    (model::dist::CDF::from_pmf(
+    (CDF::from_pmf(
         likelihoods.iter().enumerate().filter_map(|(x, lh)| {
             let prob = lh - marginal;
             if prob >= model::MIN_PROB {

@@ -3,11 +3,13 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use bio::stats::probs;
+
 use model;
 
 
 pub type CV = f64;
-pub type CDF = model::dist::CDF<CV>;
+pub type CDF = probs::cdf::CDF<CV>;
 
 
 /// Calculate CDF for differential expression.

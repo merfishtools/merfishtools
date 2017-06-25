@@ -9,7 +9,7 @@ use std::path::Path;
 
 use csv;
 
-use bio::stats::logprobs::LogProb;
+use bio::stats::LogProb;
 
 use model;
 

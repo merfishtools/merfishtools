@@ -13,11 +13,14 @@ use bit_vec::BitVec;
 use petgraph::prelude::*;
 
 
+pub type Codeword = BitVec<u32>;
+
+
 /// A codebook record.
 #[derive(Debug)]
 pub struct Record {
-    pub name: String,
-    pub codeword: BitVec<u32>
+    name: String,
+    codeword: BitVec<u32>
 }
 
 
@@ -39,6 +42,14 @@ impl Record {
             name: name,
             codeword: _codeword
         }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn codeword(&self) -> &BitVec<u32> {
+        &self.codeword
     }
 
     /// Get distance to other codeword.
@@ -138,6 +149,10 @@ impl Codebook {
 
     pub fn features(&self) -> hash_map::Keys<String, NodeIndex<u32>> {
         self.index.keys()
+    }
+
+    pub fn records(&self) -> impl Iterator<&Record> {
+        self.graph.node_references().map(|n| n.weight())
     }
 
     pub fn contains(&self, feature: &str) -> bool {

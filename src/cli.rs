@@ -59,11 +59,8 @@ struct Counts {
 }*/
 
 
-
-
-
 /// Estimate expressions.
-pub fn expression(p0: Prob, p1: Prob, codebook_path: &str, estimate_path: Option<&str>, threads: usize, cells: &str, window_width: u32, print_naive: bool) {
+pub fn expression(p0: Vec<Prob>, p1: Vec<Prob>, codebook_path: &str, estimate_path: Option<&str>, threads: usize, cells: &str, window_width: u32, print_naive: bool) {
     let codebook = io::codebook::Codebook::from_file(codebook_path).unwrap();
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
     let mut cdf_writer = io::cdf::expression::Writer::from_writer(std::io::stdout());

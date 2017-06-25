@@ -1,7 +1,9 @@
+use bio::stats::probs;
+
 use model;
 
 pub type MeanExpression = f64;
-pub type CDF = model::dist::CDF<MeanExpression>;
+pub type CDF = probs::cdf::CDF<MeanExpression>;
 
 
 pub fn cdf(expression_cdfs: &[model::expression::CDF], pseudocounts: f64) -> CDF {

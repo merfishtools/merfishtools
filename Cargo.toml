@@ -4,7 +4,7 @@ version = "1.2.0"
 authors = ["Johannes Koester <johannes.koester@tu-dortmund.de>"]
 
 [dependencies]
-bio = "0.6.*"
+bio = "0.14.*"
 regex = "0.1.*"
 bit-set = "0.4.*"
 csv = "0.14.*"
@@ -22,7 +22,7 @@ approx = "0.1.*"
 fnv = "1.0.*"
 clap = {version = "2.19.*", features = ["yaml", "color", "suggestions"]}
 rand = "0.3"
-ndarray = "0.7"
+ndarray = "0.9"
 bit-vec = "0.4"
 petgraph = "0.4"
 

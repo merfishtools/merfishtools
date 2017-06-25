@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use bio::stats::probs::cdf::CDF;
 
 use model;
 
@@ -22,7 +23,7 @@ impl MeanVar {
 }
 
 
-pub fn cdf<T: PartialOrd, F: Fn(f64, f64) -> T>(cdfs: &[model::dist::CDF<f64>], value: F) -> model::dist::CDF<T> {
+pub fn cdf<T: PartialOrd, F: Fn(f64, f64) -> T>(cdfs: &[CDF<f64>], value: F) -> CDF<T> {
     let n = cdfs.len() as f64;
     let mut curr = Vec::new();
     let mut prev = {
@@ -30,7 +31,7 @@ pub fn cdf<T: PartialOrd, F: Fn(f64, f64) -> T>(cdfs: &[model::dist::CDF<f64>], 
         for (&value, prob) in cdfs[0].iter_pmf() {
             pmf.push(((value, 0.0), prob));
         }
-        model::dist::CDF::from_pmf(pmf)
+        CDF::from_pmf(pmf)
     };
 
     for (k, cdf) in cdfs.iter().enumerate().skip(1) {
@@ -44,13 +45,13 @@ pub fn cdf<T: PartialOrd, F: Fn(f64, f64) -> T>(cdfs: &[model::dist::CDF<f64>], 
                 curr.push(((mk, sk), p));
             }
         }
-        prev = model::dist::CDF::from_pmf(curr);
+        prev = CDF::from_pmf(curr);
         curr = Vec::new();
     }
     let pmf = prev.iter_pmf().map(|(&(m, s), p)| {
         (value(m, s / (n - 1.0)), p)
     }).collect_vec();
-    model::dist::CDF::from_pmf(pmf)
+    CDF::from_pmf(pmf)
 }
 
 

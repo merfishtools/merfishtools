@@ -3,12 +3,13 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use bio::stats::logprobs::LogProb;
+use bio::stats::LogProb;
+use bio::stats::probs;
 
 use model;
 
 pub type DiffexpMeasure = f64;
-pub type CDF = model::dist::CDF<DiffexpMeasure>;
+pub type CDF = probs::cdf::CDF<DiffexpMeasure>;
 
 
 /// An estimate of differential expression.

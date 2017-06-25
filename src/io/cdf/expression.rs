@@ -11,7 +11,7 @@ use std::collections;
 use itertools::Itertools;
 use csv;
 
-use bio::stats::logprobs::LogProb;
+use bio::stats::LogProb;
 
 use model::expression::CDF;
 

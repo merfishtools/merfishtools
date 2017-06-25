@@ -1,13 +1,15 @@
 use num::rational;
 use itertools::Itertools;
 
+use bio::stats::probs;
+
 use model;
 
 
 pub type LogFC = f64;
 pub type FC = rational::Ratio<u64>;
 
-pub type CDF = model::dist::CDF<LogFC>;
+pub type CDF = probs::cdf::CDF<LogFC>;
 
 
 /// PMF of log2 fold change of a vs b. Specifically, we calculate log2((mean(a) + c) / (mean(b) + c))
@@ -22,7 +24,7 @@ pub fn cdf(a: &model::expressionset::CDF, b: &model::expressionset::CDF) -> CDF 
             pmf.push((log2fc, a_prob + b_prob));
         }
     }
-    model::dist::CDF::from_pmf(pmf).reduce().sample(100)
+    CDF::from_pmf(pmf).reduce().sample(100)
 }
 
 
