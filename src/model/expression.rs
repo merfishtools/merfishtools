@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use ordered_float::NotNaN;
 
 use bio::stats::LogProb;
 use bio::stats::probs;
@@ -6,7 +7,7 @@ use bio::stats::probs;
 use model;
 
 
-pub type CDF = probs::cdf::CDF<f64>;
+pub type CDF = probs::cdf::CDF<NotNaN<f64>>;
 
 
 /// Calculate CDF of expression.
@@ -25,7 +26,10 @@ pub fn cdf(feature: &str, count: u32, count_exact: u32, model: &Box<model::reado
         likelihoods.iter().enumerate().filter_map(|(x, lh)| {
             let prob = lh - marginal;
             if prob >= model::MIN_PROB {
-                Some(((xmin + x as u32) as f64, prob))
+                Some(probs::cdf::Entry {
+                    value: NotNaN::new((xmin + x as u32) as f64).unwrap(),
+                    prob: prob
+                })
             }
             else {
                 None

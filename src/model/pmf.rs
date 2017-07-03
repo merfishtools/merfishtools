@@ -51,8 +51,8 @@ impl<T: Clone + Sized + Copy> PMF<T> {
     /// Return the 95% credible interval.
     pub fn credible_interval(&self) -> (T, T) {
         let cdf = self.cdf();
-        let lower = cdf.binary_search_by(|p| p.partial_cmp(&0.025f64.ln()).unwrap()).unwrap_or_else(|i| i);
-        let upper = cdf.binary_search_by(|p| p.partial_cmp(&0.975f64.ln()).unwrap()).unwrap_or_else(|i| i);
+        let lower = cdf.binary_search_by(|p| p.partial_cmp(&LogProb(0.025f64.ln())).unwrap()).unwrap_or_else(|i| i);
+        let upper = cdf.binary_search_by(|p| p.partial_cmp(&LogProb(0.975f64.ln())).unwrap()).unwrap_or_else(|i| i);
 
         (self.inner[lower].value, self.inner[upper].value)
     }

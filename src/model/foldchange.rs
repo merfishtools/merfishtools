@@ -1,3 +1,4 @@
+use ordered_float::NotNaN;
 use num::rational;
 use itertools::Itertools;
 
@@ -6,7 +7,7 @@ use bio::stats::probs;
 use model;
 
 
-pub type LogFC = f64;
+pub type LogFC = NotNaN<f64>;
 pub type FC = rational::Ratio<u64>;
 
 pub type CDF = probs::cdf::CDF<LogFC>;
@@ -18,10 +19,13 @@ pub fn cdf(a: &model::expressionset::CDF, b: &model::expressionset::CDF) -> CDF 
     let a_pmf = a.iter_pmf().collect_vec();
     let b_pmf = b.iter_pmf().collect_vec();
 
-    for (a_mean, a_prob) in a_pmf {
-        for &(b_mean, b_prob) in b_pmf.iter() {
-            let log2fc = (a_mean).log2() - (b_mean).log2();
-            pmf.push((log2fc, a_prob + b_prob));
+    for a in a_pmf {
+        let a_mean = *a.value;
+        for b in b_pmf.iter() {
+            let b_mean = *b.value;
+            // the PMFs should not contain NaNs.
+            let log2fc = NotNaN::new((a_mean).log2() - (b_mean).log2()).unwrap();
+            pmf.push(probs::cdf::Entry { value: log2fc, prob: a.prob + b.prob });
         }
     }
     CDF::from_pmf(pmf).reduce().sample(100)

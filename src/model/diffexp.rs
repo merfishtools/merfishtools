@@ -3,12 +3,14 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use ordered_float::NotNaN;
+
 use bio::stats::LogProb;
 use bio::stats::probs;
 
 use model;
 
-pub type DiffexpMeasure = f64;
+pub type DiffexpMeasure = NotNaN<f64>;
 pub type CDF = probs::cdf::CDF<DiffexpMeasure>;
 
 
@@ -17,36 +19,32 @@ pub type CDF = probs::cdf::CDF<DiffexpMeasure>;
 pub struct Estimate {
     pub differential_expression_pep: LogProb,
     pub differential_expression_bf: f64,
-    pub expected_value: DiffexpMeasure,
-    pub standard_deviation: DiffexpMeasure,
     pub map: DiffexpMeasure,
     pub credible_interval: (DiffexpMeasure, DiffexpMeasure)
 }
 
 
-impl CDF {
-    /// Posterior error probability for differential expression.
-    pub fn differential_expression_pep(&self, max_null_value: DiffexpMeasure) -> LogProb {
-        self.get(&max_null_value).unwrap()
-    }
+/// Posterior error probability for differential expression.
+pub fn pep(cdf: &CDF, max_null_value: DiffexpMeasure) -> LogProb {
+    cdf.get(&max_null_value).unwrap()
+}
 
-    /// Bayes factor for differential expression.
-    pub fn differential_expression_bf(&self, max_null_value: DiffexpMeasure) -> model::BayesFactor {
-        let m0 = self.get(&max_null_value).unwrap();
-        let m1 = 1.0 - m0;
 
-        (m1 - m0).exp()
-    }
+/// Bayes factor for differential expression.
+pub fn bayes_factor(cdf: &CDF, max_null_value: DiffexpMeasure) -> model::BayesFactor {
+    let m0 = cdf.get(&max_null_value).unwrap();
+    let m1 = m0.ln_one_minus_exp();
 
-    pub fn estimate(&self, max_fc: DiffexpMeasure) -> Estimate {
-        let (ci_lower, ci_upper) = self.credible_interval();
-        Estimate {
-            differential_expression_pep: self.differential_expression_pep(max_fc),
-            differential_expression_bf: self.differential_expression_bf(max_fc),
-            expected_value: self.expected_value(),
-            standard_deviation: self.standard_deviation(),
-            map: *self.map(),
-            credible_interval: (*ci_lower, *ci_upper)
-        }
+    (m1 - m0).exp()
+}
+
+
+pub fn estimate(cdf: &CDF, max_fc: DiffexpMeasure) -> Estimate {
+    let ci = cdf.credible_interval(0.95);
+    Estimate {
+        differential_expression_pep: pep(cdf, max_fc),
+        differential_expression_bf: bayes_factor(cdf, max_fc),
+        map: *cdf.map().expect("bug: empty CDF"),
+        credible_interval: (*ci.start, *ci.end)
     }
 }

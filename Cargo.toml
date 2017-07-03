@@ -17,7 +17,7 @@ log = "0.3.*"
 fern = "0.3.*"
 cue = "0.1.*"
 GSL = "0.4.*"
-ord_subset = "1.2.*"
+ordered-float = "0.5"
 approx = "0.1.*"
 fnv = "1.0.*"
 clap = {version = "2.19.*", features = ["yaml", "color", "suggestions"]}

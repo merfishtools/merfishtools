@@ -11,6 +11,9 @@ use csv;
 use itertools::Itertools;
 use bit_vec::BitVec;
 use petgraph::prelude::*;
+use petgraph::visit::IntoNodeReferences;
+use petgraph::visit::NodeRef;
+use petgraph::graph::NodeWeightsMut;
 
 
 pub type Codeword = BitVec<u32>;
@@ -151,8 +154,9 @@ impl Codebook {
         self.index.keys()
     }
 
-    pub fn records(&self) -> impl Iterator<&Record> {
-        self.graph.node_references().map(|n| n.weight())
+    pub fn records<'a>(&'a mut self) -> NodeWeightsMut<Record> { //Vec<&'a Record> {
+        self.graph.node_weights_mut()
+        //self.graph.node_references().map(|n| n.weight()).collect_vec()
     }
 
     pub fn contains(&self, feature: &str) -> bool {

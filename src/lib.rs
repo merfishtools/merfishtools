@@ -15,7 +15,6 @@ extern crate rustc_serialize;
 extern crate nalgebra;
 extern crate regex;
 extern crate rgsl;
-extern crate ord_subset;
 #[macro_use]
 extern crate approx;
 extern crate fnv;
@@ -24,6 +23,7 @@ extern crate rand;
 extern crate ndarray;
 extern crate bit_vec;
 extern crate petgraph;
+extern crate ordered_float;
 
 pub mod model;
 pub mod io;

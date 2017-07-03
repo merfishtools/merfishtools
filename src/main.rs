@@ -16,7 +16,6 @@ extern crate rustc_serialize;
 extern crate cue;
 extern crate regex;
 extern crate rgsl;
-extern crate ord_subset;
 #[macro_use]
 extern crate approx;
 #[macro_use]
@@ -25,11 +24,15 @@ extern crate ndarray;
 extern crate bit_vec;
 extern crate bit_set;
 extern crate petgraph;
+extern crate ordered_float;
 
 use std::process;
 
 use clap::App;
 use itertools::Itertools;
+use ordered_float::NotNaN;
+
+use bio::stats::Prob;
 
 pub mod model;
 pub mod io;
@@ -72,12 +75,21 @@ fn main() {
         let threads = value_t!(matches, "threads", usize).unwrap_or(1);
         let print_naive = matches.is_present("print-naive");
 
-        cli::expression(p0, p1, &codebook_path, estimate_path, threads, &cells, window_width, print_naive);
+        cli::expression(
+            vec![Prob(p0)],
+            vec![Prob(p1)],
+            &codebook_path,
+            estimate_path,
+            threads,
+            &cells,
+            window_width,
+            print_naive
+        );
     } else if let Some(matches) = matches.subcommand_matches("diffexp") {
         let group1_path = matches.value_of("group1").unwrap();
         let group2_path = matches.value_of("group2").unwrap();
         let cdf_path = matches.value_of("cdf");
-        let max_fc = value_t!(matches, "max-null-log2fc", f64).unwrap_or(1.0);
+        let max_fc = NotNaN::new(value_t!(matches, "max-null-log2fc", f64).unwrap_or(1.0)).expect("NaN not allowed for --max-null-log2fc.");
         let pseudocounts = value_t!(matches, "pseudocounts", f64).unwrap_or(1.0);
         let threads = value_t!(matches, "threads", usize).unwrap_or(1);
 
@@ -85,7 +97,7 @@ fn main() {
     } else if let Some(matches) = matches.subcommand_matches("multidiffexp") {
         let group_paths = matches.values_of("groups").unwrap();
         let cdf_path = matches.value_of("cdf");
-        let max_cv = value_t!(matches, "max-null-cv", f64).unwrap_or(0.5);
+        let max_cv = NotNaN::new(value_t!(matches, "max-null-cv", f64).unwrap_or(0.5)).expect("NaN not allowed for --max-null-cv.");
         let pseudocounts = value_t!(matches, "pseudocounts", f64).unwrap_or(1.0);
         let threads = value_t!(matches, "threads", usize).unwrap_or(1);
 
