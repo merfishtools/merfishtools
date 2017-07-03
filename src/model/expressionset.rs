@@ -20,6 +20,8 @@ pub fn cdf(expression_cdfs: &[model::expression::CDF], pseudocounts: f64) -> CDF
 mod tests {
     #![allow(non_upper_case_globals)]
 
+    use bio::stats::{Prob, LogProb};
+
     use super::*;
     use model;
     use io;
@@ -28,7 +30,11 @@ mod tests {
     const GENE: &'static str = "COL5A1";
 
     fn setup() -> Box<model::readout::Model> {
-        model::readout::new_model(0.04, 0.1, io::codebook::Codebook::from_file("test/codebook/140genesData.1.txt").unwrap())
+        model::readout::new_model(
+            &[Prob(0.04); 16],
+            &[Prob(0.1); 16],
+            io::codebook::Codebook::from_file("test/codebook/140genesData.1.txt").unwrap()
+        )
     }
 
     #[test]
@@ -46,6 +52,6 @@ mod tests {
 
         let total = cdf.total_prob();
 
-        assert_relative_eq!(total, 0.0, epsilon = 0.0002);
+        assert_relative_eq!(*total, *LogProb::ln_one(), epsilon = 0.0002);
     }
 }

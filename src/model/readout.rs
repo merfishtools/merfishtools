@@ -354,79 +354,94 @@ mod tests {
     use io;
 
     fn setup_mhd4() -> Box<Model> {
-        new_model(0.04, 0.1, io::codebook::Codebook::from_file("test/codebook/simulated-MHD4.txt").unwrap())
+        new_model(
+            &[Prob(0.04); 16],
+            &[Prob(0.1); 16],
+            io::codebook::Codebook::from_file("test/codebook/simulated-MHD4.txt").unwrap()
+        )
     }
 
 
     fn setup_mhd2() -> Box<Model> {
-        new_model(0.04, 0.1, io::codebook::Codebook::from_file("test/codebook/simulated-MHD2.txt").unwrap())
+        new_model(
+            &[Prob(0.04); 16],
+            &[Prob(0.1); 16],
+            io::codebook::Codebook::from_file("test/codebook/simulated-MHD2.txt").unwrap()
+        )
     }
 
 
     #[test]
     fn test_prob_call_exact() {
+        let feat = "COL5A1";
         let model = setup_mhd4();
-        let p = model.prob_call_exact();
-        println!("{}", p);
-        assert!(p.approx_eq(&0.4019988717840602));
+        let p = model.prob_call_exact(feat);
+        println!("{}", *p);
+        assert!(p.exp().approx_eq(&0.4019988717840602));
     }
 
     #[test]
     fn test_prob_call_mismatch() {
+        let feat = "COL5A1";
         let model = setup_mhd4();
-        let p = model.prob_call_mismatch();
-        println!("{}", p);
-        assert!(p.approx_eq(&0.3796656011293904));
+        let p = model.prob_call_mismatch(feat);
+        println!("{}", *p);
+        assert!(p.exp().approx_eq(&0.3796656011293904));
     }
 
     #[test]
     fn test_prob_miscall_exact() {
+        let feat = "COL5A1";
         let model = setup_mhd4();
-        let p = model.prob_miscall_exact("COL5A1");
-        println!("{}", p);
-        assert!(p.approx_eq(&0.00031018431464819473));
+        let p = model.prob_miscall_exact(feat);
+        println!("{}", *p);
+        assert!(p.exp().approx_eq(&0.00031018431464819473));
     }
 
     #[test]
     fn test_prob_miscall_mismatch() {
+        let feat = "COL5A1";
         let model = setup_mhd4();
-        let p = model.prob_miscall_mismatch("COL5A1");
-        println!("{}", p);
-        assert!(p.approx_eq(&0.020670338078917206));
+        let p = model.prob_miscall_mismatch(feat);
+        println!("{}", *p);
+        assert!(p.exp().approx_eq(&0.020670338078917206));
     }
 
     #[test]
     fn test_prob_missed() {
+        let feat = "COL5A1";
         let model = setup_mhd4();
-        let p = model.prob_missed();
-        println!("{}", p);
+        let p = model.prob_missed(feat);
+        println!("{}", *p);
         assert!(p.approx_eq(&0.21833552708654924));
     }
 
     #[test]
     fn test_mhd2() {
+        let feat = "COL7A1";
         let model = setup_mhd2();
-        println!("{}", model.prob_call_exact());
-        println!("{}", model.prob_call_mismatch());
-        println!("{}", model.prob_miscall_exact("COL7A1"));
-        println!("{}", model.prob_miscall_mismatch("COL7A1"));
-        println!("{}", model.prob_missed());
+        println!("{}", *model.prob_call_exact(feat));
+        println!("{}", *model.prob_call_mismatch(feat));
+        println!("{}", *model.prob_miscall_exact(feat));
+        println!("{}", *model.prob_miscall_mismatch(feat));
+        println!("{}", *model.prob_missed(feat));
     }
 
     #[test]
     fn test_xi() {
+        let feat = "COL5A1";
         let model = setup_mhd4();
-        let p = model.xi(0, 0);
+        let p = model.xi(feat, 0, 0);
         assert!(p.approx_eq(&0.4019988717840602));
-        let p = model.xi(1, 0);
+        let p = model.xi(feat, 1, 0);
         assert!(p.approx_eq(&0.04466654130934002));
-        let p = model.xi(0, 1);
+        let p = model.xi(feat, 0, 1);
         assert!(p.approx_eq(&0.01674995299100251));
-        let p = model.xi(2, 2);
+        let p = model.xi(feat, 2, 2);
         assert!(p.approx_eq(&8.616230962449852e-06));
-        let p = model.xi(2, 1);
+        let p = model.xi(feat, 2, 1);
         assert!(p.approx_eq(&0.00020678954309879646));
-        let p = model.xi(1, 2);
+        let p = model.xi(feat, 1, 2);
         assert!(p.approx_eq(&7.754607866204867e-05));
     }
 
@@ -437,7 +452,7 @@ mod tests {
         let (lower, upper) = readout.window(175, 75);
         println!("{} {}", lower, upper);
         for x in lower..upper {
-            println!("{}={}", x, readout.likelihood(x, 175, 75));
+            println!("{}={}", x, *readout.likelihood(x, 175, 75));
         }
         assert!(readout.likelihood(lower, 175, 75).exp().approx_eq(&0.0));
         assert!(readout.likelihood(upper, 175, 75).exp().approx_eq(&0.0));

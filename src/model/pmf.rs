@@ -59,26 +59,6 @@ impl<T: Clone + Sized + Copy> PMF<T> {
 }
 
 
-impl<T: NumCast + Clone + Copy> PMF<T> {
-    pub fn expected_value(&self) -> f64 {
-        self.iter().map(|e| {
-            cast::<T, f64>(e.value).unwrap() * e.prob.exp()
-        }).fold(0.0f64, |s, e| s + e)
-    }
-
-    pub fn variance(&self) -> f64 {
-        let ev = self.expected_value();
-        self.iter().map(|e| {
-                (cast::<T, f64>(e.value).unwrap() - ev).powi(2) * e.prob.exp()
-        }).fold(0.0, |s, e| s + e)
-    }
-
-    pub fn standard_deviation(&self) -> f64 {
-        self.variance().sqrt()
-    }
-}
-
-
 impl PMF<f32> {
     pub fn scale(&mut self, scale: f32) {
         for e in self.inner.iter_mut() {

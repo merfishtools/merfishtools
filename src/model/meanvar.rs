@@ -66,21 +66,30 @@ pub fn cdf<T: Ord, F: Fn(NotNaN<f64>, NotNaN<f64>) -> T>(cdfs: &[CDF<NotNaN<f64>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use model::dist::CDF;
+
+    use bio::stats::LogProb;
 
     #[test]
     fn test_cdf() {
-        let cdf1 = CDF::from_pmf(vec![(6.0, -1.0), (70.0, -0.45867514538708193)]);
-        let cdf2 = CDF::from_pmf(vec![(3.0, -1.0), (70.0, -0.45867514538708193)]);
-        let cdf3 = CDF::from_pmf(vec![(3.0, -1.0), (70.0, -0.45867514538708193)]);
-        println!("{}", cdf1.map());
-        println!("{}", cdf2.map());
+        let cdf1 = CDF::from_pmf(vec![
+            cdf::Entry{ value: NotNaN::new(6.0).unwrap(), prob: LogProb(-1.0) },
+            cdf::Entry { value: NotNaN::new(70.0).unwrap(), prob: LogProb(-0.45867514538708193) }
+            ]);
+        let cdf2 = CDF::from_pmf(vec![
+            cdf::Entry { value: NotNaN::new(3.0).unwrap(), prob: LogProb(-1.0)},
+            cdf::Entry { value: NotNaN::new(70.0).unwrap(), prob: LogProb(-0.45867514538708193)}
+        ]);
+        let cdf3 = CDF::from_pmf(vec![
+            cdf::Entry { value: NotNaN::new(3.0).unwrap(), prob: LogProb(-1.0)},
+            cdf::Entry { value: NotNaN::new(70.0).unwrap(), prob: LogProb(-0.45867514538708193)}
+        ]);
+        println!("{}", cdf1.map().unwrap());
+        println!("{}", cdf2.map().unwrap());
 
         let cdf = cdf(&[cdf1, cdf2, cdf3], |mean, _| mean);
 
         println!("{:?}", cdf);
-        println!("{}", cdf.map());
-        println!("{}", cdf.expected_value());
-        assert_eq!(*cdf.map(), 70.0);
+        println!("{}", cdf.map().unwrap());
+        assert_eq!(**cdf.map().unwrap(), 70.0);
     }
 }

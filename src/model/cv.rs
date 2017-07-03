@@ -25,13 +25,19 @@ mod tests {
     use super::*;
     use itertools::Itertools;
 
+    use bio::stats::{Prob, LogProb};
+
     use model;
     use io;
 
     const GENE: &'static str = "COL5A1";
 
     fn setup() -> Box<model::readout::Model> {
-        model::readout::new_model(0.04, 0.1, io::codebook::Codebook::from_file("test/codebook/140genesData.1.txt").unwrap())
+        model::readout::new_model(
+            &[Prob(0.04); 16],
+            &[Prob(0.1); 16],
+            io::codebook::Codebook::from_file("test/codebook/140genesData.1.txt").unwrap()
+        )
     }
 
     #[test]
@@ -51,16 +57,16 @@ mod tests {
         ];
         let cdf1 = model::expressionset::cdf(&cdfs1, 0.0);
         let cdf2 = model::expressionset::cdf(&cdfs2, 0.0);
-        println!("{} {}", cdfs1[0].expected_value(), cdfs2[0].expected_value());
+        println!("{} {}", cdfs1[0].map().unwrap(), cdfs2[0].map().unwrap());
 
         let cdf = cdf(&[cdf1, cdf2]);
 
         let total = cdf.total_prob();
         println!("{:?}", cdf);
 
-        assert!(total <= 0.0);
-        assert_relative_eq!(total, 0.0, epsilon = 0.0002);
-        assert_relative_eq!(cdf.expected_value(), 1.14, epsilon = 0.02);
+        assert!(*total <= 0.0);
+        assert_relative_eq!(*total, 0.0, epsilon = 0.0002);
+        assert_relative_eq!(**cdf.map().unwrap(), 1.14, epsilon = 0.02);
     }
 
     #[test]
@@ -80,12 +86,11 @@ mod tests {
         ];
         let cdf1 = model::expressionset::cdf(&cdfs1, 0.0);
         let cdf2 = model::expressionset::cdf(&cdfs2, 0.0);
-        println!("{} {}", cdfs1[0].expected_value(), cdfs2[0].expected_value());
         println!("{:?}", cdf1.iter_pmf().collect_vec());
 
         let cdf = cdf(&[cdf1, cdf2]);
 
-        assert_relative_eq!(*cdf.map(), 0.0);
+        assert_relative_eq!(**cdf.map().unwrap(), 0.0);
     }
 
     #[test]
@@ -101,14 +106,12 @@ mod tests {
         let cdf1 = model::expressionset::cdf(&cdfs1, 1.0);
         let cdf2 = model::expressionset::cdf(&cdfs2, 1.0);
         let cdf3 = model::expressionset::cdf(&cdfs3, 1.0);
-        println!("{} {} {}", cdf1.map(), cdf2.map(), cdf3.map());
-        println!("{} {} {}", cdf1.expected_value(), cdf2.expected_value(), cdf3.expected_value());
+        println!("{} {} {}", cdf1.map().unwrap(), cdf2.map().unwrap(), cdf3.map().unwrap());
 
         let cdf = cdf(&[cdf1, cdf2, cdf3]);
-        println!("{}", cdf.map());
-        println!("{}", cdf.expected_value());
+        println!("{}", cdf.map().unwrap());
 
-        println!("{:?}", cdf.estimate(0.5));
+        println!("{:?}", model::diffexp::estimate(&cdf, NotNaN::new(0.5).unwrap()));
 
         // TODO add proper test case
     }

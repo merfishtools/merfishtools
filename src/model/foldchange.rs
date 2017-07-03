@@ -37,13 +37,19 @@ mod tests {
     #![allow(non_upper_case_globals)]
     use super::*;
 
+    use bio::stats::{Prob, LogProb};
+
     use model;
     use io;
 
     const GENE: &'static str = "COL5A1";
 
     fn setup() -> Box<model::readout::Model> {
-        model::readout::new_model(0.04, 0.1, io::codebook::Codebook::from_file("test/codebook/140genesData.1.txt").unwrap())
+        model::readout::new_model(
+            &[Prob(0.04); 16],
+            &[Prob(0.1); 16],
+            io::codebook::Codebook::from_file("test/codebook/140genesData.1.txt").unwrap()
+        )
     }
 
     #[test]
@@ -67,10 +73,10 @@ mod tests {
         let cdf = cdf(&cdf2, &cdf1);
 
         let total = cdf.total_prob();
-        let fc = 2.0f64.powf(cdf.expected_value());
+        let fc = 2.0f64.powf(**cdf.map().unwrap());
 
-        println!("ev={}", fc);
-        assert_relative_eq!(total, 0.0, epsilon = 0.0002);
+        println!("map={}", fc);
+        assert_relative_eq!(*total, *LogProb::ln_one(), epsilon = 0.0002);
         assert!(fc >= 9.0);
     }
 }
