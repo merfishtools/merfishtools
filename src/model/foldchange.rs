@@ -67,8 +67,8 @@ mod tests {
             model::expression::cdf(GENE, 50, 50, &readout, 100).0,
             model::expression::cdf(GENE, 50, 50, &readout, 100).0
         ];
-        let cdf1 = model::expressionset::cdf(&cdfs1, 0.0);
-        let cdf2 = model::expressionset::cdf(&cdfs2, 0.0);
+        let cdf1 = model::expressionset::cdf(&cdfs1, 0.000000001);
+        let cdf2 = model::expressionset::cdf(&cdfs2, 0.000000001);
 
         let cdf = cdf(&cdf2, &cdf1);
 

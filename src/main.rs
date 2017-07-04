@@ -20,6 +20,7 @@ extern crate rgsl;
 extern crate approx;
 #[macro_use]
 extern crate clap;
+#[macro_use(s)]
 extern crate ndarray;
 extern crate bit_vec;
 extern crate bit_set;

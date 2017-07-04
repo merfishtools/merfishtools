@@ -175,7 +175,6 @@ impl Codebook {
         let mut visited = HashSet::new();
         let mut neighbors = Vec::new();
         self.dfs(feature, 0, &mut visited, &mut neighbors, dist);
-        println!("{:?}", neighbors);
 
         neighbors
     }

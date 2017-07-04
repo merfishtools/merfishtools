@@ -45,9 +45,9 @@ impl Xi {
     fn calc(&mut self, codeword: &Codeword) -> Array2<LogProb> {
         self.curr.fill(LogProb::ln_zero());
         self.prev.fill(LogProb::ln_zero());
+        self.prev[(1, 1)] = LogProb::ln_one();
 
-        self.prev[(0, 0)] = LogProb::ln_one();
-
+        println!("-------------------------");
         for k in 0..codeword.len() {
             for i in 1..self.curr.shape()[0] {
                 for j in 1..self.curr.shape()[1] {
@@ -60,10 +60,14 @@ impl Xi {
                             self.p0[k].ln_one_minus_exp() + self.prev[(i, j)]
                         )
                     };
+                    // println!("k={} i={} j={}: {}", k, i, j, *self.curr[(i, j)]);
                 }
             }
+            println!("{} {} {}", self.p1[k].exp(), self.p0[k].exp(), codeword.get(k).unwrap());
+            println!("p={}", self.curr[(2, 1)].exp());
             mem::swap(&mut self.prev, &mut self.curr);
         }
+        println!("-------------------------");
 
         self.prev.clone()
     }
@@ -82,7 +86,8 @@ pub trait Model: Sync {
 
     /// Probability to make exactly i 1->0 and j 0->1 errors.
     fn xi(&self, feature: &str, i: i8, j: i8) -> LogProb {
-        self.params().xi.get(feature).unwrap()[(i as usize, j as usize)]
+        println!("{:?}", self.params().xi.get(feature).unwrap());
+        self.params().xi.get(feature).unwrap()[(i as usize + 1, j as usize + 1)]
     }
 
     /// Probability to see an exact readout given that we have a call.
@@ -352,6 +357,7 @@ mod tests {
     use super::*;
     use nalgebra::ApproxEq;
     use io;
+    use bio::stats::combinatorics::combinations;
 
     fn setup_mhd4() -> Box<Model> {
         new_model(
@@ -427,22 +433,56 @@ mod tests {
         println!("{}", *model.prob_missed(feat));
     }
 
+    fn psi(i: u8, j: u8) -> f64 {
+        combinations(4, i as u64) * combinations(12, j as u64)
+    }
+
     #[test]
-    fn test_xi() {
+    fn test_xi00() {
         let feat = "COL5A1";
         let model = setup_mhd4();
-        let p = model.xi(feat, 0, 0);
-        assert!(p.approx_eq(&0.4019988717840602));
-        let p = model.xi(feat, 1, 0);
-        assert!(p.approx_eq(&0.04466654130934002));
-        let p = model.xi(feat, 0, 1);
-        assert!(p.approx_eq(&0.01674995299100251));
-        let p = model.xi(feat, 2, 2);
-        assert!(p.approx_eq(&8.616230962449852e-06));
-        let p = model.xi(feat, 2, 1);
-        assert!(p.approx_eq(&0.00020678954309879646));
-        let p = model.xi(feat, 1, 2);
-        assert!(p.approx_eq(&7.754607866204867e-05));
+        let p = model.xi(feat, 0, 0).exp();
+        assert_relative_eq!(p, psi(0,0) * 0.4019988717840602);
+    }
+
+    #[test]
+    fn test_xi10() {
+        let feat = "COL5A1";
+        let model = setup_mhd4();
+        let p = model.xi(feat, 1, 0).exp();
+        assert_relative_eq!(p, psi(1,0) * 0.04466654130934002);
+    }
+
+    #[test]
+    fn test_xi01() {
+        let feat = "COL5A1";
+        let model = setup_mhd4();
+        let p = model.xi(feat, 0, 1).exp();
+        assert_relative_eq!(p, psi(0, 1) * 0.01674995299100251);
+    }
+
+    #[test]
+    fn test_xi22() {
+        let feat = "COL5A1";
+        let model = setup_mhd4();
+        let p = model.xi(feat, 2, 2).exp();
+        assert_relative_eq!(p, psi(2, 2) * 8.616230962449852e-06);
+    }
+
+    #[test]
+    fn test_xi21() {
+        let feat = "COL5A1";
+        let model = setup_mhd4();
+        let p = model.xi(feat, 2, 1).exp();
+        assert_relative_eq!(p, psi(2, 1) * 0.00020678954309879646);
+    }
+
+    #[test]
+    fn test_xi12() {
+        let feat = "COL5A1";
+        let model = setup_mhd4();
+        let p = model.xi(feat, 1, 2).exp();
+        assert_relative_eq!(p, psi(1, 2) * 7.754607866204867e-05);
     }
 
     #[test]
