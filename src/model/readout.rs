@@ -47,27 +47,25 @@ impl Xi {
         self.prev.fill(LogProb::ln_zero());
         self.prev[(1, 1)] = LogProb::ln_one();
 
-        println!("-------------------------");
         for k in 0..codeword.len() {
             for i in 1..self.curr.shape()[0] {
                 for j in 1..self.curr.shape()[1] {
-                    self.curr[(i, j)] = if codeword.get(k).unwrap() {
-                        (self.p1[k] + self.prev[(i - 1, j)]).ln_add_exp(
-                            self.p1[k].ln_one_minus_exp() + self.prev[(i, j)]
-                        )
+
+                    let (i_err, j_err, p_err) = if codeword.get(k).unwrap() {
+                        (i - 1, j, self.p1[k])
                     } else {
-                        (self.p0[k] + self.prev[(i, j - 1)]).ln_add_exp(
-                            self.p0[k].ln_one_minus_exp() + self.prev[(i, j)]
-                        )
+                        (i, j - 1, self.p0[k])
                     };
-                    // println!("k={} i={} j={}: {}", k, i, j, *self.curr[(i, j)]);
+
+                    let mut p = (p_err + self.prev[(i_err, j_err)]).ln_add_exp(
+                        p_err.ln_one_minus_exp() + self.prev[(i, j)]
+                    );
+
+                    self.curr[(i, j)] = p;
                 }
             }
-            println!("{} {} {}", self.p1[k].exp(), self.p0[k].exp(), codeword.get(k).unwrap());
-            println!("p={}", self.curr[(2, 1)].exp());
             mem::swap(&mut self.prev, &mut self.curr);
         }
-        println!("-------------------------");
 
         self.prev.clone()
     }
@@ -86,7 +84,6 @@ pub trait Model: Sync {
 
     /// Probability to make exactly i 1->0 and j 0->1 errors.
     fn xi(&self, feature: &str, i: i8, j: i8) -> LogProb {
-        println!("{:?}", self.params().xi.get(feature).unwrap());
         self.params().xi.get(feature).unwrap()[(i as usize + 1, j as usize + 1)]
     }
 
@@ -142,6 +139,7 @@ impl Model for MHD4 {
     /// Probability to see an exact readout given that we have a miscall.
     fn prob_miscall_exact(&self, feature: &str) -> LogProb {
         LogProb::ln_sum_exp(&self.params().codebook.neighbors(feature, 4).iter().map(|neighbor| {
+            println!("neighbor: {}", neighbor.name());
             self.xi(neighbor.name(), 2, 2)
         }).collect_vec())
     }
@@ -400,8 +398,7 @@ mod tests {
         let feat = "COL5A1";
         let model = setup_mhd4();
         let p = model.prob_miscall_exact(feat);
-        println!("{}", *p);
-        assert!(p.exp().approx_eq(&0.00031018431464819473));
+        assert_relative_eq!(p.exp(), 0.00031018431464819473)
     }
 
     #[test]
@@ -433,7 +430,7 @@ mod tests {
         println!("{}", *model.prob_missed(feat));
     }
 
-    fn psi(i: u8, j: u8) -> f64 {
+    fn comb(i: u8, j: u8) -> f64 {
         combinations(4, i as u64) * combinations(12, j as u64)
     }
 
@@ -442,7 +439,7 @@ mod tests {
         let feat = "COL5A1";
         let model = setup_mhd4();
         let p = model.xi(feat, 0, 0).exp();
-        assert_relative_eq!(p, psi(0,0) * 0.4019988717840602);
+        assert_relative_eq!(p, comb(0,0) * 0.4019988717840602);
     }
 
     #[test]
@@ -450,7 +447,7 @@ mod tests {
         let feat = "COL5A1";
         let model = setup_mhd4();
         let p = model.xi(feat, 1, 0).exp();
-        assert_relative_eq!(p, psi(1,0) * 0.04466654130934002);
+        assert_relative_eq!(p, comb(1,0) * 0.04466654130934002);
     }
 
     #[test]
@@ -458,7 +455,7 @@ mod tests {
         let feat = "COL5A1";
         let model = setup_mhd4();
         let p = model.xi(feat, 0, 1).exp();
-        assert_relative_eq!(p, psi(0, 1) * 0.01674995299100251);
+        assert_relative_eq!(p, comb(0, 1) * 0.01674995299100251);
     }
 
     #[test]
@@ -466,7 +463,7 @@ mod tests {
         let feat = "COL5A1";
         let model = setup_mhd4();
         let p = model.xi(feat, 2, 2).exp();
-        assert_relative_eq!(p, psi(2, 2) * 8.616230962449852e-06);
+        assert_relative_eq!(p, comb(2, 2) * 8.616230962449852e-06);
     }
 
     #[test]
@@ -474,7 +471,7 @@ mod tests {
         let feat = "COL5A1";
         let model = setup_mhd4();
         let p = model.xi(feat, 2, 1).exp();
-        assert_relative_eq!(p, psi(2, 1) * 0.00020678954309879646);
+        assert_relative_eq!(p, comb(2, 1) * 0.00020678954309879646);
     }
 
     #[test]
@@ -482,7 +479,7 @@ mod tests {
         let feat = "COL5A1";
         let model = setup_mhd4();
         let p = model.xi(feat, 1, 2).exp();
-        assert_relative_eq!(p, psi(1, 2) * 7.754607866204867e-05);
+        assert_relative_eq!(p, comb(1, 2) * 7.754607866204867e-05);
     }
 
     #[test]
