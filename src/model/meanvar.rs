@@ -32,6 +32,7 @@ pub fn cdf<T: Ord, F: Fn(NotNaN<f64>, NotNaN<f64>) -> T>(cdfs: &[CDF<NotNaN<f64>
     let mut prev = {
         let mut pmf = Vec::new();
         for e in cdfs[0].iter_pmf() {
+            println!("{:?}", e.prob);
             pmf.push(cdf::Entry {
                 value: (*e.value, NotNaN::new(0.0).unwrap()),
                 prob: e.prob
