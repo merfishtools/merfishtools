@@ -44,7 +44,7 @@ pub fn cdf<T: PartialOrd, F: Fn(f64, f64) -> T>(cdfs: &[model::dist::CDF<f64>], 
                 curr.push(((mk, sk), p));
             }
         }
-        println!("{:?}", curr);
+        println!("----------\n{:?}", &curr[..5]);
         prev = model::dist::CDF::from_pmf(curr);
         curr = Vec::new();
     }
