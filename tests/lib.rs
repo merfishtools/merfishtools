@@ -15,6 +15,6 @@ fn test_output(result: &str, expected: &str) {
 fn test_exp() {
     assert!(Command::new("bash")
             .arg("-c")
-            .arg("target/debug/merfishtools exp test/codebook/140genesData.1.txt < test/data/140genesData.1.cell0.txt")
+            .arg("target/debug/merfishtools exp tests/codebook/140genesData.1.txt < tests/data/140genesData.1.cell0.txt")
             .spawn().unwrap().wait().unwrap().success());
 }
