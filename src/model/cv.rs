@@ -102,10 +102,24 @@ mod tests {
         let cdfs1 = cdfs1.get("AHNAK2").unwrap();
         let cdfs2 = cdfs2.get("AHNAK2").unwrap();
         let cdfs3 = cdfs3.get("AHNAK2").unwrap();
+        for cdf in cdfs1.iter() {
+            assert_relative_eq!(cdf.total_prob().exp(), 1.0, epsilon=0.001);
+        }
+        for cdf in cdfs2.iter() {
+            assert_relative_eq!(cdf.total_prob().exp(), 1.0, epsilon=0.001);
+        }
+        for cdf in cdfs3.iter() {
+            assert_relative_eq!(cdf.total_prob().exp(), 1.0, epsilon=0.001);
+        }
 
         let cdf1 = model::expressionset::cdf(&cdfs1, 1.0);
         let cdf2 = model::expressionset::cdf(&cdfs2, 1.0);
         let cdf3 = model::expressionset::cdf(&cdfs3, 1.0);
+        assert_relative_eq!(cdf1.total_prob().exp(), 1.0, epsilon=0.001);
+        assert_relative_eq!(cdf2.total_prob().exp(), 1.0, epsilon=0.001);
+        assert_relative_eq!(cdf3.total_prob().exp(), 1.0, epsilon=0.001);
+
+
         println!("{} {} {}", cdf1.map().unwrap(), cdf2.map().unwrap(), cdf3.map().unwrap());
 
         let cdf = cdf(&[cdf1, cdf2, cdf3]);

@@ -41,6 +41,8 @@ pub fn cdf<T: Ord, F: Fn(NotNaN<f64>, NotNaN<f64>) -> T>(cdfs: &[CDF<NotNaN<f64>
     };
 
     for (k, cdf) in cdfs.iter().enumerate().skip(1) {
+        assert_relative_eq!(cdf.total_prob().exp(), 1.0, epsilon=0.002);
+
         let k = k as f64 + 1.0;
 
         for prev_entry in prev.sample(1000).iter_pmf() {

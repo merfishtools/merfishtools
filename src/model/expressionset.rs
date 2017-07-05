@@ -12,6 +12,7 @@ pub fn cdf(expression_cdfs: &[model::expression::CDF], pseudocounts: f64) -> CDF
     //assert!(pseudocounts != 0.0, "pseudocounts may not be zero");
     let pseudocounts = NotNaN::new(pseudocounts).unwrap();
     let cdf = model::meanvar::cdf(expression_cdfs, |mean, _| mean + pseudocounts);
+    assert_relative_eq!(cdf.total_prob().exp(), 1.0);
     cdf.reduce().sample(1000)
 }
 
