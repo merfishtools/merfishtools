@@ -3,14 +3,16 @@
 use std::cmp;
 use std::mem;
 use std::collections::HashMap;
+use std::cell::RefCell;
 
 use rgsl::randist::multinomial::multinomial_pdf;
 use itertools::Itertools;
+use bit_vec::BitVec;
 
 use bio::stats::combinatorics::combinations;
 use bio::stats::{Prob, LogProb};
 
-use io::codebook::{Codebook, Codeword};
+use io::codebook::{self, Codebook, Codeword};
 use ndarray::prelude::*;
 
 
@@ -18,8 +20,7 @@ use ndarray::prelude::*;
 struct Xi {
     p0: Vec<LogProb>,
     p1: Vec<LogProb>,
-    curr: Array2<LogProb>,
-    prev: Array2<LogProb>
+    max_err: u8
 }
 
 
@@ -33,23 +34,22 @@ impl Xi {
     /// * `max_err` - maximum number of errors considered
     fn new(p0: &[Prob], p1: &[Prob], max_err: u8) -> Self {
         let tolog = |&p| LogProb::from(p);
-        let n = max_err as usize;
         Xi {
-            curr: Array::default((n + 1, n + 1)),
-            prev: Array::default((n + 1, n + 1)),
             p0: p0.iter().map(&tolog).collect_vec(),
-            p1: p1.iter().map(&tolog).collect_vec()
+            p1: p1.iter().map(&tolog).collect_vec(),
+            max_err: max_err
         }
     }
 
-    fn calc(&mut self, codeword: &Codeword) -> Array2<LogProb> {
-        self.curr.fill(LogProb::ln_zero());
-        self.prev.fill(LogProb::ln_zero());
-        self.prev[(1, 1)] = LogProb::ln_one();
+    fn calc(&self, codeword: &Codeword, mask: Option<&BitVec>) -> Array2<LogProb> {
+        let n = self.max_err as usize;
+        let mut curr = Array::from_elem((n + 1, n + 1), LogProb::ln_zero());
+        let mut prev = Array::from_elem((n + 1, n + 1), LogProb::ln_zero());
+        prev[(1, 1)] = LogProb::ln_one();
 
         for k in 0..codeword.len() {
-            for i in 1..self.curr.shape()[0] {
-                for j in 1..self.curr.shape()[1] {
+            for i in 1..curr.shape()[0] {
+                for j in 1..curr.shape()[1] {
 
                     let (i_err, j_err, p_err) = if codeword.get(k).unwrap() {
                         (i - 1, j, self.p1[k])
@@ -57,24 +57,40 @@ impl Xi {
                         (i, j - 1, self.p0[k])
                     };
 
-                    let mut p = (p_err + self.prev[(i_err, j_err)]).ln_add_exp(
-                        p_err.ln_one_minus_exp() + self.prev[(i, j)]
-                    );
+                    let mut p = p_err.ln_one_minus_exp() + prev[(i, j)];
 
-                    self.curr[(i, j)] = p;
+                    if mask.map_or(true, |mask| mask.get(k).unwrap()) {
+                        p = p.ln_add_exp(p_err + prev[(i_err, j_err)]);
+                    }
+
+                    curr[(i, j)] = p;
                 }
             }
-            mem::swap(&mut self.prev, &mut self.curr);
+            mem::swap(&mut prev, &mut curr);
         }
 
-        self.prev.clone()
+        prev.slice(s![1.., 1..]).to_owned()
     }
 }
 
 
 pub struct Params {
     codebook: Codebook,
-    xi: HashMap<String, Array2<LogProb>>
+    xi: Xi
+}
+
+
+#[derive(Debug)]
+pub struct Events {
+    exact: LogProb,
+    mismatch: LogProb
+}
+
+
+impl Events {
+    pub fn total(&self) -> LogProb {
+        self.exact.ln_add_exp(self.mismatch)
+    }
 }
 
 
@@ -82,36 +98,36 @@ pub trait Model: Sync {
 
     fn params(&self) -> &Params;
 
-    /// Probability to make exactly i 1->0 and j 0->1 errors.
-    fn xi(&self, feature: &str, i: i8, j: i8) -> LogProb {
-        self.params().xi.get(feature).unwrap()[(i as usize + 1, j as usize + 1)]
+    /// Probability to make exactly i 1->0 and j 0->1 errors towards any target.
+    fn xi(&self, source: &codebook::Record, target: Option<&codebook::Record>) -> Array2<LogProb> {
+        let mask = if let Some(target) = target {
+            Some(source.diff(target))
+        } else {
+            None
+        };
+
+        self.params().xi.calc(source.codeword(), mask.as_ref())
     }
 
-    /// Probability to see an exact readout given that we have a call.
-    fn prob_call_exact(&self, feature: &str) -> LogProb;
+    /// Probability to see an exact readout or a readout with one mismatch given that we have a call.
+    fn prob_call(&self, feature: &str) -> Events;
 
-    /// Probability to see a readout with one mismatch given that we have a call.
-    fn prob_call_mismatch(&self, feature: &str) -> LogProb;
+    /// Probability to see a miscalled exact readout or a miscalled readout with one mismatch.
+    fn prob_miscall(&self, feature: &str) -> Events;
 
-    /// Probability to see an exact readout given that we have a miscall.
-    fn prob_miscall_exact(&self, feature: &str) -> LogProb;
-
-    /// Probability to see a readout with one mismatch given that we have a miscall.
-    fn prob_miscall_mismatch(&self, feature: &str) -> LogProb;
-
-    /// Probability to miss or miscall a readout because of too many errors.
-    fn prob_missed(&self, feature: &str) -> LogProb {
-        self.prob_call_exact(feature).ln_add_exp(self.prob_call_mismatch(feature)).ln_one_minus_exp()
-    }
-
-    fn prob_miscall(&self, feature: &str) -> LogProb {
-        self.prob_miscall_exact(feature).ln_add_exp(self.prob_miscall_mismatch(feature))
-    }
-
-    /// Probability to completely miss a readout (not miscalled).
-    fn prob_nocall(&self, feature: &str) -> LogProb {
-        self.prob_miscall_exact(feature).ln_add_exp(self.prob_miscall_mismatch(feature)).ln_one_minus_exp()
-    }
+    // /// Probability to miss or miscall a readout because of too many errors.
+    // fn prob_missed(&self, feature: &str) -> LogProb {
+    //     self.prob_call_exact(feature).ln_add_exp(self.prob_call_mismatch(feature)).ln_one_minus_exp()
+    // }
+    //
+    // fn prob_miscall(&self, feature: &str) -> LogProb {
+    //     self.prob_miscall_exact(feature).ln_add_exp(self.prob_miscall_mismatch(feature))
+    // }
+    //
+    // /// Probability to completely miss a readout (not miscalled).
+    // fn prob_nocall(&self, feature: &str) -> LogProb {
+    //     self.prob_miscall_exact(feature).ln_add_exp(self.prob_miscall_mismatch(feature)).ln_one_minus_exp()
+    // }
 }
 
 
@@ -126,36 +142,33 @@ impl Model for MHD4 {
         &self.params
     }
 
-    /// Probability to see an exact readout given that we have a call.
-    fn prob_call_exact(&self, feature: &str) -> LogProb {
-        self.xi(feature, 0, 0)
+    fn prob_call(&self, feature: &str) -> Events {
+        let xi = self.xi(self.params().codebook.get(feature), None);
+
+        Events {
+            exact: xi[(0, 0)],
+            mismatch: xi[(1, 0)].ln_add_exp(xi[(0, 1)])
+        }
     }
 
-    /// Probability to see a readout with one mismatch given that we have a call.
-    fn prob_call_mismatch(&self, feature: &str) -> LogProb {
-        self.xi(feature, 1, 0).ln_add_exp(self.xi(feature, 0, 1))
-    }
+    fn prob_miscall(&self, feature: &str) -> Events {
+        let feature = self.params().codebook.get(feature);
 
-    /// Probability to see an exact readout given that we have a miscall.
-    fn prob_miscall_exact(&self, feature: &str) -> LogProb {
-        LogProb::ln_sum_exp(&self.params().codebook.neighbors(feature, 4).iter().map(|neighbor| {
-            println!("neighbor: {}", neighbor.name());
-            self.xi(neighbor.name(), 2, 2)
-        }).collect_vec())
-    }
-
-    /// Probability to see a readout with one mismatch given that we have a miscall.
-    fn prob_miscall_mismatch(&self, feature: &str) -> LogProb {
-        let neighbors = self.params().codebook.neighbors(feature, 4);
-        let mut summands = Vec::with_capacity(neighbors.len() * 4);
-        for neighbor in neighbors {
-            summands.push(self.xi(neighbor.name(), 2, 1));
-            summands.push(self.xi(neighbor.name(), 1, 2));
-            summands.push(self.xi(neighbor.name(), 2, 3));
-            summands.push(self.xi(neighbor.name(), 3, 2));
+        let mut exact_summands = Vec::new();
+        let mut mismatch_summands = Vec::new();
+        for neighbor in self.params().codebook.neighbors(feature.name(), 4) {
+            let xi = self.xi(feature, Some(&neighbor));
+            exact_summands.push(xi[(2, 2)]);
+            mismatch_summands.push(xi[(2, 1)]);
+            mismatch_summands.push(xi[(1, 2)]);
+            mismatch_summands.push(xi[(2, 3)]);
+            mismatch_summands.push(xi[(3, 2)]);
         }
 
-        LogProb::ln_sum_exp(&summands)
+        Events {
+            exact: LogProb::ln_sum_exp(&exact_summands),
+            mismatch: LogProb::ln_sum_exp(&mismatch_summands)
+        }
     }
 }
 
@@ -171,48 +184,39 @@ impl Model for MHD2 {
         &self.params
     }
 
-    /// Probability to see an exact readout given that we have a call.
-    fn prob_call_exact(&self, feature: &str) -> LogProb {
-        self.xi(feature, 0, 0)
-    }
+    fn prob_call(&self, feature: &str) -> Events {
+        let xi = self.xi(self.params().codebook.get(feature), None);
 
-    /// Probability to see a readout with one mismatch given that we have a call.
-    fn prob_call_mismatch(&self, feature: &str) -> LogProb {
-        LogProb::ln_zero()
-    }
-
-    /// Probability to see an exact readout given that we have a miscall.
-    fn prob_miscall_exact(&self, feature: &str) -> LogProb {
-        let neighbors_4 = self.params().codebook.neighbors(feature, 4);
-        let neighbors_2 = self.params().codebook.neighbors(feature, 2);
-        let mut summands = Vec::with_capacity(neighbors_4.len() + neighbors_2.len());
-        for neighbor in neighbors_4 {
-            summands.push(self.xi(neighbor.name(), 2, 2));
+        Events {
+            exact: xi[(0, 0)],
+            mismatch: LogProb::ln_zero()
         }
-        for neighbor in neighbors_2 {
-            summands.push(self.xi(neighbor.name(), 1, 1));
-        }
-
-        LogProb::ln_sum_exp(&summands)
     }
 
-    /// Probability to see a readout with one mismatch given that we have a miscall.
-    #[allow(unused_variables)]
-    fn prob_miscall_mismatch(&self, feature: &str) -> LogProb {
-        LogProb::ln_zero()
+    fn prob_miscall(&self, feature: &str) -> Events {
+        let feature = self.params().codebook.get(feature);
+
+        let mut exact_summands = Vec::new();
+        for neighbor in self.params().codebook.neighbors(feature.name(), 4) {
+            let xi = self.xi(feature, Some(&neighbor));
+            exact_summands.push(xi[(2, 2)]);
+        }
+        for neighbor in self.params().codebook.neighbors(feature.name(), 4) {
+            let xi = self.xi(feature, Some(&neighbor));
+            exact_summands.push(xi[(1, 1)]);
+        }
+
+        Events {
+            exact: LogProb::ln_sum_exp(&exact_summands),
+            mismatch: LogProb::ln_zero()
+        }
     }
 }
 
 
 pub fn new_model(p0: &[Prob], p1: &[Prob], mut codebook: Codebook) -> Box<Model> {
-    let mut xi = HashMap::new();
     // TODO get rid of hardcoded value for max_err
-    let mut xicalc = Xi::new(p0, p1, 6);
-    for rec in codebook.records() {
-        xi.insert(rec.name().to_owned(), xicalc.calc(rec.codeword()));
-    }
-
-    let params = Params {codebook: codebook, xi: xi};
+    let params = Params {codebook: codebook, xi: Xi::new(p0, p1, 6)};
     let model: Box<Model> = match params.codebook.min_dist {
         4 => Box::new(MHD4 { params: params }),
         2 => Box::new(MHD2 { params: params }),
@@ -229,7 +233,6 @@ pub struct Readout {
     prob_miscall_exact: Prob,
     prob_miscall_mismatch: Prob,
     prob_missed: Prob,
-    prob_nocall: Prob,
     prob_miscall: Prob,
     prob_call: Prob,
     margin: u32
@@ -237,17 +240,18 @@ pub struct Readout {
 
 
 impl Readout {
-    pub fn new(feature: &str, model: &Box<Model>, window_width: u32) -> Self {
+    pub fn new(feature: &str, mut model: &Box<Model>, window_width: u32) -> Self {
+        let prob_call = model.prob_call(feature);
         let prob_miscall = model.prob_miscall(feature);
+
         Readout {
-            prob_call_exact: Prob::from(model.prob_call_exact(feature)),
-            prob_call_mismatch: Prob::from(model.prob_call_mismatch(feature)),
-            prob_miscall_exact: Prob::from(model.prob_miscall_exact(feature)),
-            prob_miscall_mismatch: Prob::from(model.prob_miscall_mismatch(feature)),
-            prob_missed: Prob::from(model.prob_missed(feature)),
-            prob_nocall: Prob::from(model.prob_nocall(feature)),
-            prob_miscall: Prob::from(prob_miscall),
-            prob_call: Prob::from(prob_miscall.ln_one_minus_exp()),
+            prob_call_exact: Prob::from(prob_call.exact),
+            prob_call_mismatch: Prob::from(prob_call.mismatch),
+            prob_miscall_exact: Prob::from(prob_miscall.exact),
+            prob_miscall_mismatch: Prob::from(prob_miscall.mismatch),
+            prob_missed: Prob::from(prob_call.total().ln_one_minus_exp()),
+            prob_miscall: Prob::from(prob_miscall.total()),
+            prob_call: Prob::from(prob_miscall.total().ln_one_minus_exp()),
             margin: window_width / 2
         }
     }
@@ -339,12 +343,6 @@ impl Readout {
         assert!(!likelihood.is_nan());
         likelihood
     }
-
-    pub fn expected_total(&self, total_count: u32) -> f64 {
-        // c = x - x * p_nocall
-        // x = c / (1 - p_nocall)
-        total_count as f64 / (1.0 - *self.prob_nocall)
-    }
 }
 
 
@@ -379,7 +377,7 @@ mod tests {
     fn test_prob_call_exact() {
         let feat = "COL5A1";
         let model = setup_mhd4();
-        let p = model.prob_call_exact(feat);
+        let p = model.prob_call(feat).exact;
         println!("{}", *p);
         assert!(p.exp().approx_eq(&0.4019988717840602));
     }
@@ -388,7 +386,7 @@ mod tests {
     fn test_prob_call_mismatch() {
         let feat = "COL5A1";
         let model = setup_mhd4();
-        let p = model.prob_call_mismatch(feat);
+        let p = model.prob_call(feat).mismatch;
         println!("{}", *p);
         assert!(p.exp().approx_eq(&0.3796656011293904));
     }
@@ -397,7 +395,7 @@ mod tests {
     fn test_prob_miscall_exact() {
         let feat = "COL5A1";
         let model = setup_mhd4();
-        let p = model.prob_miscall_exact(feat);
+        let p = model.prob_miscall(feat).exact;
         assert_relative_eq!(p.exp(), 0.00031018431464819473)
     }
 
@@ -405,29 +403,25 @@ mod tests {
     fn test_prob_miscall_mismatch() {
         let feat = "COL5A1";
         let model = setup_mhd4();
-        let p = model.prob_miscall_mismatch(feat);
+        let p = model.prob_miscall(feat).mismatch;
         println!("{}", *p);
-        assert!(p.exp().approx_eq(&0.020670338078917206));
+        assert_relative_eq!(p.exp(), 0.0204, epsilon=0.001);
     }
 
     #[test]
     fn test_prob_missed() {
         let feat = "COL5A1";
         let model = setup_mhd4();
-        let p = model.prob_missed(feat);
-        println!("{}", *p);
-        assert!(p.approx_eq(&0.21833552708654924));
+        let p = model.prob_call(feat).total().ln_one_minus_exp();
+        assert_relative_eq!(p.exp(), 0.21833552708654924);
     }
 
     #[test]
     fn test_mhd2() {
         let feat = "COL7A1";
         let model = setup_mhd2();
-        println!("{}", *model.prob_call_exact(feat));
-        println!("{}", *model.prob_call_mismatch(feat));
-        println!("{}", *model.prob_miscall_exact(feat));
-        println!("{}", *model.prob_miscall_mismatch(feat));
-        println!("{}", *model.prob_missed(feat));
+        println!("{:?}", model.prob_call(feat));
+        println!("{:?}", model.prob_miscall(feat));
     }
 
     fn comb(i: u8, j: u8) -> f64 {
@@ -436,49 +430,49 @@ mod tests {
 
     #[test]
     fn test_xi00() {
-        let feat = "COL5A1";
         let model = setup_mhd4();
-        let p = model.xi(feat, 0, 0).exp();
+        let feat = model.params().codebook.get("COL5A1");
+        let p = model.xi(feat, None)[(0, 0)].exp();
         assert_relative_eq!(p, comb(0,0) * 0.4019988717840602);
     }
 
     #[test]
     fn test_xi10() {
-        let feat = "COL5A1";
         let model = setup_mhd4();
-        let p = model.xi(feat, 1, 0).exp();
+        let feat = model.params().codebook.get("COL5A1");
+        let p = model.xi(feat, None)[(1, 0)].exp();
         assert_relative_eq!(p, comb(1,0) * 0.04466654130934002);
     }
 
     #[test]
     fn test_xi01() {
-        let feat = "COL5A1";
         let model = setup_mhd4();
-        let p = model.xi(feat, 0, 1).exp();
+        let feat = model.params().codebook.get("COL5A1");
+        let p = model.xi(feat, None)[(0, 1)].exp();
         assert_relative_eq!(p, comb(0, 1) * 0.01674995299100251);
     }
 
     #[test]
     fn test_xi22() {
-        let feat = "COL5A1";
         let model = setup_mhd4();
-        let p = model.xi(feat, 2, 2).exp();
+        let feat = model.params().codebook.get("COL5A1");
+        let p = model.xi(feat, None)[(2, 2)].exp();
         assert_relative_eq!(p, comb(2, 2) * 8.616230962449852e-06);
     }
 
     #[test]
     fn test_xi21() {
-        let feat = "COL5A1";
         let model = setup_mhd4();
-        let p = model.xi(feat, 2, 1).exp();
+        let feat = model.params().codebook.get("COL5A1");
+        let p = model.xi(feat, None)[(2, 1)].exp();
         assert_relative_eq!(p, comb(2, 1) * 0.00020678954309879646);
     }
 
     #[test]
     fn test_xi12() {
-        let feat = "COL5A1";
         let model = setup_mhd4();
-        let p = model.xi(feat, 1, 2).exp();
+        let feat = model.params().codebook.get("COL5A1");
+        let p = model.xi(feat, None)[(1, 2)].exp();
         assert_relative_eq!(p, comb(1, 2) * 7.754607866204867e-05);
     }
 

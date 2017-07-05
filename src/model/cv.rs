@@ -55,8 +55,8 @@ mod tests {
             model::expression::cdf(GENE, 50, 50, &readout, 100).0,
             model::expression::cdf(GENE, 50, 50, &readout, 100).0
         ];
-        let cdf1 = model::expressionset::cdf(&cdfs1, 0.0);
-        let cdf2 = model::expressionset::cdf(&cdfs2, 0.0);
+        let cdf1 = model::expressionset::cdf(&cdfs1, 0.000000001);
+        let cdf2 = model::expressionset::cdf(&cdfs2, 0.000000001);
         println!("{} {}", cdfs1[0].map().unwrap(), cdfs2[0].map().unwrap());
 
         let cdf = cdf(&[cdf1, cdf2]);
@@ -65,7 +65,7 @@ mod tests {
         println!("{:?}", cdf);
 
         assert!(*total <= 0.0);
-        assert_relative_eq!(*total, 0.0, epsilon = 0.0002);
+        assert_relative_eq!(*total, 0.0, epsilon = 0.005);
         assert_relative_eq!(**cdf.map().unwrap(), 1.14, epsilon = 0.02);
     }
 

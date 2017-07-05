@@ -76,7 +76,7 @@ mod tests {
         let fc = 2.0f64.powf(**cdf.map().unwrap());
 
         println!("map={}", fc);
-        assert_relative_eq!(*total, *LogProb::ln_one(), epsilon = 0.0002);
+        assert_relative_eq!(*total, *LogProb::ln_one(), epsilon = 0.002);
         assert!(fc >= 9.0);
     }
 }

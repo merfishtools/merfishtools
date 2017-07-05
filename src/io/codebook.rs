@@ -65,6 +65,19 @@ impl Record {
         }
         dist
     }
+
+    pub fn diff(&self, other: &Record) -> BitVec {
+        let mut diff = BitVec::new();
+        {
+            let mut s = unsafe { diff.storage_mut() };
+            for (a, b) in self.codeword.blocks().zip(other.codeword.blocks()) {
+                s.push(a ^ b);
+            }
+        }
+        unsafe { diff.set_len(self.codeword.len()); }
+
+        diff
+    }
 }
 
 
