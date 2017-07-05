@@ -54,6 +54,7 @@ pub fn cdf<T: Ord, F: Fn(NotNaN<f64>, NotNaN<f64>) -> T>(cdfs: &[CDF<NotNaN<f64>
                 curr.push(cdf::Entry { value: (mk, sk), prob: p });
             }
         }
+        println!("----------\n{:?}", &curr[..5]);
         prev = CDF::from_pmf(curr);
         curr = Vec::new();
     }
