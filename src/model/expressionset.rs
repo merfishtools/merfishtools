@@ -6,6 +6,7 @@ pub type CDF = model::dist::CDF<MeanExpression>;
 
 pub fn cdf(expression_cdfs: &[model::expression::CDF], pseudocounts: f64) -> CDF {
     let cdf = model::meanvar::cdf(expression_cdfs, |mean, _| mean + pseudocounts);
+    assert_relative_eq!(cdf.total_prob().exp(), 1.0);
     cdf.reduce().sample(1000)
 }
 
