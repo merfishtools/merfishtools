@@ -359,7 +359,7 @@ mod tests {
         new_model(
             &[Prob(0.04); 16],
             &[Prob(0.1); 16],
-            io::codebook::Codebook::from_file("test/codebook/simulated-MHD4.txt").unwrap()
+            io::codebook::Codebook::from_file("tests/codebook/simulated-MHD4.txt").unwrap()
         )
     }
 
@@ -368,7 +368,7 @@ mod tests {
         new_model(
             &[Prob(0.04); 16],
             &[Prob(0.1); 16],
-            io::codebook::Codebook::from_file("test/codebook/simulated-MHD2.txt").unwrap()
+            io::codebook::Codebook::from_file("tests/codebook/simulated-MHD2.txt").unwrap()
         )
     }
 

@@ -77,8 +77,8 @@ fn main() {
         let print_naive = matches.is_present("print-naive");
 
         cli::expression(
-            vec![Prob(p0)],
-            vec![Prob(p1)],
+            vec![Prob(p0); 32],
+            vec![Prob(p1); 32],
             &codebook_path,
             estimate_path,
             threads,

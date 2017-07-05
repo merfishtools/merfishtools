@@ -36,7 +36,7 @@ mod tests {
         model::readout::new_model(
             &[Prob(0.04); 16],
             &[Prob(0.1); 16],
-            io::codebook::Codebook::from_file("test/codebook/140genesData.1.txt").unwrap()
+            io::codebook::Codebook::from_file("tests/codebook/140genesData.1.txt").unwrap()
         )
     }
 
@@ -95,9 +95,9 @@ mod tests {
 
     #[test]
     fn test_ahnak2() {
-        let cdfs1 = io::cdf::expression::Reader::from_file("test/expression_cdf/1.txt").unwrap().cdfs();
-        let cdfs2 = io::cdf::expression::Reader::from_file("test/expression_cdf/2.txt").unwrap().cdfs();
-        let cdfs3 = io::cdf::expression::Reader::from_file("test/expression_cdf/3.txt").unwrap().cdfs();
+        let cdfs1 = io::cdf::expression::Reader::from_file("tests/expression_cdf/1.txt").unwrap().cdfs();
+        let cdfs2 = io::cdf::expression::Reader::from_file("tests/expression_cdf/2.txt").unwrap().cdfs();
+        let cdfs3 = io::cdf::expression::Reader::from_file("tests/expression_cdf/3.txt").unwrap().cdfs();
 
         let cdfs1 = cdfs1.get("AHNAK2").unwrap();
         let cdfs2 = cdfs2.get("AHNAK2").unwrap();

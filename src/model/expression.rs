@@ -58,7 +58,7 @@ mod tests {
         model::readout::new_model(
             &[Prob(0.04); 16],
             &[Prob(0.1); 16],
-            io::codebook::Codebook::from_file("test/codebook/140genesData.1.txt").unwrap()
+            io::codebook::Codebook::from_file("tests/codebook/140genesData.1.txt").unwrap()
         )
     }
 
@@ -66,7 +66,7 @@ mod tests {
         model::readout::new_model(
             &[Prob(0.04); 14],
             &[Prob(0.1); 14],
-            io::codebook::Codebook::from_file("test/codebook/simulated-MHD2.txt").unwrap()
+            io::codebook::Codebook::from_file("tests/codebook/simulated-MHD2.txt").unwrap()
         )
     }
 
