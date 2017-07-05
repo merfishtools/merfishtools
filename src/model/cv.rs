@@ -66,7 +66,7 @@ mod tests {
 
         assert!(*total <= 0.0);
         assert_relative_eq!(*total, 0.0, epsilon = 0.005);
-        assert_relative_eq!(**cdf.map().unwrap(), 1.14, epsilon = 0.02);
+        assert_relative_eq!(**cdf.map().unwrap(), 1.14, epsilon = 0.03);
     }
 
     #[test]

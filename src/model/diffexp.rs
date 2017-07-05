@@ -40,7 +40,7 @@ pub fn bayes_factor(cdf: &CDF, max_null_value: DiffexpMeasure) -> model::BayesFa
 
 
 pub fn estimate(cdf: &CDF, max_fc: DiffexpMeasure) -> Estimate {
-    let ci = cdf.credible_interval(0.95);
+    let ci = cdf.credible_interval(0.95).expect("bug: empty CDF");
     Estimate {
         differential_expression_pep: pep(cdf, max_fc),
         differential_expression_bf: bayes_factor(cdf, max_fc),

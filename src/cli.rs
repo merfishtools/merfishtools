@@ -121,7 +121,7 @@ pub fn expression(p0: Vec<Prob>, p1: Vec<Prob>, codebook_path: &str, estimate_pa
                         &cell,
                         &feature,
                         *cdf.map().expect("bug: empty CDF"),
-                        cdf.credible_interval(0.95),
+                        cdf.credible_interval(0.95).expect("bug: empty CDF"),
                         naive_estimate
                     );
                 }

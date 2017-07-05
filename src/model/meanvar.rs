@@ -27,12 +27,12 @@ impl MeanVar {
 
 
 pub fn cdf<T: Ord, F: Fn(NotNaN<f64>, NotNaN<f64>) -> T>(cdfs: &[CDF<NotNaN<f64>>], value: F) -> CDF<T> {
+    assert!(cdfs.len() > 1, "meanvar::cdf() has to run on at least 2 cdfs");
     let n = cdfs.len() as f64;
     let mut curr = Vec::new();
     let mut prev = {
         let mut pmf = Vec::new();
         for e in cdfs[0].iter_pmf() {
-            println!("{:?}", e.prob);
             pmf.push(cdf::Entry {
                 value: (*e.value, NotNaN::new(0.0).unwrap()),
                 prob: e.prob
@@ -42,8 +42,6 @@ pub fn cdf<T: Ord, F: Fn(NotNaN<f64>, NotNaN<f64>) -> T>(cdfs: &[CDF<NotNaN<f64>
     };
 
     for (k, cdf) in cdfs.iter().enumerate().skip(1) {
-        assert_relative_eq!(cdf.total_prob().exp(), 1.0, epsilon=0.002);
-
         let k = k as f64 + 1.0;
 
         for prev_entry in prev.sample(1000).iter_pmf() {
@@ -55,7 +53,6 @@ pub fn cdf<T: Ord, F: Fn(NotNaN<f64>, NotNaN<f64>) -> T>(cdfs: &[CDF<NotNaN<f64>
                 curr.push(cdf::Entry { value: (mk, sk), prob: p });
             }
         }
-        println!("----------\n{:?}", &curr[..5]);
         prev = CDF::from_pmf(curr);
         curr = Vec::new();
     }

@@ -4,7 +4,7 @@ version = "1.2.0"
 authors = ["Johannes Koester <johannes.koester@tu-dortmund.de>"]
 
 [dependencies]
-bio = "0.14.*"
+bio = { git = "https://github.com/rust-bio/rust-bio.git" } # "0.14.*"
 regex = "0.1.*"
 bit-set = "0.4.*"
 csv = "0.14.*"
