@@ -422,6 +422,7 @@ mod tests {
         let model = setup_mhd2();
         println!("{:?}", model.prob_call(feat));
         println!("{:?}", model.prob_miscall(feat));
+        assert!(false);
     }
 
     fn comb(i: u8, j: u8) -> f64 {
