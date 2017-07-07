@@ -420,8 +420,8 @@ mod tests {
     fn test_mhd2() {
         let feat = "COL7A1";
         let model = setup_mhd2();
-        println!("{:?}", model.prob_call(feat));
-        println!("{:?}", model.prob_miscall(feat));
+        println!("{:?}", model.prob_call(feat).exact.exp());
+        println!("{:?}", model.prob_miscall(feat).exact.exp());
         assert!(false);
     }
 
