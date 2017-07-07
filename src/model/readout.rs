@@ -332,6 +332,7 @@ mod tests {
         println!("{}", model.prob_miscall_exact("COL7A1"));
         println!("{}", model.prob_miscall_mismatch("COL7A1"));
         println!("{}", model.prob_missed());
+        assert!(false);
     }
 
     #[test]
