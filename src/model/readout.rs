@@ -201,7 +201,7 @@ impl Model for MHD2 {
             let xi = self.xi(feature, Some(&neighbor));
             exact_summands.push(xi[(2, 2)]);
         }
-        for neighbor in self.params().codebook.neighbors(feature.name(), 4) {
+        for neighbor in self.params().codebook.neighbors(feature.name(), 2) {
             let xi = self.xi(feature, Some(&neighbor));
             exact_summands.push(xi[(1, 1)]);
         }
@@ -420,9 +420,12 @@ mod tests {
     fn test_mhd2() {
         let feat = "COL7A1";
         let model = setup_mhd2();
-        println!("{:?}", model.prob_call(feat).exact.exp());
-        println!("{:?}", model.prob_miscall(feat).exact.exp());
-        assert!(false);
+        let prob_call = model.prob_call(feat);
+        let prob_miscall = model.prob_miscall(feat);
+        assert_relative_eq!(prob_call.exact.exp(), 0.4361, epsilon=0.0001);
+        assert_relative_eq!(prob_miscall.exact.exp(), 0.0817, epsilon=0.0001);
+        assert_relative_eq!(prob_call.mismatch.exp(), 0.0);
+        assert_relative_eq!(prob_miscall.mismatch.exp(), 0.0);
     }
 
     fn comb(i: u8, j: u8) -> f64 {
