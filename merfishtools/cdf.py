@@ -13,22 +13,22 @@ def read_cdf(path_or_buffer):
     return cdf
 
 
-def plot_cdf(cdf, expected_value=None, credible_interval=None, legend=True):
+def plot_cdf(cdf, map_value=None, credible_interval=None, legend=True):
     probs = np.exp(cdf.iloc[:, 1])
     plt.step(cdf.iloc[:, 0], probs, "k-", label="", clip_on=False, zorder=2)
     ylim = plt.ylim()
-    plot_estimate(ylim, expected_value, credible_interval, legend=legend)
+    plot_estimate(ylim, map_value, credible_interval, legend=legend)
     if credible_interval is not None or expected_value is not None:
         _mask_estimate(ylim, cdf.iloc[:, 0], probs, step="pre")
     plt.ylabel("CDF")
 
 
-def plot_pmf(cdf, expected_value=None, credible_interval=None, legend=True):
+def plot_pmf(cdf, map_value=None, credible_interval=None, legend=True):
     probs = np.exp(cdf.iloc[:, 1])
     probs[1:] = probs[1:] - probs[:-1]
     plt.plot(cdf.iloc[:, 0], probs, "ko", label="", ms=4, clip_on=False, zorder=2)
     ylim = plt.ylim()
-    plot_estimate(ylim, expected_value, credible_interval, legend=legend)
+    plot_estimate(ylim, map_value, credible_interval, legend=legend)
     if credible_interval is not None or expected_value is not None:
         _mask_estimate(ylim, cdf.iloc[:, 0], probs)
     plt.ylabel("PMF")
