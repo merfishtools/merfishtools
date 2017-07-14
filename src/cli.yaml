@@ -57,13 +57,13 @@ subcommands:
             long: p0
             value_name: FLOAT
             multiple: true
-            default: "0.04"
+            default_value: "0.04"
             help: Prior probability of 0->1 error
         - p1:
             long: p1
             value_name: FLOAT
             multiple: true
-            default: "0.1"
+            default_value: "0.1"
             help: Prior probability of 1->0 error
         - cells:
             long: cells

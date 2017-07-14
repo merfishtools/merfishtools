@@ -76,9 +76,19 @@ fn main() {
         let threads = value_t!(matches, "threads", usize).unwrap_or(1);
         let print_naive = matches.is_present("print-naive");
 
+        let convert_err_rates = |values: Vec<f64>| {
+            if values.len() == 1 {
+                vec![Prob::checked(values[0]).unwrap(); 32]
+            } else {
+                values.into_iter().map(|p| {
+                    Prob::checked(p).unwrap()
+                }).collect_vec()
+            }
+        };
+
         cli::expression(
-            p0.into_iter().map(|p| Prob(p)).collect_vec(),
-            p1.into_iter().map(|p| Prob(p)).collect_vec(),
+            convert_err_rates(p0),
+            convert_err_rates(p1),
             &codebook_path,
             estimate_path,
             threads,
