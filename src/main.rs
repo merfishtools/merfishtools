@@ -67,8 +67,8 @@ fn main() {
     }
 
     if let Some(matches) = matches.subcommand_matches("exp") {
-        let p0 = value_t!(matches, "p0", f64).unwrap_or(0.04);
-        let p1 = value_t!(matches, "p1", f64).unwrap_or(0.1);
+        let p0 = values_t!(matches, "p0", f64).unwrap_or_else(|e| e.exit());
+        let p1 = values_t!(matches, "p1", f64).unwrap_or_else(|e| e.exit());
         let estimate_path = matches.value_of("estimate");
         let codebook_path = matches.value_of("codebook").unwrap();
         let cells = matches.value_of("cells").unwrap_or(".*");
@@ -77,8 +77,8 @@ fn main() {
         let print_naive = matches.is_present("print-naive");
 
         cli::expression(
-            vec![Prob(p0); 32],
-            vec![Prob(p1); 32],
+            p0.into_iter().map(|p| Prob(p)).collect_vec(),
+            p1.into_iter().map(|p| Prob(p)).collect_vec(),
             &codebook_path,
             estimate_path,
             threads,
