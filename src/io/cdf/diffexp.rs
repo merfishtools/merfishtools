@@ -40,8 +40,8 @@ impl<W: io::Write> Writer<W> {
         for e in cdf.iter() {
             self.inner.write([
                 feature,
-                &format!("{}", e.0)[..],
-                &format!("{}", e.1)[..]
+                &format!("{}", e.value)[..],
+                &format!("{}", *e.prob)[..]
             ].iter()).unwrap();
         }
     }

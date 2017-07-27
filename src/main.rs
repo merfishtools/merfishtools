@@ -16,20 +16,24 @@ extern crate rustc_serialize;
 extern crate cue;
 extern crate regex;
 extern crate rgsl;
-extern crate ord_subset;
 #[macro_use]
 extern crate approx;
 #[macro_use]
 extern crate clap;
+#[macro_use(s)]
 extern crate ndarray;
 extern crate bit_vec;
 extern crate bit_set;
 extern crate petgraph;
+extern crate ordered_float;
 
 use std::process;
 
 use clap::App;
 use itertools::Itertools;
+use ordered_float::NotNaN;
+
+use bio::stats::Prob;
 
 pub mod model;
 pub mod io;
@@ -63,8 +67,8 @@ fn main() {
     }
 
     if let Some(matches) = matches.subcommand_matches("exp") {
-        let p0 = value_t!(matches, "p0", f64).unwrap_or(0.04);
-        let p1 = value_t!(matches, "p1", f64).unwrap_or(0.1);
+        let p0 = values_t!(matches, "p0", f64).unwrap_or_else(|e| e.exit());
+        let p1 = values_t!(matches, "p1", f64).unwrap_or_else(|e| e.exit());
         let estimate_path = matches.value_of("estimate");
         let codebook_path = matches.value_of("codebook").unwrap();
         let cells = matches.value_of("cells").unwrap_or(".*");
@@ -72,12 +76,31 @@ fn main() {
         let threads = value_t!(matches, "threads", usize).unwrap_or(1);
         let print_naive = matches.is_present("print-naive");
 
-        cli::expression(p0, p1, &codebook_path, estimate_path, threads, &cells, window_width, print_naive);
+        let convert_err_rates = |values: Vec<f64>| {
+            if values.len() == 1 {
+                vec![Prob::checked(values[0]).unwrap(); 32]
+            } else {
+                values.into_iter().map(|p| {
+                    Prob::checked(p).unwrap()
+                }).collect_vec()
+            }
+        };
+
+        cli::expression(
+            convert_err_rates(p0),
+            convert_err_rates(p1),
+            &codebook_path,
+            estimate_path,
+            threads,
+            &cells,
+            window_width,
+            print_naive
+        );
     } else if let Some(matches) = matches.subcommand_matches("diffexp") {
         let group1_path = matches.value_of("group1").unwrap();
         let group2_path = matches.value_of("group2").unwrap();
         let cdf_path = matches.value_of("cdf");
-        let max_fc = value_t!(matches, "max-null-log2fc", f64).unwrap_or(1.0);
+        let max_fc = NotNaN::new(value_t!(matches, "max-null-log2fc", f64).unwrap_or(1.0)).expect("NaN not allowed for --max-null-log2fc.");
         let pseudocounts = value_t!(matches, "pseudocounts", f64).unwrap_or(1.0);
         let threads = value_t!(matches, "threads", usize).unwrap_or(1);
 
@@ -85,7 +108,7 @@ fn main() {
     } else if let Some(matches) = matches.subcommand_matches("multidiffexp") {
         let group_paths = matches.values_of("groups").unwrap();
         let cdf_path = matches.value_of("cdf");
-        let max_cv = value_t!(matches, "max-null-cv", f64).unwrap_or(0.5);
+        let max_cv = NotNaN::new(value_t!(matches, "max-null-cv", f64).unwrap_or(0.5)).expect("NaN not allowed for --max-null-cv.");
         let pseudocounts = value_t!(matches, "pseudocounts", f64).unwrap_or(1.0);
         let threads = value_t!(matches, "threads", usize).unwrap_or(1);
 

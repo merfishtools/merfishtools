@@ -6,7 +6,9 @@
 use std::io;
 use std::fs;
 use std::path::Path;
+use std::ops::Range;
 
+use ordered_float::NotNaN;
 use csv;
 
 
@@ -31,7 +33,7 @@ impl<W: io::Write> Writer<W> {
             inner: csv::Writer::from_writer(w).delimiter(b'\t'),
             print_naive: print_naive
         };
-        let mut fields = vec!["cell", "feat", "expr_ev", "expr_sd", "expr_map", "expr_ci_lower", "expr_ci_upper"];
+        let mut fields = vec!["cell", "feat", "expr_map", "expr_ci_lower", "expr_ci_upper"];
         if print_naive {
             fields.push("expr_naive");
         }
@@ -40,27 +42,30 @@ impl<W: io::Write> Writer<W> {
         writer
     }
 
-    pub fn write(&mut self, cell: &str, feature: &str, expected_value: f64, standard_deviation: f64, map: f64, credible_interval: (&f64, &f64), naive_estimate: u32) {
+    pub fn write(
+        &mut self,
+        cell: &str,
+        feature: &str,
+        map: NotNaN<f64>,
+        credible_interval: Range<&NotNaN<f64>>,
+        naive_estimate: u32
+    ) {
         if self.print_naive {
             self.inner.write([
                 cell,
                 feature,
-                &format!("{:.*}", 2, expected_value)[..],
-                &format!("{:.*}", 4, standard_deviation)[..],
                 &format!("{}", map)[..],
-                &format!("{}", credible_interval.0)[..],
-                &format!("{}", credible_interval.1)[..],
+                &format!("{}", credible_interval.start)[..],
+                &format!("{}", credible_interval.end)[..],
                 &format!("{}", naive_estimate)[..]
             ].iter()).unwrap();
         } else {
             self.inner.write([
                 cell,
                 feature,
-                &format!("{:.*}", 2, expected_value)[..],
-                &format!("{:.*}", 4, standard_deviation)[..],
                 &format!("{}", map)[..],
-                &format!("{}", credible_interval.0)[..],
-                &format!("{}", credible_interval.1)[..]
+                &format!("{}", credible_interval.start)[..],
+                &format!("{}", credible_interval.end)[..]
             ].iter()).unwrap();
         }
 

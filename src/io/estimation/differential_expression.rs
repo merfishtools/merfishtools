@@ -9,7 +9,7 @@ use std::path::Path;
 
 use csv;
 
-use bio::stats::logprobs::LogProb;
+use bio::stats::LogProb;
 
 use model;
 
@@ -38,8 +38,6 @@ impl<W: io::Write> Writer<W> {
             "diff_pep",
             "diff_fdr",
             "diff_bf",
-            &format!("{}_ev", measure_label)[..],
-            &format!("{}_sd", measure_label)[..],
             &format!("{}_map", measure_label)[..],
             &format!("{}_ci_lower", measure_label)[..],
             &format!("{}_ci_upper", measure_label)[..]
@@ -54,8 +52,6 @@ impl<W: io::Write> Writer<W> {
         differential_expression_pep: LogProb,
         fdr: LogProb,
         differential_expression_bf: model::BayesFactor,
-        expected_value: model::diffexp::DiffexpMeasure,
-        standard_deviation: model::diffexp::DiffexpMeasure,
         map: model::diffexp::DiffexpMeasure,
         credible_interval: (model::diffexp::DiffexpMeasure, model::diffexp::DiffexpMeasure)
     ) {
@@ -64,8 +60,6 @@ impl<W: io::Write> Writer<W> {
             &format!("{:.*e}", 2, differential_expression_pep.exp())[..],
             &format!("{:.*e}", 2, fdr.exp())[..],
             &format!("{:.*}", 2, differential_expression_bf)[..],
-            &format!("{:.*}", 2, expected_value)[..],
-            &format!("{:.*}", 2, standard_deviation)[..],
             &format!("{:.*}", 2, map)[..],
             &format!("{:.*}", 2, credible_interval.0)[..],
             &format!("{:.*}", 2, credible_interval.1)[..]

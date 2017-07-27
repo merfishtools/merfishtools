@@ -15,8 +15,7 @@ use itertools::Itertools;
 use cue;
 use regex::Regex;
 
-use bio::stats::logprobs::Prob;
-use bio::stats::logprobs;
+use bio::stats::{Prob, LogProb};
 
 use io;
 use model;
@@ -59,11 +58,8 @@ struct Counts {
 }*/
 
 
-
-
-
 /// Estimate expressions.
-pub fn expression(p0: Prob, p1: Prob, codebook_path: &str, estimate_path: Option<&str>, threads: usize, cells: &str, window_width: u32, print_naive: bool) {
+pub fn expression(p0: Vec<Prob>, p1: Vec<Prob>, codebook_path: &str, estimate_path: Option<&str>, threads: usize, cells: &str, window_width: u32, print_naive: bool) {
     let codebook = io::codebook::Codebook::from_file(codebook_path).unwrap();
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
     let mut cdf_writer = io::cdf::expression::Writer::from_writer(std::io::stdout());
@@ -102,7 +98,7 @@ pub fn expression(p0: Prob, p1: Prob, codebook_path: &str, estimate_path: Option
         }
     }
 
-    let model = model::readout::new_model(p0, p1, codebook);
+    let model = model::readout::new_model(&p0, &p1, codebook);
 
     cue::pipeline(
         "exp",
@@ -124,10 +120,8 @@ pub fn expression(p0: Prob, p1: Prob, codebook_path: &str, estimate_path: Option
                     est_writer.write(
                         &cell,
                         &feature,
-                        cdf.expected_value(),
-                        cdf.standard_deviation(),
-                        *cdf.map(),
-                        cdf.credible_interval(),
+                        *cdf.map().expect("bug: empty CDF"),
+                        cdf.credible_interval(0.95).expect("bug: empty CDF"),
                         naive_estimate
                     );
                 }
@@ -168,29 +162,31 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
             (feature, cdf)
         },
         |(feature, cdf)| {
-            if cdf.iter().any(|&(_, prob)| prob.is_nan()) {
+            if cdf.iter().any(|e| e.prob.is_nan()) {
                 warn!("A CDF probability for feature {} cannot be estimated because counts are too high. It will be reported as NaN.", feature);
             }
 
             if let Some(ref mut cdf_writer) = cdf_writer {
                 cdf_writer.write(&feature, &cdf);
             }
-            estimates.push((feature, cdf.estimate(max_fc)));
+            estimates.push((feature, model::diffexp::estimate(&cdf, max_fc)));
         }
     );
 
     // calculate FDR and write estimates to STDOUT
-    estimates.sort_by(|&(_, ref a), &(_, ref b)| a.differential_expression_pep.partial_cmp(&b.differential_expression_pep).unwrap());
-    let expected_fds = logprobs::cumsum(estimates.iter().map(|&(_, ref a)| a.differential_expression_pep)).collect_vec();
+    estimates.sort_by(|&(_, ref a), &(_, ref b)| {
+        a.differential_expression_pep.partial_cmp(&b.differential_expression_pep).unwrap()
+    });
+    let expected_fds = LogProb::ln_cumsum_exp(
+        estimates.iter().map(|&(_, ref a)| a.differential_expression_pep)
+    ).collect_vec();
     for (i, ((feature, estimate), fd)) in estimates.into_iter().zip(expected_fds).enumerate() {
-        let fdr = fd - (i as f64 + 1.0).ln();
+        let fdr = LogProb(*fd - (i as f64 + 1.0).ln());
         est_writer.write(
             &feature,
             estimate.differential_expression_pep,
             fdr,
             estimate.differential_expression_bf,
-            estimate.expected_value,
-            estimate.standard_deviation,
             estimate.map,
             estimate.credible_interval
         );
@@ -237,29 +233,31 @@ pub fn multi_differential_expression(group_paths: &[&str], pmf_path: Option<&str
             (feature, cdf)
         },
         |(feature, cdf)| {
-            if cdf.iter().any(|&(_, prob)| prob.is_nan()) {
+            if cdf.iter().any(|e| e.prob.is_nan()) {
                 warn!("A CDF probability for feature {} cannot be estimated due to numerical problems. It will be reported as NaN.", feature);
             }
 
             if let Some(ref mut cdf_writer) = cdf_writer {
                 cdf_writer.write(&feature, &cdf);
             }
-            estimates.push((feature, cdf.estimate(max_cv)));
+            estimates.push((feature, model::diffexp::estimate(&cdf, max_cv)));
         }
     );
 
     // calculate FDR and write estimates to STDOUT
-    estimates.sort_by(|&(_, ref a), &(_, ref b)| a.differential_expression_pep.partial_cmp(&b.differential_expression_pep).unwrap());
-    let expected_fds = logprobs::cumsum(estimates.iter().map(|&(_, ref a)| a.differential_expression_pep)).collect_vec();
+    estimates.sort_by(|&(_, ref a), &(_, ref b)| {
+        a.differential_expression_pep.partial_cmp(&b.differential_expression_pep).unwrap()
+    });
+    let expected_fds = LogProb::ln_cumsum_exp(
+        estimates.iter().map(|&(_, ref a)| a.differential_expression_pep)
+    ).collect_vec();
     for (i, ((feature, estimate), fd)) in estimates.into_iter().zip(expected_fds).enumerate() {
-        let fdr = fd - (i as f64 + 1.0).ln();
+        let fdr = LogProb(*fd - (i as f64 + 1.0).ln());
         est_writer.write(
             &feature,
             estimate.differential_expression_pep,
             fdr,
             estimate.differential_expression_bf,
-            estimate.expected_value,
-            estimate.standard_deviation,
             estimate.map,
             estimate.credible_interval
         );

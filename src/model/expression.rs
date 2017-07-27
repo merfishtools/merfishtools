@@ -1,11 +1,13 @@
 use itertools::Itertools;
+use ordered_float::NotNaN;
 
-use bio::stats::logprobs;
+use bio::stats::LogProb;
+use bio::stats::probs;
 
 use model;
 
 
-pub type CDF = model::dist::CDF<f64>;
+pub type CDF = probs::cdf::CDF<NotNaN<f64>>;
 
 
 /// Calculate CDF of expression.
@@ -18,13 +20,16 @@ pub fn cdf(feature: &str, count: u32, count_exact: u32, model: &Box<model::reado
         readout_model.likelihood(x, count, count_exact)
     }).collect_vec();
     // calculate (marginal / flat_prior)
-    let marginal = logprobs::sum(&likelihoods);
+    let marginal = LogProb::ln_sum_exp(&likelihoods);
 
-    (model::dist::CDF::from_pmf(
+    (CDF::from_pmf(
         likelihoods.iter().enumerate().filter_map(|(x, lh)| {
             let prob = lh - marginal;
             if prob >= model::MIN_PROB {
-                Some(((xmin + x as u32) as f64, prob))
+                Some(probs::cdf::Entry {
+                    value: NotNaN::new((xmin + x as u32) as f64).unwrap(),
+                    prob: prob
+                })
             }
             else {
                 None
@@ -41,6 +46,8 @@ mod tests {
 
     use nalgebra::ApproxEq;
 
+    use bio::stats::{Prob, LogProb};
+
     use super::*;
     use model;
     use io;
@@ -48,11 +55,19 @@ mod tests {
     const GENE: &'static str = "COL5A1";
 
     fn setup() -> Box<model::readout::Model> {
-        model::readout::new_model(0.04, 0.1, io::codebook::Codebook::from_file("test/codebook/140genesData.1.txt").unwrap())
+        model::readout::new_model(
+            &[Prob(0.04); 16],
+            &[Prob(0.1); 16],
+            io::codebook::Codebook::from_file("tests/codebook/140genesData.1.txt").unwrap()
+        )
     }
 
     fn setup_mhd2() -> Box<model::readout::Model> {
-        model::readout::new_model(0.04, 0.1, io::codebook::Codebook::from_file("test/codebook/simulated-MHD2.txt").unwrap())
+        model::readout::new_model(
+            &[Prob(0.04); 14],
+            &[Prob(0.1); 14],
+            io::codebook::Codebook::from_file("tests/codebook/simulated-MHD2.txt").unwrap()
+        )
     }
 
     #[test]
@@ -62,7 +77,7 @@ mod tests {
 
         let total = cdf.total_prob();
         println!("{:?}", cdf);
-        println!("{}", total);
+        println!("{}", *total);
         assert!(total.approx_eq(&-0.0000011368907495423741));
     }
 
@@ -73,7 +88,7 @@ mod tests {
 
         let total = cdf.total_prob();
         println!("{:?}", cdf);
-        println!("{}", total);
+        println!("{}", *total);
         assert!(total.approx_eq(&-0.0000035876739698048574));
     }
 
@@ -86,7 +101,7 @@ mod tests {
         let readout = setup_mhd2();
         let (cdf, _) = cdf("COL7A1", count, count, &readout, 100);
 
-        println!("{:?} {} {:?}", cdf.expected_value(), cdf.map(), cdf);
+        println!("{} {:?}", cdf.map().unwrap(), cdf);
     }
 }
 /*

@@ -56,11 +56,15 @@ subcommands:
         - p0:
             long: p0
             value_name: FLOAT
-            help: Prior probability of 0->1 error [0.04]
+            multiple: true
+            default_value: "0.04"
+            help: Prior probability of 0->1 error
         - p1:
             long: p1
             value_name: FLOAT
-            help: Prior probability of 1->0 error [0.1]
+            multiple: true
+            default_value: "0.1"
+            help: Prior probability of 1->0 error
         - cells:
             long: cells
             value_name: REGEX

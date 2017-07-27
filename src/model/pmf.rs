@@ -3,8 +3,7 @@ use std::slice;
 use itertools::Itertools;
 use num::traits::{cast, NumCast};
 
-use bio::stats::logprobs::LogProb;
-use bio::stats::logprobs;
+use bio::stats::LogProb;
 
 
 #[derive(Clone, Debug)]
@@ -32,7 +31,7 @@ impl<T: Clone + Sized> PMF<T> {
     }
 
     pub fn cdf(&self) -> Vec<LogProb> {
-        logprobs::cumsum(self.inner.iter().map(|e| e.prob)).collect_vec()
+        LogProb::ln_cumsum_exp(self.inner.iter().map(|e| e.prob)).collect_vec()
     }
 
     /// Return maximum a posteriori probability estimate (MAP).
@@ -52,30 +51,10 @@ impl<T: Clone + Sized + Copy> PMF<T> {
     /// Return the 95% credible interval.
     pub fn credible_interval(&self) -> (T, T) {
         let cdf = self.cdf();
-        let lower = cdf.binary_search_by(|p| p.partial_cmp(&0.025f64.ln()).unwrap()).unwrap_or_else(|i| i);
-        let upper = cdf.binary_search_by(|p| p.partial_cmp(&0.975f64.ln()).unwrap()).unwrap_or_else(|i| i);
+        let lower = cdf.binary_search_by(|p| p.partial_cmp(&LogProb(0.025f64.ln())).unwrap()).unwrap_or_else(|i| i);
+        let upper = cdf.binary_search_by(|p| p.partial_cmp(&LogProb(0.975f64.ln())).unwrap()).unwrap_or_else(|i| i);
 
         (self.inner[lower].value, self.inner[upper].value)
-    }
-}
-
-
-impl<T: NumCast + Clone + Copy> PMF<T> {
-    pub fn expected_value(&self) -> f64 {
-        self.iter().map(|e| {
-            cast::<T, f64>(e.value).unwrap() * e.prob.exp()
-        }).fold(0.0f64, |s, e| s + e)
-    }
-
-    pub fn variance(&self) -> f64 {
-        let ev = self.expected_value();
-        self.iter().map(|e| {
-                (cast::<T, f64>(e.value).unwrap() - ev).powi(2) * e.prob.exp()
-        }).fold(0.0, |s, e| s + e)
-    }
-
-    pub fn standard_deviation(&self) -> f64 {
-        self.variance().sqrt()
     }
 }
 

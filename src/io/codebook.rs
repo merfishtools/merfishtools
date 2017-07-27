@@ -11,13 +11,19 @@ use csv;
 use itertools::Itertools;
 use bit_vec::BitVec;
 use petgraph::prelude::*;
+use petgraph::visit::IntoNodeReferences;
+use petgraph::visit::NodeRef;
+use petgraph::graph::NodeWeightsMut;
+
+
+pub type Codeword = BitVec<u32>;
 
 
 /// A codebook record.
 #[derive(Debug)]
 pub struct Record {
-    pub name: String,
-    pub codeword: BitVec<u32>
+    name: String,
+    codeword: BitVec<u32>
 }
 
 
@@ -41,6 +47,14 @@ impl Record {
         }
     }
 
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn codeword(&self) -> &BitVec<u32> {
+        &self.codeword
+    }
+
     /// Get distance to other codeword.
     pub fn dist(&self, other: &Record) -> u8 {
         let mut dist = 0;
@@ -50,6 +64,19 @@ impl Record {
             );
         }
         dist
+    }
+
+    pub fn diff(&self, other: &Record) -> BitVec {
+        let mut diff = BitVec::new();
+        {
+            let mut s = unsafe { diff.storage_mut() };
+            for (a, b) in self.codeword.blocks().zip(other.codeword.blocks()) {
+                s.push(a ^ b);
+            }
+        }
+        unsafe { diff.set_len(self.codeword.len()); }
+
+        diff
     }
 }
 
@@ -140,6 +167,11 @@ impl Codebook {
         self.index.keys()
     }
 
+    pub fn records<'a>(&'a mut self) -> NodeWeightsMut<Record> { //Vec<&'a Record> {
+        self.graph.node_weights_mut()
+        //self.graph.node_references().map(|n| n.weight()).collect_vec()
+    }
+
     pub fn contains(&self, feature: &str) -> bool {
         self.index.contains_key(feature)
     }
@@ -156,7 +188,6 @@ impl Codebook {
         let mut visited = HashSet::new();
         let mut neighbors = Vec::new();
         self.dfs(feature, 0, &mut visited, &mut neighbors, dist);
-        println!("{:?}", neighbors);
 
         neighbors
     }

@@ -8,8 +8,9 @@ pub mod foldchange;
 pub mod meanvar;
 pub mod cv;
 pub mod pmf;
-pub mod dist;
 
-pub const MIN_PROB: f64 = -13.815510557964274; // = 0.000001f64.ln();
+use bio::stats::LogProb;
+
+pub const MIN_PROB: LogProb = LogProb(-13.815510557964274); // = 0.000001f64.ln();
 
 pub type BayesFactor = f64;

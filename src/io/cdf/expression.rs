@@ -8,10 +8,12 @@ use std::fs;
 use std::path::Path;
 use std::collections;
 
+use ordered_float::NotNaN;
 use itertools::Itertools;
 use csv;
 
-use bio::stats::logprobs::LogProb;
+use bio::stats::LogProb;
+use bio::stats::probs::cdf;
 
 use model::expression::CDF;
 
@@ -92,7 +94,10 @@ impl<R: io::Read> Reader<R> {
         );
         for ((_, feature), records) in groups.into_iter() {
             let cdf = CDF::from_cdf(records.map(|rec| {
-                (rec.expression.clone(), rec.prob.clone())
+                cdf::Entry {
+                    value: NotNaN::new(rec.expression.clone()).unwrap(),
+                    prob: rec.prob.clone()
+                }
             }));
             let mut cdfs = features.entry(feature).or_insert(Vec::new());
             cdfs.push(cdf);
@@ -130,8 +135,8 @@ impl<W: io::Write> Writer<W> {
             self.inner.write([
                 cell,
                 feature,
-                &format!("{:.0}", x.0)[..],
-                &format!("{}", x.1)[..]
+                &format!("{:.0}", x.value)[..],
+                &format!("{}", *x.prob)[..]
             ].iter()).unwrap();
         }
     }
