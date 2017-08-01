@@ -14,7 +14,7 @@ extern crate num;
 extern crate rustc_serialize;
 extern crate nalgebra;
 extern crate regex;
-extern crate rgsl;
+extern crate statrs;
 #[macro_use]
 extern crate approx;
 extern crate fnv;

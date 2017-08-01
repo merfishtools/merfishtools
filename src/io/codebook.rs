@@ -81,10 +81,13 @@ impl Record {
 }
 
 
+pub type FeatureID = u32;
+
+
 /// Codebook representation.\
 #[allow(non_snake_case)]
 pub struct Codebook {
-    index: HashMap<String, NodeIndex<u32>>,
+    index: HashMap<String, FeatureID>,
     graph: UnGraph<Record, ()>,
     pub min_dist: u8,
     // Number of bits in the codewords.
@@ -157,10 +160,14 @@ impl Codebook {
         })
     }
 
-    pub fn get(&self, feature: &str) -> &Record {
+    pub fn get_record(&self, feature: FeatureID) -> &Record {
         self.graph.node_weight(
-            *self.index.get(feature).expect("bug: feature not in codebook")
+            NodeIndex::from(feature)
         ).unwrap()
+    }
+
+    pub fn get_id(&self, feature: &str) -> FeatureID {
+        self.index.get(feature).expect("bug: feature not in codebook").index()
     }
 
     pub fn features(&self) -> hash_map::Keys<String, NodeIndex<u32>> {
@@ -176,14 +183,13 @@ impl Codebook {
         self.index.contains_key(feature)
     }
 
-    pub fn neighbors(&self, feature: &str, dist: u8) -> Vec<&Record> {
+    pub fn neighbors(&self, feature: FeatureID, dist: u8) -> Vec<FeatureID> {
         assert!(
             dist % self.min_dist == 0,
             "unsupported distance: only multiples of {} allowed",
             self.min_dist
         );
-
-        let feature = *self.index.get(feature).unwrap();
+        let feature = NodeIndex::from(feature);
 
         let mut visited = HashSet::new();
         let mut neighbors = Vec::new();
@@ -192,12 +198,12 @@ impl Codebook {
         neighbors
     }
 
-    fn dfs<'a>(
-        &'a self,
+    fn dfs(
+        &self,
         node: NodeIndex<u32>,
         d: u8,
         visited: &mut HashSet<NodeIndex<u32>>,
-        neighbors: &mut Vec<&'a Record>,
+        neighbors: &mut Vec<FeatureID>,
         dist: u8) {
         if visited.contains(&node) {
             return;
@@ -205,7 +211,7 @@ impl Codebook {
         visited.insert(node);
 
         if d == dist {
-            neighbors.push(self.graph.node_weight(node).unwrap());
+            neighbors.push(node.index());
             return;
         }
 
