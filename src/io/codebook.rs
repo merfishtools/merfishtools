@@ -81,7 +81,7 @@ impl Record {
 }
 
 
-pub type FeatureID = u32;
+pub type FeatureID = usize;
 
 
 /// Codebook representation.\
@@ -130,15 +130,15 @@ impl Codebook {
                 let idx = graph.add_node(rec);
                 index.insert(
                     feature,
-                    idx
+                    idx.index()
                 );
             }
             index
         };
 
         let dist = |a, b, graph: &UnGraph<Record, ()>| {
-            let rec_a = graph.node_weight(a).unwrap();
-            let rec_b = graph.node_weight(b).unwrap();
+            let rec_a = graph.node_weight(NodeIndex::new(a)).unwrap();
+            let rec_b = graph.node_weight(NodeIndex::new(b)).unwrap();
             rec_a.dist(&rec_b)
         };
 
@@ -147,7 +147,7 @@ impl Codebook {
         for (&a, &b) in index.values().tuple_combinations() {
             let d = dist(a, b, &graph);
             if d == min_dist {
-                graph.add_edge(a, b, ());
+                graph.add_edge(NodeIndex::new(a), NodeIndex::new(b), ());
             }
         }
 
@@ -162,15 +162,15 @@ impl Codebook {
 
     pub fn get_record(&self, feature: FeatureID) -> &Record {
         self.graph.node_weight(
-            NodeIndex::from(feature)
+            NodeIndex::new(feature)
         ).unwrap()
     }
 
     pub fn get_id(&self, feature: &str) -> FeatureID {
-        self.index.get(feature).expect("bug: feature not in codebook").index()
+        *self.index.get(feature).expect("bug: feature not in codebook")
     }
 
-    pub fn features(&self) -> hash_map::Keys<String, NodeIndex<u32>> {
+    pub fn features(&self) -> hash_map::Keys<String, FeatureID> {
         self.index.keys()
     }
 
@@ -189,7 +189,7 @@ impl Codebook {
             "unsupported distance: only multiples of {} allowed",
             self.min_dist
         );
-        let feature = NodeIndex::from(feature);
+        let feature = NodeIndex::new(feature);
 
         let mut visited = HashSet::new();
         let mut neighbors = Vec::new();

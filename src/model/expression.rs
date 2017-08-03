@@ -5,6 +5,7 @@ use bio::stats::LogProb;
 use bio::stats::probs;
 
 use model;
+use io::codebook::FeatureID;
 
 
 pub type CDF = probs::cdf::CDF<NotNaN<f64>>;
@@ -13,11 +14,10 @@ pub type CDF = probs::cdf::CDF<NotNaN<f64>>;
 /// Calculate CDF of expression.
 ///
 /// Returns a tuple of CDF and the naive estimate.
-pub fn cdf(feature: &str, count: u32, count_exact: u32, model: &Box<model::readout::Model>, window_width: u32) -> (CDF, u32) {
-    let readout_model = model::Readout::new(feature, model, window_width);
-    let (xmin, xmax) = readout_model.window(count, count_exact);
+pub fn cdf(feature: FeatureID, model: &mut model::readout::JointModel, window_width: u32) -> (CDF, u32) {
+    let (xmin, xmax) = model.window(feature);
     let likelihoods = (xmin..xmax + 1).map(|x| {
-        readout_model.likelihood(x, count, count_exact)
+        model.likelihood(feature, x)
     }).collect_vec();
     // calculate (marginal / flat_prior)
     let marginal = LogProb::ln_sum_exp(&likelihoods);
@@ -35,7 +35,7 @@ pub fn cdf(feature: &str, count: u32, count_exact: u32, model: &Box<model::reado
                 None
             }
         }).collect_vec()
-    ), readout_model.naive_estimate(count))
+    ), model.map_estimate(feature))
 }
 
 

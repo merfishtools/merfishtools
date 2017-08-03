@@ -98,7 +98,7 @@ pub fn expression(p0: Vec<Prob>, p1: Vec<Prob>, codebook_path: &str, estimate_pa
         }
     }
 
-    let model = model::readout::new_model(&p0, &p1, codebook);
+    let model = model::readout::JointModel::new(&p0, &p1, codebook);
 
     cue::pipeline(
         "exp",
