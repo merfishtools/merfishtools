@@ -71,10 +71,9 @@ fn main() {
         let p1 = values_t!(matches, "p1", f64).unwrap_or_else(|e| e.exit());
         let estimate_path = matches.value_of("estimate");
         let codebook_path = matches.value_of("codebook").unwrap();
-        let cells = matches.value_of("cells").unwrap_or(".*");
-        let window_width = value_t!(matches, "pmf-window-width", u32).unwrap_or(100);
-        let threads = value_t!(matches, "threads", usize).unwrap_or(1);
-        let print_naive = matches.is_present("print-naive");
+        let cells = matches.value_of("cells").unwrap();
+        let window_width = value_t!(matches, "pmf-window-width", u32).unwrap_or_else(|e| e.exit());
+        let threads = value_t!(matches, "threads", usize).unwrap_or_else(|e| e.exit());
 
         let convert_err_rates = |values: Vec<f64>| {
             if values.len() == 1 {
@@ -93,8 +92,7 @@ fn main() {
             estimate_path,
             threads,
             &cells,
-            window_width,
-            print_naive
+            window_width
         );
     } else if let Some(matches) = matches.subcommand_matches("diffexp") {
         let group1_path = matches.value_of("group1").unwrap();

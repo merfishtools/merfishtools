@@ -68,19 +68,19 @@ subcommands:
         - cells:
             long: cells
             value_name: REGEX
-            help: Regular expression to select cells from cell column (see above) [.*].
+            default_value: ".*"
+            help: Regular expression to select cells from cell column (see above).
         - pmf-window-width:
             long: pmf-window-width
-            value_name: INT
-            help: Width of the window to calculate PMF for [100].
+            value_name: INT,
+            default_value: "100"
+            help: Width of the window to calculate PMF for.
         - threads:
             long: threads
             short: t
             value_name: INT
+            default_value: "1"
             help: Number of threads to use.
-        - print-naive:
-            long: print-naive
-            help: Also print naive expression estimate.
 
   - diffexp:
       about: Test for differential expression between two groups of cells.

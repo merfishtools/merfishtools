@@ -19,7 +19,7 @@ cue = "0.1.*"
 ordered-float = "0.5"
 approx = "0.1.*"
 fnv = "1.0.*"
-clap = {version = "2.24.*", features = ["yaml", "color", "suggestions"]}
+clap = {version = "2.26", features = ["yaml", "color", "suggestions"]}
 rand = "0.3"
 ndarray = "0.9"
 bit-vec = "0.4"

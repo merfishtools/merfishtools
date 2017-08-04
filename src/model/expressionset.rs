@@ -8,7 +8,7 @@ pub type MeanExpression = NotNaN<f64>;
 pub type CDF = probs::cdf::CDF<MeanExpression>;
 
 
-pub fn cdf(expression_cdfs: &[model::expression::CDF], pseudocounts: f64) -> CDF {
+pub fn cdf(expression_cdfs: &[model::expression::NormalizedCDF], pseudocounts: f64) -> CDF {
     let pseudocounts = NotNaN::new(pseudocounts).unwrap();
 
     if expression_cdfs.len() == 1 {

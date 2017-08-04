@@ -8,13 +8,14 @@ use model;
 use io::codebook::FeatureID;
 
 
-pub type CDF = probs::cdf::CDF<NotNaN<f64>>;
+pub type CDF = probs::cdf::CDF<u32>;
+pub type NormalizedCDF = probs::cdf::CDF<NotNaN<f64>>;
 
 
 /// Calculate CDF of expression.
 ///
-/// Returns a tuple of CDF and the naive estimate.
-pub fn cdf(feature: FeatureID, model: &mut model::readout::JointModel, window_width: u32) -> (CDF, u32) {
+/// Returns a tuple of CDF and the MAP estimate.
+pub fn cdf(feature: FeatureID, model: &mut model::readout::JointModel) -> (CDF, u32) {
     let (xmin, xmax) = model.window(feature);
     let likelihoods = (xmin..xmax + 1).map(|x| {
         model.likelihood(feature, x)
@@ -22,12 +23,12 @@ pub fn cdf(feature: FeatureID, model: &mut model::readout::JointModel, window_wi
     // calculate (marginal / flat_prior)
     let marginal = LogProb::ln_sum_exp(&likelihoods);
 
-    (CDF::from_pmf(
+    let cdf = CDF::from_pmf(
         likelihoods.iter().enumerate().filter_map(|(x, lh)| {
             let prob = lh - marginal;
             if prob >= model::MIN_PROB {
                 Some(probs::cdf::Entry {
-                    value: NotNaN::new((xmin + x as u32) as f64).unwrap(),
+                    value: xmin + x as u32,
                     prob: prob
                 })
             }
@@ -35,7 +36,17 @@ pub fn cdf(feature: FeatureID, model: &mut model::readout::JointModel, window_wi
                 None
             }
         }).collect_vec()
-    ), model.map_estimate(feature))
+    );
+
+    let map = model.map_estimate(feature);
+    let cdf_map = *cdf.map().expect("bug: empty CDF");
+
+    assert_eq!(
+        cdf_map, map,
+        "bug: CDF-derived MAP and EM MAP are not the same: {} != {}", cdf_map, map
+    );
+
+    (cdf, map)
 }
 
 

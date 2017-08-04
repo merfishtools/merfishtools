@@ -14,29 +14,24 @@ use csv;
 
 /// A writer for expression estimates.
 pub struct Writer<W: io::Write> {
-    inner: csv::Writer<W>,
-    print_naive: bool
+    inner: csv::Writer<W>
 }
 
 
 impl Writer<fs::File> {
     /// Write to a given file path.
-    pub fn from_file<P: AsRef<Path>>(path: P, print_naive: bool) -> Self {
-        fs::File::create(path).map(|f| Writer::from_writer(f, print_naive)).unwrap()
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Self {
+        fs::File::create(path).map(|f| Writer::from_writer(f)).unwrap()
     }
 }
 
 
 impl<W: io::Write> Writer<W> {
-    pub fn from_writer(w: W, print_naive: bool) -> Self {
+    pub fn from_writer(w: W) -> Self {
         let mut writer = Writer {
-            inner: csv::Writer::from_writer(w).delimiter(b'\t'),
-            print_naive: print_naive
+            inner: csv::Writer::from_writer(w).delimiter(b'\t')
         };
         let mut fields = vec!["cell", "feat", "expr_map", "expr_ci_lower", "expr_ci_upper"];
-        if print_naive {
-            fields.push("expr_naive");
-        }
         writer.inner.write(fields.iter()).unwrap();
 
         writer
@@ -46,28 +41,15 @@ impl<W: io::Write> Writer<W> {
         &mut self,
         cell: &str,
         feature: &str,
-        map: NotNaN<f64>,
-        credible_interval: Range<&NotNaN<f64>>,
-        naive_estimate: u32
+        map: u32,
+        credible_interval: Range<&u32>
     ) {
-        if self.print_naive {
-            self.inner.write([
-                cell,
-                feature,
-                &format!("{}", map)[..],
-                &format!("{}", credible_interval.start)[..],
-                &format!("{}", credible_interval.end)[..],
-                &format!("{}", naive_estimate)[..]
-            ].iter()).unwrap();
-        } else {
-            self.inner.write([
-                cell,
-                feature,
-                &format!("{}", map)[..],
-                &format!("{}", credible_interval.start)[..],
-                &format!("{}", credible_interval.end)[..]
-            ].iter()).unwrap();
-        }
-
+        self.inner.write([
+            cell,
+            feature,
+            &format!("{}", map)[..],
+            &format!("{}", credible_interval.start)[..],
+            &format!("{}", credible_interval.end)[..]
+        ].iter()).unwrap();
     }
 }

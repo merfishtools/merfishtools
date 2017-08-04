@@ -15,7 +15,7 @@ use csv;
 use bio::stats::LogProb;
 use bio::stats::probs::cdf;
 
-use model::expression::CDF;
+use model::expression::{CDF, NormalizedCDF};
 
 
 const HEADER: [&'static str; 4] = ["cell", "feat", "expr", "prob"];
@@ -23,7 +23,7 @@ const HEADER: [&'static str; 4] = ["cell", "feat", "expr", "prob"];
 
 /// A container for feature expression CDFs from multiple cells.
 pub struct CDFs {
-    inner: collections::HashMap<String, Vec<CDF>>
+    inner: collections::HashMap<String, Vec<NormalizedCDF>>
 }
 
 
@@ -32,19 +32,19 @@ impl CDFs {
         self.inner.contains_key(feature)
     }
 
-    pub fn get(&self, feature: &str) -> Option<&Vec<CDF>> {
+    pub fn get(&self, feature: &str) -> Option<&Vec<NormalizedCDF>> {
         self.inner.get(feature)
     }
 
-    pub fn get_mut(&mut self, feature: &str) -> Option<&mut Vec<CDF>> {
+    pub fn get_mut(&mut self, feature: &str) -> Option<&mut Vec<NormalizedCDF>> {
         self.inner.get_mut(feature)
     }
 
-    pub fn features(&self) -> collections::hash_map::Keys<String, Vec<CDF>>  {
+    pub fn features(&self) -> collections::hash_map::Keys<String, Vec<NormalizedCDF>>  {
         self.inner.keys()
     }
 
-    pub fn iter(&self) -> collections::hash_map::Iter<String, Vec<CDF>> {
+    pub fn iter(&self) -> collections::hash_map::Iter<String, Vec<NormalizedCDF>> {
         self.inner.iter()
     }
 }
@@ -93,7 +93,7 @@ impl<R: io::Read> Reader<R> {
             |rec: &Record| (rec.cell.clone(), rec.feature.clone())
         );
         for ((_, feature), records) in groups.into_iter() {
-            let cdf = CDF::from_cdf(records.map(|rec| {
+            let cdf = NormalizedCDF::from_cdf(records.map(|rec| {
                 cdf::Entry {
                     value: NotNaN::new(rec.expression.clone()).unwrap(),
                     prob: rec.prob.clone()

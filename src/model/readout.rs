@@ -26,7 +26,7 @@ pub struct JointModel {
 
 
 impl JointModel {
-    pub fn new<'a, I: Iterator<Item=(&'a str, Counts)>>(
+    pub fn new<'a, I: Iterator<Item=(&'a String, &'a Counts)>>(
         counts: I,
         p0: &[Prob],
         p1: &[Prob],
@@ -36,7 +36,7 @@ impl JointModel {
 
         let feature_models = counts.map(
             |(feature, counts)| {
-                FeatureModel::new(feature, counts, codebook, &xi)
+                FeatureModel::new(feature, counts.clone(), codebook, &xi)
             }
         ).collect_vec();
 
@@ -100,10 +100,10 @@ impl JointModel {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Counts {
-    exact: u32,
-    mismatch: u32
+    pub exact: u32,
+    pub mismatch: u32
 }
 
 

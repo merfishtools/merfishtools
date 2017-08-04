@@ -22,18 +22,12 @@ use model;
 use model::foldchange::LogFC;
 use model::cv::CV;
 use codebook;
+use model::readout::Counts;
 
 
 pub struct Selection {
     pub expmnt: String,
     pub cell: String
-}
-
-
-#[derive(Debug)]
-struct Counts {
-    exact: u32,
-    corrected: u32
 }
 
 
@@ -59,11 +53,11 @@ struct Counts {
 
 
 /// Estimate expressions.
-pub fn expression(p0: Vec<Prob>, p1: Vec<Prob>, codebook_path: &str, estimate_path: Option<&str>, threads: usize, cells: &str, window_width: u32, print_naive: bool) {
+pub fn expression(p0: Vec<Prob>, p1: Vec<Prob>, codebook_path: &str, estimate_path: Option<&str>, threads: usize, cells: &str, window_width: u32) {
     let codebook = io::codebook::Codebook::from_file(codebook_path).unwrap();
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
     let mut cdf_writer = io::cdf::expression::Writer::from_writer(std::io::stdout());
-    let mut est_writer = estimate_path.map(|path| io::estimation::expression::Writer::from_file(path, print_naive));
+    let mut est_writer = estimate_path.map(|path| io::estimation::expression::Writer::from_file(path));
 
     let cells = Regex::new(cells).ok().expect("Invalid regular expression for cells.");
 
@@ -80,12 +74,12 @@ pub fn expression(p0: Vec<Prob>, p1: Vec<Prob>, codebook_path: &str, estimate_pa
         }
     ) {
         let cell_counts = counts.entry(record.cell_id).or_insert_with(collections::HashMap::new);
-        let feature_counts = cell_counts.entry(record.feature).or_insert(Counts{ exact: 0, corrected: 0});
+        let feature_counts = cell_counts.entry(record.feature).or_insert(Counts{ exact: 0, mismatch: 0});
         if record.hamming_dist == 0 {
             feature_counts.exact += 1;
         }
         else if record.hamming_dist == 1 {
-            feature_counts.corrected += 1;
+            feature_counts.mismatch += 1;
         }
         else {
             panic!("Hamming distance of greater than 1 is unsupported at the moment.")
@@ -94,35 +88,40 @@ pub fn expression(p0: Vec<Prob>, p1: Vec<Prob>, codebook_path: &str, estimate_pa
     // add missing features from codebook
     for (_, cell_counts) in counts.iter_mut() {
         for feature in codebook.features() {
-            cell_counts.entry(feature.clone()).or_insert(Counts{ exact: 0, corrected: 0});
+            cell_counts.entry(feature.clone()).or_insert(Counts{ exact: 0, mismatch: 0});
         }
     }
-
-    let model = model::readout::JointModel::new(&p0, &p1, codebook);
 
     cue::pipeline(
         "exp",
         threads,
         counts.into_iter(),
         |(cell, counts)| {
-            let cdfs = counts.into_iter().map(|(feature, count)| {
-                let (cdf, naive_estimate) = model::expression::cdf(&feature, count.exact + count.corrected, count.exact, &model, window_width);
+            // Generate joint model.
+            let mut model = model::readout::JointModel::new(
+                counts.iter(), &p0, &p1, &codebook, window_width
+            );
 
-                (feature, cdf, naive_estimate)
+            // Calculate CDF for all features.
+            let cdfs = counts.into_iter().map(|(feature, count)| {
+                let (cdf, map_estimate) = model::expression::cdf(
+                    codebook.get_id(&feature), &mut model
+                );
+
+                (feature, cdf, map_estimate)
             }).collect_vec();
             (cell, cdfs)
         },
         |(cell, cdfs)| {
-            for (feature, cdf, naive_estimate) in cdfs {
+            for (feature, cdf, map_estimate) in cdfs {
                 cdf_writer.write(&cell, &feature, &cdf);
 
                 if let Some(ref mut est_writer) = est_writer {
                     est_writer.write(
                         &cell,
                         &feature,
-                        *cdf.map().expect("bug: empty CDF"),
-                        cdf.credible_interval(0.95).expect("bug: empty CDF"),
-                        naive_estimate
+                        map_estimate,
+                        cdf.credible_interval(0.95).expect("bug: empty CDF")
                     );
                 }
             }
