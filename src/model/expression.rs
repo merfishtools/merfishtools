@@ -41,6 +41,10 @@ pub fn cdf(feature: FeatureID, model: &mut model::readout::JointModel) -> (CDF, 
     let map = model.map_estimate(feature);
     let cdf_map = *cdf.map().expect("bug: empty CDF");
 
+    if (cdf_map as i32 - map as i32).abs() <= 1 {
+        eprintln!("{} {} {:?}", xmin, xmax, cdf);
+    }
+
     assert_eq!(
         cdf_map, map,
         "bug: CDF-derived MAP and EM MAP are not the same: {} != {}", cdf_map, map
@@ -63,9 +67,11 @@ mod tests {
     use model;
     use io;
 
+/*
+
     const GENE: &'static str = "COL5A1";
 
-    fn setup() -> Box<model::readout::Model> {
+    fn setup() -> model::readout::JointModel {
         model::readout::new_model(
             &[Prob(0.04); 16],
             &[Prob(0.1); 16],
@@ -80,6 +86,8 @@ mod tests {
             io::codebook::Codebook::from_file("tests/codebook/simulated-MHD2.txt").unwrap()
         )
     }
+
+
 
     #[test]
     fn test_cdf() {
@@ -113,44 +121,5 @@ mod tests {
         let (cdf, _) = cdf("COL7A1", count, count, &readout, 100);
 
         println!("{} {:?}", cdf.map().unwrap(), cdf);
-    }
+    }*/
 }
-/*
-    #[test]
-    fn test_likelihood() {
-        let readout = setup();
-        assert!(likelihood(0, 0, 0, &readout).exp().approx_eq(&1.0));
-        assert!(likelihood(1, 1, 1, &readout).exp().approx_eq(&0.4019988717840602));
-    }
-
-    #[test]
-    fn test_posterior_prob() {
-        let readout = setup();
-        let expression = Expression::new(100, 99, &readout);
-        println!("{:?}", (90..110).map(|x| expression.posterior_prob(x).exp()).collect_vec());
-        assert!(false);
-        let expression = Expression::new(5, 5, &readout);
-        // check if x=5 yields highest probability
-        assert_eq!((0..21).sorted_by(|&x, &y| {
-            expression.posterior_prob(x).partial_cmp(&expression.posterior_prob(y)).unwrap()
-        })[20], 5);
-        // check that expression beyond window yields zero probability
-        assert!(expression.posterior_prob(100).exp().approx_eq(&0.0));
-    }
-
-    // #[test]
-    // fn test_set_expected_value() {
-    //     let readout = setup();
-    //     let expressions = [
-    //         Expression::new(5, 1, &readout),
-    //         Expression::new(5, 1, &readout),
-    //         Expression::new(5, 1, &readout),
-    //         Expression::new(1, 0, &readout)
-    //     ];
-    //     let expression_set = ExpressionSet::new(&expressions);
-    //     // calculate expected value directly
-    //     let expected_value = expressions.iter().map(|e| e.expected_value()).fold(0.0, |s, e| s + e) / expressions.len() as f64;
-    //     assert!(expression_set.expected_value().approx_eq(&expected_value));
-    // }
-}
-*/

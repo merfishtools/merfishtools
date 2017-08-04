@@ -20,113 +20,113 @@ pub fn cdf(cdfs: &[model::expressionset::CDF]) -> CDF {
 }
 
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use itertools::Itertools;
-
-    use bio::stats::{Prob, LogProb};
-
-    use model;
-    use io;
-
-    const GENE: &'static str = "COL5A1";
-
-    fn setup() -> Box<model::readout::Model> {
-        model::readout::new_model(
-            &[Prob(0.04); 16],
-            &[Prob(0.1); 16],
-            io::codebook::Codebook::from_file("tests/codebook/140genesData.1.txt").unwrap()
-        )
-    }
-
-    #[test]
-    fn test_cdf() {
-        let readout = setup();
-        let cdfs1 = [
-            model::expression::cdf(GENE, 5, 5, &readout, 100).0,
-            model::expression::cdf(GENE, 5, 5, &readout, 100).0,
-            model::expression::cdf(GENE, 5, 5, &readout, 100).0,
-            model::expression::cdf(GENE, 5, 5, &readout, 100).0
-        ];
-        let cdfs2 = [
-            model::expression::cdf(GENE, 50, 50, &readout, 100).0,
-            model::expression::cdf(GENE, 50, 50, &readout, 100).0,
-            model::expression::cdf(GENE, 50, 50, &readout, 100).0,
-            model::expression::cdf(GENE, 50, 50, &readout, 100).0
-        ];
-        let cdf1 = model::expressionset::cdf(&cdfs1, 0.000000001);
-        let cdf2 = model::expressionset::cdf(&cdfs2, 0.000000001);
-        println!("{} {}", cdfs1[0].map().unwrap(), cdfs2[0].map().unwrap());
-
-        let cdf = cdf(&[cdf1, cdf2]);
-
-        let total = cdf.total_prob();
-        println!("{:?}", cdf);
-
-        assert!(*total <= 0.0);
-        assert_relative_eq!(*total, 0.0, epsilon = 0.005);
-        assert_relative_eq!(**cdf.map().unwrap(), 1.14, epsilon = 0.03);
-    }
-
-    #[test]
-    fn test_zero_cv() {
-        let readout = setup();
-        let cdfs1 = [
-            model::expression::cdf(GENE, 5, 5, &readout, 100).0,
-            //model::expression::cdf(GENE, 5, 5, &readout, 100),
-            //model::expression::cdf(GENE, 5, 5, &readout, 100),
-            //model::expression::cdf(GENE, 5, 5, &readout, 100)
-        ];
-        let cdfs2 = [
-            model::expression::cdf(GENE, 5, 5, &readout, 100).0,
-            //model::expression::cdf(GENE, 5, 5, &readout, 100),
-            //model::expression::cdf(GENE, 5, 5, &readout, 100),
-            //model::expression::cdf(GENE, 5, 5, &readout, 100)
-        ];
-        let cdf1 = model::expressionset::cdf(&cdfs1, 0.0);
-        let cdf2 = model::expressionset::cdf(&cdfs2, 0.0);
-        println!("{:?}", cdf1.iter_pmf().collect_vec());
-
-        let cdf = cdf(&[cdf1, cdf2]);
-
-        assert_relative_eq!(**cdf.map().unwrap(), 0.0);
-    }
-
-    #[test]
-    fn test_ahnak2() {
-        let cdfs1 = io::cdf::expression::Reader::from_file("tests/expression_cdf/1.txt").unwrap().cdfs();
-        let cdfs2 = io::cdf::expression::Reader::from_file("tests/expression_cdf/2.txt").unwrap().cdfs();
-        let cdfs3 = io::cdf::expression::Reader::from_file("tests/expression_cdf/3.txt").unwrap().cdfs();
-
-        let cdfs1 = cdfs1.get("AHNAK2").unwrap();
-        let cdfs2 = cdfs2.get("AHNAK2").unwrap();
-        let cdfs3 = cdfs3.get("AHNAK2").unwrap();
-        for cdf in cdfs1.iter() {
-            assert_relative_eq!(cdf.total_prob().exp(), 1.0, epsilon=0.001);
-        }
-        for cdf in cdfs2.iter() {
-            assert_relative_eq!(cdf.total_prob().exp(), 1.0, epsilon=0.001);
-        }
-        for cdf in cdfs3.iter() {
-            assert_relative_eq!(cdf.total_prob().exp(), 1.0, epsilon=0.001);
-        }
-
-        let cdf1 = model::expressionset::cdf(&cdfs1, 1.0);
-        let cdf2 = model::expressionset::cdf(&cdfs2, 1.0);
-        let cdf3 = model::expressionset::cdf(&cdfs3, 1.0);
-        assert_relative_eq!(cdf1.total_prob().exp(), 1.0, epsilon=0.001);
-        assert_relative_eq!(cdf2.total_prob().exp(), 1.0, epsilon=0.001);
-        assert_relative_eq!(cdf3.total_prob().exp(), 1.0, epsilon=0.001);
-
-
-        println!("{} {} {}", cdf1.map().unwrap(), cdf2.map().unwrap(), cdf3.map().unwrap());
-
-        let cdf = cdf(&[cdf1, cdf2, cdf3]);
-        println!("{}", cdf.map().unwrap());
-
-        println!("{:?}", model::diffexp::estimate(&cdf, NotNaN::new(0.5).unwrap()));
-
-        // TODO add proper test case
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use itertools::Itertools;
+//
+//     use bio::stats::{Prob, LogProb};
+//
+//     use model;
+//     use io;
+//
+//     const GENE: &'static str = "COL5A1";
+//
+//     fn setup() -> Box<model::readout::Model> {
+//         model::readout::new_model(
+//             &[Prob(0.04); 16],
+//             &[Prob(0.1); 16],
+//             io::codebook::Codebook::from_file("tests/codebook/140genesData.1.txt").unwrap()
+//         )
+//     }
+//
+//     #[test]
+//     fn test_cdf() {
+//         let readout = setup();
+//         let cdfs1 = [
+//             model::expression::cdf(GENE, 5, 5, &readout, 100).0,
+//             model::expression::cdf(GENE, 5, 5, &readout, 100).0,
+//             model::expression::cdf(GENE, 5, 5, &readout, 100).0,
+//             model::expression::cdf(GENE, 5, 5, &readout, 100).0
+//         ];
+//         let cdfs2 = [
+//             model::expression::cdf(GENE, 50, 50, &readout, 100).0,
+//             model::expression::cdf(GENE, 50, 50, &readout, 100).0,
+//             model::expression::cdf(GENE, 50, 50, &readout, 100).0,
+//             model::expression::cdf(GENE, 50, 50, &readout, 100).0
+//         ];
+//         let cdf1 = model::expressionset::cdf(&cdfs1, 0.000000001);
+//         let cdf2 = model::expressionset::cdf(&cdfs2, 0.000000001);
+//         println!("{} {}", cdfs1[0].map().unwrap(), cdfs2[0].map().unwrap());
+//
+//         let cdf = cdf(&[cdf1, cdf2]);
+//
+//         let total = cdf.total_prob();
+//         println!("{:?}", cdf);
+//
+//         assert!(*total <= 0.0);
+//         assert_relative_eq!(*total, 0.0, epsilon = 0.005);
+//         assert_relative_eq!(**cdf.map().unwrap(), 1.14, epsilon = 0.03);
+//     }
+//
+//     #[test]
+//     fn test_zero_cv() {
+//         let readout = setup();
+//         let cdfs1 = [
+//             model::expression::cdf(GENE, 5, 5, &readout, 100).0,
+//             //model::expression::cdf(GENE, 5, 5, &readout, 100),
+//             //model::expression::cdf(GENE, 5, 5, &readout, 100),
+//             //model::expression::cdf(GENE, 5, 5, &readout, 100)
+//         ];
+//         let cdfs2 = [
+//             model::expression::cdf(GENE, 5, 5, &readout, 100).0,
+//             //model::expression::cdf(GENE, 5, 5, &readout, 100),
+//             //model::expression::cdf(GENE, 5, 5, &readout, 100),
+//             //model::expression::cdf(GENE, 5, 5, &readout, 100)
+//         ];
+//         let cdf1 = model::expressionset::cdf(&cdfs1, 0.0);
+//         let cdf2 = model::expressionset::cdf(&cdfs2, 0.0);
+//         println!("{:?}", cdf1.iter_pmf().collect_vec());
+//
+//         let cdf = cdf(&[cdf1, cdf2]);
+//
+//         assert_relative_eq!(**cdf.map().unwrap(), 0.0);
+//     }
+//
+//     #[test]
+//     fn test_ahnak2() {
+//         let cdfs1 = io::cdf::expression::Reader::from_file("tests/expression_cdf/1.txt").unwrap().cdfs();
+//         let cdfs2 = io::cdf::expression::Reader::from_file("tests/expression_cdf/2.txt").unwrap().cdfs();
+//         let cdfs3 = io::cdf::expression::Reader::from_file("tests/expression_cdf/3.txt").unwrap().cdfs();
+//
+//         let cdfs1 = cdfs1.get("AHNAK2").unwrap();
+//         let cdfs2 = cdfs2.get("AHNAK2").unwrap();
+//         let cdfs3 = cdfs3.get("AHNAK2").unwrap();
+//         for cdf in cdfs1.iter() {
+//             assert_relative_eq!(cdf.total_prob().exp(), 1.0, epsilon=0.001);
+//         }
+//         for cdf in cdfs2.iter() {
+//             assert_relative_eq!(cdf.total_prob().exp(), 1.0, epsilon=0.001);
+//         }
+//         for cdf in cdfs3.iter() {
+//             assert_relative_eq!(cdf.total_prob().exp(), 1.0, epsilon=0.001);
+//         }
+//
+//         let cdf1 = model::expressionset::cdf(&cdfs1, 1.0);
+//         let cdf2 = model::expressionset::cdf(&cdfs2, 1.0);
+//         let cdf3 = model::expressionset::cdf(&cdfs3, 1.0);
+//         assert_relative_eq!(cdf1.total_prob().exp(), 1.0, epsilon=0.001);
+//         assert_relative_eq!(cdf2.total_prob().exp(), 1.0, epsilon=0.001);
+//         assert_relative_eq!(cdf3.total_prob().exp(), 1.0, epsilon=0.001);
+//
+//
+//         println!("{} {} {}", cdf1.map().unwrap(), cdf2.map().unwrap(), cdf3.map().unwrap());
+//
+//         let cdf = cdf(&[cdf1, cdf2, cdf3]);
+//         println!("{}", cdf.map().unwrap());
+//
+//         println!("{:?}", model::diffexp::estimate(&cdf, NotNaN::new(0.5).unwrap()));
+//
+//         // TODO add proper test case
+//     }
+// }

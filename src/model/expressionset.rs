@@ -25,42 +25,42 @@ pub fn cdf(expression_cdfs: &[model::expression::NormalizedCDF], pseudocounts: f
 }
 
 
-#[cfg(test)]
-mod tests {
-    #![allow(non_upper_case_globals)]
-
-    use bio::stats::{Prob, LogProb};
-
-    use super::*;
-    use model;
-    use io;
-
-
-    const GENE: &'static str = "COL5A1";
-
-    fn setup() -> Box<model::readout::Model> {
-        model::readout::new_model(
-            &[Prob(0.04); 16],
-            &[Prob(0.1); 16],
-            io::codebook::Codebook::from_file("tests/codebook/140genesData.1.txt").unwrap()
-        )
-    }
-
-    #[test]
-    fn test_cdf() {
-        let readout = setup();
-        let cdfs = [
-            model::expression::cdf(GENE, 5, 5, &readout, 100).0,
-            model::expression::cdf(GENE, 5, 5, &readout, 100).0,
-            model::expression::cdf(GENE, 5, 5, &readout, 100).0,
-            model::expression::cdf(GENE, 5, 5, &readout, 100).0
-        ];
-        println!("{:?}", cdfs[0]);
-        let cdf = cdf(&cdfs, 0.0000001);
-        println!("{:?}", cdf);
-
-        let total = cdf.total_prob();
-
-        assert_relative_eq!(*total, *LogProb::ln_one(), epsilon = 0.002);
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     #![allow(non_upper_case_globals)]
+//
+//     use bio::stats::{Prob, LogProb};
+//
+//     use super::*;
+//     use model;
+//     use io;
+//
+//
+//     const GENE: &'static str = "COL5A1";
+//
+//     fn setup() -> Box<model::readout::Model> {
+//         model::readout::new_model(
+//             &[Prob(0.04); 16],
+//             &[Prob(0.1); 16],
+//             io::codebook::Codebook::from_file("tests/codebook/140genesData.1.txt").unwrap()
+//         )
+//     }
+//
+//     #[test]
+//     fn test_cdf() {
+//         let readout = setup();
+//         let cdfs = [
+//             model::expression::cdf(GENE, 5, 5, &readout, 100).0,
+//             model::expression::cdf(GENE, 5, 5, &readout, 100).0,
+//             model::expression::cdf(GENE, 5, 5, &readout, 100).0,
+//             model::expression::cdf(GENE, 5, 5, &readout, 100).0
+//         ];
+//         println!("{:?}", cdfs[0]);
+//         let cdf = cdf(&cdfs, 0.0000001);
+//         println!("{:?}", cdf);
+//
+//         let total = cdf.total_prob();
+//
+//         assert_relative_eq!(*total, *LogProb::ln_one(), epsilon = 0.002);
+//     }
+// }

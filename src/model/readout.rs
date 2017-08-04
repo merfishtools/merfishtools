@@ -227,9 +227,13 @@ impl FeatureModel {
         let xi_miscall_4 = codebook.neighbors(feature, 4).iter().map(|&n| {
             xi.prob_error(feature_record, Some(codebook.get_record(n)))
         }).collect_vec();
-        let xi_miscall_2 = codebook.neighbors(feature, 2).iter().map(|&n| {
-            xi.prob_error(feature_record, Some(codebook.get_record(n)))
-        }).collect_vec();
+        let xi_miscall_2 = if codebook.min_dist == 2 {
+            codebook.neighbors(feature, 2).iter().map(|&n| {
+                xi.prob_error(feature_record, Some(codebook.get_record(n)))
+            }).collect_vec()
+        } else {
+            vec![]
+        };
 
         let prob_miscall_exact = xi_miscall_4.iter().map(|xi| {
             xi[(2, 2)]
