@@ -42,7 +42,7 @@ pub fn cdf(feature: FeatureID, model: &mut model::readout::JointModel) -> (CDF, 
     let cdf_map = *cdf.map().expect(&format!("bug: empty CDF, xmin={}, xmax={}", xmin, xmax));
 
     if cdf_map != map {
-        eprintln!("{}!={}: min={} max={} pmf={:?}", cdf_map, map, xmin, xmax, cdf.iter_pmf().collect_vec());
+        debug!("EM-MAP and CDF MAP do not agree: {}!={}", map, cdf_map);
     }
 
     // assert_eq!(
