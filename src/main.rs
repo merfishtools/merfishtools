@@ -26,6 +26,7 @@ extern crate bit_vec;
 extern crate bit_set;
 extern crate petgraph;
 extern crate ordered_float;
+extern crate rand;
 
 use std::process;
 

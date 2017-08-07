@@ -1,9 +1,12 @@
 use std::mem;
 use std::cell::RefCell;
+use std::cmp;
 
+use rand;
+use rand::Rng;
 use itertools::Itertools;
 use ndarray::prelude::*;
-use statrs::distribution::{Discrete, Multinomial};
+use statrs::distribution::{Discrete, Multinomial, Distribution};
 use bit_vec::BitVec;
 
 use bio::stats::{Prob, LogProb};
@@ -20,8 +23,11 @@ pub type Expressions = Vec<u32>;
 pub struct JointModel {
     feature_models: Vec<FeatureModel>,
     expressions: Expressions,
-    miscalls: Miscalls,
-    margin: u32
+    miscalls_exact: Miscalls,
+    miscalls_mismatch: Miscalls,
+    margin: u32,
+    em_run: bool,
+    rng: rand::StdRng
 }
 
 
@@ -34,24 +40,34 @@ impl JointModel {
         window_width: u32) -> Self {
         let mut xi = Xi::new(p0, p1, MAX_ERR);
 
-        let feature_models = counts.map(
+        let mut feature_models = counts.map(
             |(feature, counts)| {
                 FeatureModel::new(feature, counts.clone(), codebook, &xi)
             }
         ).collect_vec();
+        // sort feature models by id, such that we can access them by id in the array
+        feature_models.sort_by_key(|m| m.feature_id);
 
         // calculate start values (we take raw counts as start expression)
         let expressions = feature_models.iter().map(
             |model| model.counts.total()
         ).collect_vec();
 
-        let miscalls = Miscalls::new(feature_models.len());
+        let miscalls_exact = Miscalls::new(&feature_models, true);
+        let miscalls_mismatch = Miscalls::new(&feature_models, false);
+
+        for (i, m) in feature_models.iter().enumerate() {
+            assert_eq!(i, m.feature_id);
+        }
 
         JointModel {
             feature_models: feature_models,
             expressions: expressions,
-            miscalls: miscalls,
-            margin: window_width / 2
+            miscalls_exact: miscalls_exact,
+            miscalls_mismatch: miscalls_mismatch,
+            margin: window_width / 2,
+            em_run: false,
+            rng: rand::StdRng::new().unwrap()
         }
     }
 
@@ -60,42 +76,125 @@ impl JointModel {
     /// Expressions are our model parameters to estimate, miscalls are our latent variables,
     /// counts are our observed variables.
     pub fn expectation_maximization(&mut self) {
+        let mut idx = (0..self.feature_models.len()).collect_vec();
+        let mut phase = 0;
+        let mut count_no_change = 0;
+        let mut map_likelihood = LogProb::ln_zero();
+        let mut map_miscalls_exact = None;
+        let mut map_miscalls_mismatch = None;
+        let mut map_expressions = None;
+        let mut i = 0;
         // EM iterations
         loop {
-            let total: u32 = self.expressions.iter().sum::<u32>() + self.miscalls.sum();
+            // Shuffle models, such that miscalls can be drawn unbiased
+            // this is necessary because there is a maximum miscall count for each feature.
+            // If we would not shuffle, it would be easier for the first model to provide miscalls.
+            self.rng.shuffle(&mut idx);
 
-            let mut total_change: u32 = 0;
+            let total: u32 = self.expressions.iter().sum::<u32>();
+
+            let mut e_change: u32 = 0;
+            let mut m_change: u32 = 0;
             // E-step: estimate miscalls
-            for m in &self.feature_models {
-                total_change += m.mle_miscalls(&self.expressions, &mut self.miscalls);
+            for &j in &idx {
+                e_change += self.feature_models[j].mle_miscalls(
+                    &self.expressions,
+                    &mut self.miscalls_exact,
+                    &mut self.miscalls_mismatch,
+                    &mut self.rng
+                );
             }
 
             // M-step: estimate expressions that maximize the probability
             for m in &self.feature_models {
-                total_change += m.mle_expression(&mut self.expressions, &self.miscalls)
+                m_change += m.mle_expression(
+                    &mut self.expressions,
+                    &self.miscalls_exact,
+                    &self.miscalls_mismatch
+                );
             }
 
-            // check for convergence (less than 1% change)
-            // TODO tune, parameterize, max number of iterations?
-            if total_change as f64 / total as f64 <= 0.01 {
-                break;
+            let fraction_change = m_change as f64 / total as f64;
+
+            if phase == 0 {
+                // phase 0: run until convergence
+                if fraction_change <= 0.05 {
+                    count_no_change += 1;
+                } else {
+                    count_no_change = 0;
+                }
+                // convergence or at least 100 steps
+                if count_no_change >= 5 || i >= 100 {
+                    phase = 1;
+                }
+                debug!("EM-iteration (phase 0): e-change={}, m-change={}, %={}",
+                    e_change,
+                    m_change,
+                    fraction_change,
+                );
+
+            } else if phase == 1 {
+                // phase 1: take best likelihood from 100 iterations
+                let mut likelihood = LogProb(0.0);
+                for m in &self.feature_models {
+                    let x = self.expressions[m.feature_id];
+                    let l = m.likelihood(x, &self.miscalls_exact, &self.miscalls_mismatch);
+                    likelihood = likelihood + l;
+                }
+
+                if likelihood > map_likelihood {
+                    map_miscalls_exact = Some(self.miscalls_exact.clone());
+                    map_miscalls_mismatch = Some(self.miscalls_mismatch.clone());
+                    map_expressions = Some(self.expressions.clone());
+                }
+
+                debug!(
+                    "EM-iteration (phase 1): e-change={}, m-change={}, %={}, L={}",
+                    e_change,
+                    m_change,
+                    fraction_change,
+                    *likelihood
+                );
+
+                if i >= 100 {
+                    break;
+                }
             }
+
+            i += 1;
         }
+        self.miscalls_exact = map_miscalls_exact.unwrap();
+        self.miscalls_mismatch = map_miscalls_mismatch.unwrap();
+        self.expressions = map_expressions.unwrap();
+        self.em_run = true;
     }
 
     pub fn likelihood(&mut self, feature_id: FeatureID, x: u32) -> LogProb {
-        self.feature_models[feature_id as usize].likelihood(x, &self.miscalls)
+        assert!(self.em_run);
+        self.feature_models[feature_id as usize].likelihood(
+            x, &self.miscalls_exact, &self.miscalls_mismatch
+        )
     }
 
     pub fn map_estimate(&self, feature_id: FeatureID) -> u32 {
+        assert!(self.em_run);
         self.expressions[feature_id as usize]
+    }
+
+    pub fn feature_model(&self, feature_id: FeatureID) -> &FeatureModel {
+        &self.feature_models[feature_id]
     }
 
     /// Prior window for calculating expression PMF
     pub fn window(&self, feature_id: FeatureID) -> (u32, u32) {
+        assert!(self.em_run);
         let x = self.map_estimate(feature_id);
-
-        (self.feature_models[feature_id as usize].min_expression(&self.miscalls), x + self.margin)
+        let xmin = self.feature_models[feature_id as usize].min_expression(
+            &self.miscalls_exact, &self.miscalls_mismatch
+        );
+        let xmax = x + self.margin;
+        assert!(xmax >= xmin, "xmax has to be greater than xmin: xmin={}, xmax={}", xmin, xmax);
+        (xmin, xmax)
     }
 }
 
@@ -114,67 +213,73 @@ impl Counts {
 }
 
 
+#[derive(Clone)]
 pub struct Miscalls {
-    exact: Array2<u32>,
-    mismatch: Array2<u32>
+    miscalls: Array2<u32>,
+    total_to: Vec<u32>,
+    max_total_to: Vec<u32>,
+    total: u32
 }
 
 
 impl Miscalls {
     /// Create new instance.
-    pub fn new(feature_count: usize) -> Self {
+    pub fn new(feature_models: &[FeatureModel], exact: bool) -> Self {
+        let feature_count = feature_models.len();
+        let mut max_total_to = vec![0; feature_models.len()];
+        for m in feature_models.iter() {
+            max_total_to[m.feature_id] = if exact { m.counts.exact } else { m.counts.mismatch };
+        }
         Miscalls {
-            exact: Array::from_elem((feature_count, feature_count), 0),
-            mismatch: Array::from_elem((feature_count, feature_count), 0)
+            miscalls: Array::from_elem((feature_count, feature_count), 0),
+            total_to: vec![0; feature_count],
+            max_total_to: max_total_to,
+            total: 0
         }
     }
 
-    pub fn exact(&self, i: FeatureID, j: FeatureID) -> u32 {
-        self.exact[(i as usize, j as usize)]
+    pub fn get(&self, i: FeatureID, j: FeatureID) -> u32 {
+        self.miscalls[(i as usize, j as usize)]
     }
 
-    pub fn mismatch(&self, i: FeatureID, j: FeatureID) -> u32 {
-        self.mismatch[(i as usize, j as usize)]
-    }
+    pub fn set(&mut self, i: FeatureID, j: FeatureID, value: u32) -> u32 {
+        let change = {
+            let entry = self.miscalls.get_mut((i as usize, j as usize)).unwrap();
+            let mut change = value as i32 - *entry as i32;
 
-    pub fn set_exact(&mut self, i: FeatureID, j: FeatureID, value: u32) -> u32 {
-        let entry = self.exact.get_mut((i as usize, j as usize)).unwrap();
-        let change = (*entry as i32 - value as i32).abs() as u32;
-        *entry = value;
+            // update column sum
+            let colsum = self.total_to[j] as i32 + change;
+            // get difference to maximum, only consider exceeding
+            let maxdiff = cmp::max(colsum - self.max_total_to[j] as i32, 0);
+            // correct change
+            change -= maxdiff;
+            self.total_to[j] = (colsum - maxdiff) as u32;
 
-        change
-    }
+            // update total
+            self.total = (self.total as i32 + change) as u32;
+            // update entry
+            *entry = (*entry as i32 + change) as u32;
 
-    pub fn set_mismatch(&mut self, i: FeatureID, j: FeatureID, value: u32) -> u32 {
-        let entry = self.mismatch.get_mut((i as usize, j as usize)).unwrap();
-        let change = (*entry as i32 - value as i32).abs() as u32;
-        *entry = value;
+            change.abs() as u32
+        };
+        assert!(self.total_to[j] <= self.max_total_to[j]);
+        assert_eq!(self.total_to[j], self.miscalls.column(j).scalar_sum());
 
         change
     }
 
     /// Total miscalls coming from given feature as the true origin.
-    pub fn total_exact_from(&self, feature: FeatureID) -> u32 {
-        self.exact.row(feature).scalar_sum()
-    }
-
-    /// Total miscalls coming from given feature as the true origin.
-    pub fn total_mismatch_from(&self, feature: FeatureID) -> u32 {
-        self.mismatch.row(feature).scalar_sum()
+    pub fn total_from(&self, feature: FeatureID) -> u32 {
+        self.miscalls.row(feature).scalar_sum()
     }
 
     /// Total miscalls leading to given feature.
-    pub fn total_exact_to(&self, feature: FeatureID) -> u32 {
-        self.exact.column(feature).scalar_sum()
+    pub fn total_to(&self, feature: FeatureID) -> u32 {
+        self.total_to[feature]
     }
 
-    /// Total miscalls leading to given feature.
-    pub fn total_mismatch_to(&self, feature: FeatureID) -> u32 {
-        self.mismatch.column(feature).scalar_sum()
-    }
-
-    pub fn sum(&self) -> u32 {
-        self.exact.scalar_sum() + self.mismatch.scalar_sum()
+    pub fn total(&self) -> u32 {
+        self.total
     }
 }
 
@@ -277,23 +382,31 @@ impl FeatureModel {
     /// Calculate maximum likelihood estimate of miscalls given expression and store in the given
     /// arrays.
     /// Returns the total absolute changes to estimated miscall counts.
-    pub fn mle_miscalls(&self, expressions: &Expressions, miscalls: &mut Miscalls) -> u32 {
+    pub fn mle_miscalls(
+        &self,
+        expressions: &Expressions,
+        miscalls_exact: &mut Miscalls,
+        miscalls_mismatch: &mut Miscalls,
+        rng: &mut rand::StdRng
+    ) -> u32 {
         let x = expressions[self.feature_id as usize];
-        let expectation = |p: f64| (p * x as f64).round() as u32;
 
-        let mut total_change = 0;
+        let multinomial = Multinomial::new(&self.event_probs, x as u64).unwrap();
+        let sample = multinomial.sample(rng);
 
         let offset_exact = 3;
         let offset_mismatch = 3 + self.neighbors.len();
-        for &n in &self.neighbors {
-            let prob_miscall_exact = self.event_probs[offset_exact + n as usize];
-            let prob_miscall_mismatch = self.event_probs[offset_mismatch + n as usize];
+        let mut total_change = 0;
 
-            total_change += miscalls.set_exact(
-                self.feature_id, n, expectation(prob_miscall_exact)
+        for (i, &n) in self.neighbors.iter().enumerate() {
+            let miscall_exact = sample[offset_exact + i] as u32;
+            let miscall_mismatch = sample[offset_mismatch + i] as u32;
+
+            total_change += miscalls_exact.set(
+                self.feature_id, n, miscall_exact
             );
-            total_change += miscalls.set_mismatch(
-                self.feature_id, n, expectation(prob_miscall_mismatch)
+            total_change += miscalls_mismatch.set(
+                self.feature_id, n, miscall_mismatch
             );
         }
 
@@ -302,17 +415,30 @@ impl FeatureModel {
 
     /// Calculate maximum likelihood estimate of expression given miscalls.
     /// Returns the absolute amount of change to the expression.
-    pub fn mle_expression(&self, expressions: &mut Expressions, miscalls: &Miscalls) -> u32 {
-        let x1 = (self.counts.exact - miscalls.total_exact_to(self.feature_id)) as f64 /
-                 self.event_probs[0];
-        let x2 = if self.min_dist == 4 {
-            (self.counts.mismatch - miscalls.total_mismatch_to(self.feature_id)) as f64 /
-             self.event_probs[1]
-        } else {
-            x1
-        };
+    pub fn mle_expression(
+        &self,
+        expressions: &mut Expressions,
+        miscalls_exact: &Miscalls,
+        miscalls_mismatch: &Miscalls
+    ) -> u32 {
+        let calls_exact = self.counts.exact.saturating_sub(
+            miscalls_exact.total_to(self.feature_id)
+        );
+        let calls_mismatch = self.counts.mismatch.saturating_sub(
+            miscalls_mismatch.total_to(self.feature_id)
+        );
+        let event_count = calls_exact + calls_mismatch +
+                          miscalls_exact.total_from(self.feature_id) +
+                          miscalls_mismatch.total_from(self.feature_id);
 
-        let x_ = (x1 as f64 + x2 as f64 / 2.0).round() as u32;
+        let x = event_count as f64 / (1.0 - self.event_probs[2]);
+
+        let x_ = cmp::max(
+            x.floor() as u32,
+            // or at least as many as we have events coming from this feature
+            event_count
+        );
+
         let x = expressions.get_mut(self.feature_id as usize).unwrap();
 
         let change = (*x as i32 - x_ as i32).abs() as u32;
@@ -323,30 +449,36 @@ impl FeatureModel {
     }
 
     /// Minimum expression given fixed miscalls.
-    pub fn min_expression(&self, miscalls: &Miscalls) -> u32 {
-        self.counts.exact.saturating_sub(miscalls.total_exact_to(self.feature_id)) +
-        self.counts.mismatch.saturating_sub(miscalls.total_mismatch_to(self.feature_id)) +
-        miscalls.total_exact_from(self.feature_id) + miscalls.total_mismatch_from(self.feature_id)
+    pub fn min_expression(&self, miscalls_exact: &Miscalls, miscalls_mismatch: &Miscalls) -> u32 {
+        self.counts.exact.saturating_sub(miscalls_exact.total_to(self.feature_id)) +
+        self.counts.mismatch.saturating_sub(miscalls_mismatch.total_to(self.feature_id)) +
+        miscalls_exact.total_from(self.feature_id) + miscalls_mismatch.total_from(self.feature_id)
     }
 
     /// Calculate likelihood of given expression.
     pub fn likelihood(
         &self,
         x: u32,
-        miscalls: &Miscalls
+        miscalls_exact: &Miscalls,
+        miscalls_mismatch: &Miscalls
     ) -> LogProb {
-        let count_exact_miscalled = miscalls.total_exact_to(self.feature_id);
-        let count_mismatch_miscalled = miscalls.total_mismatch_to(self.feature_id);
+        let count_exact_miscalled = miscalls_exact.total_to(self.feature_id);
+        let count_mismatch_miscalled = miscalls_mismatch.total_to(self.feature_id);
 
         if self.counts.exact < count_exact_miscalled {
-            return LogProb::ln_zero();
+            panic!("bug: likelihood cannot be calculated if exact miscalls exceed counts: counts={}, miscalls={}", self.counts.exact, count_exact_miscalled);
         }
         if self.counts.mismatch < count_mismatch_miscalled {
-            return LogProb::ln_zero();
+            panic!("bug: likelihood cannot be calculated if mismatch miscalls exceed counts: counts={}, miscalls={}", self.counts.mismatch, count_mismatch_miscalled);
         }
-        if (self.counts.exact - count_exact_miscalled + self.counts.mismatch - count_mismatch_miscalled) > x {
-            return LogProb::ln_zero();
+        let total_count = self.counts.exact - count_exact_miscalled +
+                          self.counts.mismatch - count_mismatch_miscalled;
+        if total_count > x {
+            panic!("bug: event count exceeds expression: x={}, event count={}", x, total_count);
         }
+
+        let calls_exact = self.counts.exact - count_exact_miscalled;
+        let calls_mismatch = self.counts.mismatch - count_mismatch_miscalled;
 
         // setup event counts
         {
@@ -354,36 +486,38 @@ impl FeatureModel {
             event_counts.clear();
             event_counts.push(
                 // exact calls
-                (self.counts.exact - count_exact_miscalled) as u64
+                calls_exact as u64
             );
             event_counts.push(
                 // mismatch calls
-                (self.counts.mismatch - count_mismatch_miscalled) as u64
+                calls_mismatch as u64
             );
             event_counts.push(
-                // dropouts
-                x.saturating_sub(self.counts.total()) as u64
+                // dropouts (fill in later)
+                0
             );
             // miscalls
             event_counts.extend(self.neighbors.iter().map(
-                |&n| miscalls.exact(self.feature_id, n) as u64
+                |&n| miscalls_exact.get(self.feature_id, n) as u64
             ));
             if self.min_dist == 4 {
                 event_counts.extend(
-                    self.neighbors.iter().map(|&n| miscalls.mismatch(self.feature_id, n) as u64)
+                    self.neighbors.iter().map(
+                        |&n| miscalls_mismatch.get(self.feature_id, n) as u64
+                    )
                 );
             }
-        }
 
-        // check if sum matches x, else return 0
-        if self.event_counts.borrow().iter().sum::<u64>() != x as u64 {
-            debug!("Likelihood calculated for unrealistic expression. This should be optimized.");
-            return LogProb::ln_zero();
+            // set dropouts
+            let total_counts = event_counts.iter().sum();
+            assert!(x as u64 >= total_counts, "total event counts exceed expression: x={} {:?}", x, event_counts);
+            let dropouts = x as u64 - total_counts;
+            event_counts[2] = dropouts;
         }
 
         let multinomial = Multinomial::new(&self.event_probs, x as u64).unwrap();
 
-        LogProb::from(Prob(multinomial.pmf(&self.event_counts.borrow())))
+        LogProb(multinomial.ln_pmf(&self.event_counts.borrow()))
     }
 }
 

@@ -101,6 +101,7 @@ pub fn expression(p0: Vec<Prob>, p1: Vec<Prob>, codebook_path: &str, estimate_pa
             let mut model = model::readout::JointModel::new(
                 counts.iter(), &p0, &p1, &codebook, window_width
             );
+            model.expectation_maximization();
 
             // Calculate CDF for all features.
             let cdfs = counts.into_iter().map(|(feature, count)| {
