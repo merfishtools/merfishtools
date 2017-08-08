@@ -400,14 +400,17 @@ impl FeatureModel {
 
         for (i, &n) in self.neighbors.iter().enumerate() {
             let miscall_exact = sample[offset_exact + i] as u32;
-            let miscall_mismatch = sample[offset_mismatch + i] as u32;
-
             total_change += miscalls_exact.set(
                 self.feature_id, n, miscall_exact
             );
-            total_change += miscalls_mismatch.set(
-                self.feature_id, n, miscall_mismatch
-            );
+
+            if self.min_dist == 4 {
+                let miscall_mismatch = sample[offset_mismatch + i] as u32;
+
+                total_change += miscalls_mismatch.set(
+                    self.feature_id, n, miscall_mismatch
+                );
+            }
         }
 
         total_change
