@@ -91,11 +91,13 @@ impl JointModel {
             // If we would not shuffle, it would be easier for the first model to provide miscalls.
             self.rng.shuffle(&mut idx);
 
-            let total: u32 = self.expressions.iter().sum::<u32>();
+            let total: u32 = self.expressions.len() as u32;
+            //let total: u32 = self.expressions.iter().sum::<u32>();
 
             let mut e_change: u32 = 0;
             let mut m_change: u32 = 0;
             // E-step: estimate miscalls
+            debug!("E-step");
             for &j in &idx {
                 e_change += self.feature_models[j].mle_miscalls(
                     &self.expressions,
@@ -106,6 +108,7 @@ impl JointModel {
             }
 
             // M-step: estimate expressions that maximize the probability
+            debug!("M-step");
             for m in &self.feature_models {
                 m_change += m.mle_expression(
                     &mut self.expressions,
@@ -115,6 +118,13 @@ impl JointModel {
             }
 
             let fraction_change = m_change as f64 / total as f64;
+
+            let mut likelihood = LogProb(0.0);
+            for m in &self.feature_models {
+                let x = self.expressions[m.feature_id];
+                let l = m.likelihood(x, &self.miscalls_exact, &self.miscalls_mismatch);
+                likelihood = likelihood + l;
+            }
 
             if phase == 0 {
                 // phase 0: run until convergence
@@ -127,20 +137,15 @@ impl JointModel {
                 if count_no_change >= 5 || i >= 100 {
                     phase = 1;
                 }
-                debug!("EM-iteration (phase 0): e-change={}, m-change={}, %={}",
+                debug!("EM-iteration (phase 0): e-change={}, m-change={}, %={}, L={}",
                     e_change,
                     m_change,
                     fraction_change,
+                    *likelihood
                 );
 
             } else if phase == 1 {
                 // phase 1: take best likelihood from 100 iterations
-                let mut likelihood = LogProb(0.0);
-                for m in &self.feature_models {
-                    let x = self.expressions[m.feature_id];
-                    let l = m.likelihood(x, &self.miscalls_exact, &self.miscalls_mismatch);
-                    likelihood = likelihood + l;
-                }
 
                 if likelihood > map_likelihood {
                     map_miscalls_exact = Some(self.miscalls_exact.clone());
@@ -242,23 +247,21 @@ impl Miscalls {
         self.miscalls[(i as usize, j as usize)]
     }
 
-    pub fn set(&mut self, i: FeatureID, j: FeatureID, value: u32) -> u32 {
+    /// Set a given miscall value, such that the total maximum per feature capacity is not exceeded.
+    /// The given capacity is updated.
+    /// Returns the change.
+    pub fn set(&mut self, i: FeatureID, j: FeatureID, value: u32, capacity: &mut u32) -> u32 {
         let change = {
             let entry = self.miscalls.get_mut((i as usize, j as usize)).unwrap();
-            let mut change = value as i32 - *entry as i32;
-
-            // update column sum
-            let colsum = self.total_to[j] as i32 + change;
-            // get difference to maximum, only consider exceeding
-            let maxdiff = cmp::max(colsum - self.max_total_to[j] as i32, 0);
-            // correct change
-            change -= maxdiff;
-            self.total_to[j] = (colsum - maxdiff) as u32;
-
-            // update total
+            let value = cmp::min(
+                cmp::min(value, *capacity),
+                self.max_total_to[j] - (self.total_to[j] - *entry)
+            );
+            let change = value as i32 - *entry as i32;
+            *capacity -= value;
+            *entry = value;
+            self.total_to[j] = (self.total_to[j] as i32 + change) as u32;
             self.total = (self.total as i32 + change) as u32;
-            // update entry
-            *entry = (*entry as i32 + change) as u32;
 
             change.abs() as u32
         };
@@ -391,27 +394,58 @@ impl FeatureModel {
     ) -> u32 {
         let x = expressions[self.feature_id as usize];
 
-        let multinomial = Multinomial::new(&self.event_probs, x as u64).unwrap();
-        let sample = multinomial.sample(rng);
-
         let offset_exact = 3;
         let offset_mismatch = 3 + self.neighbors.len();
         let mut total_change = 0;
 
-        for (i, &n) in self.neighbors.iter().enumerate() {
-            let miscall_exact = sample[offset_exact + i] as u32;
+        // We need to ensure that the sum of the estimated miscalls does not exceed x.
+        // Hence, we iterate randomly over the neighbors such that we can simply stop once that
+        // happens without causing a bias.
+        let mut idx = (0..self.neighbors.len()).collect_vec();
+        rng.shuffle(&mut idx);
+
+        // by stochastic rounding, we ensure that on average \sum x*p_i = x
+        // numeric rounding would not work if many of the probabilities are small enough to yield
+        // expectations less than 1
+        let mut stochastic_round = |v: f64| v.floor() as u32 + (rng.next_f64() <= v % 1.0) as u32;
+
+        let mut rest = x;
+        for i in idx {
+            let n = self.neighbors[i];
+            let miscall_exact = self.event_probs[offset_exact + i] * x as f64;
             total_change += miscalls_exact.set(
-                self.feature_id, n, miscall_exact
+                self.feature_id, n, stochastic_round(miscall_exact), &mut rest
             );
 
             if self.min_dist == 4 {
-                let miscall_mismatch = sample[offset_mismatch + i] as u32;
-
+                let miscall_mismatch = self.event_probs[offset_exact + i] * x as f64;
                 total_change += miscalls_mismatch.set(
-                    self.feature_id, n, miscall_mismatch
+                    self.feature_id, n, stochastic_round(miscall_mismatch), &mut rest
                 );
             }
         }
+
+
+
+        // let multinomial = Multinomial::new(&self.event_probs, x as u64).unwrap();
+        // let sample = multinomial.sample(rng);
+        //
+        //
+        //
+        // for (i, &n) in self.neighbors.iter().enumerate() {
+        //     let miscall_exact = sample[offset_exact + i] as u32;
+        //     total_change += miscalls_exact.set(
+        //         self.feature_id, n, miscall_exact
+        //     );
+        //
+        //     if self.min_dist == 4 {
+        //         let miscall_mismatch = sample[offset_mismatch + i] as u32;
+        //
+        //         total_change += miscalls_mismatch.set(
+        //             self.feature_id, n, miscall_mismatch
+        //         );
+        //     }
+        // }
 
         total_change
     }
@@ -444,7 +478,8 @@ impl FeatureModel {
 
         let x = expressions.get_mut(self.feature_id as usize).unwrap();
 
-        let change = (*x as i32 - x_ as i32).abs() as u32;
+        //let change = (*x as i32 - x_ as i32).abs() as u32;
+        let change = if x_ != *x { 1 } else { 0 };
 
         *x = x_;
 
