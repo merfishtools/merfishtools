@@ -123,7 +123,6 @@ impl JointModel {
             for m in &self.feature_models {
                 let x = self.expressions[m.feature_id];
                 let l = m.likelihood(x, &self.miscalls_exact, &self.miscalls_mismatch);
-                debug!("L={}", *l);
                 likelihood = likelihood + l;
             }
 
@@ -533,7 +532,6 @@ impl FeatureModel {
         }
 
         let multinomial = Multinomial::new(&self.event_probs, x as u64).unwrap();
-        debug!("event_probs={:?}, event_counts={:?}", self.event_probs, self.event_counts.borrow());
 
         LogProb::from(Prob(multinomial.pmf(&self.event_counts.borrow())))
     }
