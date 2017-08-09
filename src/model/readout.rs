@@ -119,10 +119,11 @@ impl JointModel {
 
             let fraction_change = m_change as f64 / total as f64;
 
-            let mut likelihood = LogProb(0.0);
+            let mut likelihood = LogProb::ln_one();
             for m in &self.feature_models {
                 let x = self.expressions[m.feature_id];
                 let l = m.likelihood(x, &self.miscalls_exact, &self.miscalls_mismatch);
+                debug!("L={}", *l);
                 likelihood = likelihood + l;
             }
 
@@ -425,28 +426,6 @@ impl FeatureModel {
             }
         }
 
-
-
-        // let multinomial = Multinomial::new(&self.event_probs, x as u64).unwrap();
-        // let sample = multinomial.sample(rng);
-        //
-        //
-        //
-        // for (i, &n) in self.neighbors.iter().enumerate() {
-        //     let miscall_exact = sample[offset_exact + i] as u32;
-        //     total_change += miscalls_exact.set(
-        //         self.feature_id, n, miscall_exact
-        //     );
-        //
-        //     if self.min_dist == 4 {
-        //         let miscall_mismatch = sample[offset_mismatch + i] as u32;
-        //
-        //         total_change += miscalls_mismatch.set(
-        //             self.feature_id, n, miscall_mismatch
-        //         );
-        //     }
-        // }
-
         total_change
     }
 
@@ -554,6 +533,7 @@ impl FeatureModel {
         }
 
         let multinomial = Multinomial::new(&self.event_probs, x as u64).unwrap();
+        debug!("event_probs={:?}, event_counts={:?}", self.event_probs, self.event_counts.borrow());
 
         LogProb(multinomial.ln_pmf(&self.event_counts.borrow()))
     }

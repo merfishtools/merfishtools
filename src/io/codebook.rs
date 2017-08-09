@@ -183,19 +183,36 @@ impl Codebook {
         self.index.contains_key(feature)
     }
 
+    /// Return neighbors with given shortest distance to feature.
+    /// If a neighbor is e.g. distance 4 and distance 2, and we require distance 4, it will not be
+    /// returned because the shortest distance is 2.
     pub fn neighbors(&self, feature: FeatureID, dist: u8) -> Vec<FeatureID> {
         assert!(
             dist % self.min_dist == 0,
             "unsupported distance: only multiples of {} allowed",
             self.min_dist
         );
+        assert!(dist == 4 || dist == 2, "unsupported distance {}", dist);
         let feature = NodeIndex::new(feature);
 
-        let mut visited = HashSet::new();
-        let mut neighbors = Vec::new();
-        self.dfs(feature, 0, &mut visited, &mut neighbors, dist);
-
-        neighbors
+        if dist == self.min_dist {
+            self.graph.neighbors(feature).map(|n| n.index()).collect_vec()
+        } else if dist == self.min_dist * 2 {
+            let mut neighbors = HashSet::new();
+            for n in self.graph.neighbors(feature) {
+                for n_ in self.graph.neighbors(n) {
+                    if self.graph.find_edge(feature, n_).is_none() {
+                        // consider if not a direct neighbor
+                        neighbors.insert(n_.index());
+                    }
+                }
+            }
+            neighbors.into_iter().collect_vec()
+        } else {
+            panic!(
+                "unsupported distance {}, only first and second order neighbors supported", dist
+            );
+        }
     }
 
     fn dfs(
