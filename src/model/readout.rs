@@ -535,7 +535,7 @@ impl FeatureModel {
         let multinomial = Multinomial::new(&self.event_probs, x as u64).unwrap();
         debug!("event_probs={:?}, event_counts={:?}", self.event_probs, self.event_counts.borrow());
 
-        LogProb(multinomial.ln_pmf(&self.event_counts.borrow()))
+        LogProb::from(Prob(multinomial.pmf(&self.event_counts.borrow())))
     }
 }
 
