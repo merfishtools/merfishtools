@@ -20,7 +20,7 @@ pub fn cdf(expression_cdfs: &[model::expression::NormalizedCDF], pseudocounts: f
     }
 
     let cdf = model::meanvar::cdf(expression_cdfs, |mean, _| mean + pseudocounts);
-    assert_relative_eq!(cdf.total_prob().exp(), 1.0);
+    assert_relative_eq!(cdf.total_prob().exp(), 1.0, epsilon=0.001);
     cdf.reduce().sample(1000)
 }
 
