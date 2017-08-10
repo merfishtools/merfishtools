@@ -6,6 +6,7 @@ use rand;
 use rand::Rng;
 use itertools::Itertools;
 use ndarray::prelude::*;
+use ndarray;
 use statrs::distribution::{Discrete, Multinomial, Distribution};
 use bit_vec::BitVec;
 
@@ -17,7 +18,7 @@ use io::codebook::{self, Codebook, Codeword, FeatureID};
 const MAX_ERR: u8 = 6;
 
 
-pub type Expressions = Vec<u32>;
+pub type Expressions = Array1<u32>;
 
 
 pub struct JointModel {
@@ -39,6 +40,7 @@ impl JointModel {
         codebook: &Codebook,
         window_width: u32) -> Self {
         let mut xi = Xi::new(p0, p1, MAX_ERR);
+        let mut rng = rand::StdRng::new().unwrap();
 
         let mut feature_models = counts.map(
             |(feature, counts)| {
@@ -49,9 +51,9 @@ impl JointModel {
         feature_models.sort_by_key(|m| m.feature_id);
 
         // calculate start values (we take raw counts as start expression)
-        let expressions = feature_models.iter().map(
-            |model| model.counts.total()
-        ).collect_vec();
+        let expressions = Array1::from_iter(feature_models.iter().map(
+            |model| rng.next_u32()
+        ));
 
         let miscalls_exact = Miscalls::new(&feature_models, true);
         let miscalls_mismatch = Miscalls::new(&feature_models, false);
@@ -67,7 +69,7 @@ impl JointModel {
             miscalls_mismatch: miscalls_mismatch,
             margin: window_width / 2,
             em_run: false,
-            rng: rand::StdRng::new().unwrap()
+            rng: rng
         }
     }
 
@@ -83,9 +85,10 @@ impl JointModel {
         let mut map_miscalls_exact = None;
         let mut map_miscalls_mismatch = None;
         let mut map_expressions = None;
-        let mut i = 0;
+        let mut last_expressions = self.expressions.clone();
+        let n_iterations = 20;
         // EM iterations
-        loop {
+        for i in 1..n_iterations + 1 {
             // Shuffle models, such that miscalls can be drawn unbiased
             // this is necessary because there is a maximum miscall count for each feature.
             // If we would not shuffle, it would be easier for the first model to provide miscalls.
@@ -126,47 +129,75 @@ impl JointModel {
                 likelihood = likelihood + l;
             }
 
-            if phase == 0 {
-                // phase 0: run until convergence
-                if fraction_change <= 0.05 {
-                    count_no_change += 1;
-                } else {
-                    count_no_change = 0;
-                }
-                // convergence or at least 100 steps
-                if count_no_change >= 5 || i >= 100 {
-                    phase = 1;
-                }
-                debug!("EM-iteration (phase 0): e-change={}, m-change={}, %={}, L={}",
-                    e_change,
-                    m_change,
-                    fraction_change,
-                    *likelihood
-                );
+            // debug!("x={:?}", &self.expressions.slice(s![..10]));
 
-            } else if phase == 1 {
-                // phase 1: take best likelihood from 100 iterations
+            // if phase == 0 {
+            //     // phase 0: run until convergence or at least 100 steps
+            //     if i != 0 {
+            //         // store fold change in last_expressions
+            //         let max_fc = ndarray::Zip::from(&last_expressions).and(&self.expressions).fold_while(
+            //             0.0,
+            //             |max, &a, &b| {
+            //                 let fc = ((a as f64 + 10.0) / (b as f64 + 10.0)).log(1.05).abs();
+            //                 if fc > max {
+            //                     ndarray::FoldWhile::Continue(fc)
+            //                 } else {
+            //                     ndarray::FoldWhile::Continue(max)
+            //                 }
+            //             }
+            //         ).into_inner();
+            //
+            //         if max_fc <= 1.0 || i >= 100 {
+            //             phase = 1;
+            //             i = 0;
+            //         }
+            //         debug!("max-fc={}", max_fc);
+            //     }
+            //
+            //     debug!("EM-iteration (phase 0): e-change={}, m-change={}, %={}, L={}",
+            //         e_change,
+            //         m_change,
+            //         fraction_change,
+            //         *likelihood
+            //     );
+            //
+            // } else if phase == 1 {
+            //     // phase 1: take best likelihood from 100 iterations
+            //
+            //     if likelihood > map_likelihood {
+            //         map_miscalls_exact = Some(self.miscalls_exact.clone());
+            //         map_miscalls_mismatch = Some(self.miscalls_mismatch.clone());
+            //         map_expressions = Some(self.expressions.clone());
+            //     }
+            //
+            //     debug!(
+            //         "EM-iteration (phase 1): e-change={}, m-change={}, %={}, L={}",
+            //         e_change,
+            //         m_change,
+            //         fraction_change,
+            //         *likelihood
+            //     );
+            //
+            //     if i >= 101 {
+            //         break;
+            //     }
+            // }
 
-                if likelihood > map_likelihood {
-                    map_miscalls_exact = Some(self.miscalls_exact.clone());
-                    map_miscalls_mismatch = Some(self.miscalls_mismatch.clone());
-                    map_expressions = Some(self.expressions.clone());
-                }
-
-                debug!(
-                    "EM-iteration (phase 1): e-change={}, m-change={}, %={}, L={}",
-                    e_change,
-                    m_change,
-                    fraction_change,
-                    *likelihood
-                );
-
-                if i >= 100 {
-                    break;
-                }
+            //mem::swap(&mut self.expressions, &mut last_expressions);
+            if likelihood > map_likelihood {
+                map_miscalls_exact = Some(self.miscalls_exact.clone());
+                map_miscalls_mismatch = Some(self.miscalls_mismatch.clone());
+                map_expressions = Some(self.expressions.clone());
             }
 
-            i += 1;
+            info!("EM-iteration {} of {}", i, n_iterations);
+            debug!(
+                "e-change={}, m-change={}, %={}, L={}",
+                e_change,
+                m_change,
+                fraction_change,
+                *likelihood
+            );
         }
         self.miscalls_exact = map_miscalls_exact.unwrap();
         self.miscalls_mismatch = map_miscalls_mismatch.unwrap();
