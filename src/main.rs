@@ -15,7 +15,7 @@ extern crate num;
 extern crate rustc_serialize;
 extern crate cue;
 extern crate regex;
-extern crate statrs;
+extern crate rgsl;
 #[macro_use]
 extern crate approx;
 #[macro_use]

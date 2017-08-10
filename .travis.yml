@@ -1,10 +1,19 @@
 language: rust
+
 rust:
   - stable
   - nightly
+
+cache: cargo
+
 matrix:
   allow_failures:
     - rust: nightly
+
+before_install:
+  - sudo apt-get -qq update
+  - sudo apt-get install -y libgsl0-dev
+
 script:
   - cargo build --verbose --release
   - cargo test --verbose --release

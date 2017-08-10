@@ -7,8 +7,8 @@ use rand::Rng;
 use itertools::Itertools;
 use ndarray::prelude::*;
 use ndarray;
-use statrs::distribution::{Discrete, Multinomial, Distribution};
 use bit_vec::BitVec;
+use rgsl::randist::multinomial::multinomial_pdf;
 
 use bio::stats::{Prob, LogProb};
 
@@ -324,7 +324,7 @@ pub struct FeatureModel {
     neighbors: Vec<FeatureID>,
     min_dist: u8,
     counts: Counts,
-    event_counts: RefCell<Vec<u64>>
+    event_counts: RefCell<Vec<u32>>
 }
 
 
@@ -533,11 +533,11 @@ impl FeatureModel {
             event_counts.clear();
             event_counts.push(
                 // exact calls
-                calls_exact as u64
+                calls_exact
             );
             event_counts.push(
                 // mismatch calls
-                calls_mismatch as u64
+                calls_mismatch
             );
             event_counts.push(
                 // dropouts (fill in later)
@@ -545,26 +545,26 @@ impl FeatureModel {
             );
             // miscalls
             event_counts.extend(self.neighbors.iter().map(
-                |&n| miscalls_exact.get(self.feature_id, n) as u64
+                |&n| miscalls_exact.get(self.feature_id, n)
             ));
             if self.min_dist == 4 {
                 event_counts.extend(
                     self.neighbors.iter().map(
-                        |&n| miscalls_mismatch.get(self.feature_id, n) as u64
+                        |&n| miscalls_mismatch.get(self.feature_id, n)
                     )
                 );
             }
 
             // set dropouts
             let total_counts = event_counts.iter().sum();
-            assert!(x as u64 >= total_counts, "total event counts exceed expression: x={} {:?}", x, event_counts);
-            let dropouts = x as u64 - total_counts;
+            assert!(x >= total_counts, "total event counts exceed expression: x={} {:?}", x, event_counts);
+            let dropouts = x - total_counts;
             event_counts[2] = dropouts;
         }
 
-        let multinomial = Multinomial::new(&self.event_probs, x as u64).unwrap();
-
-        LogProb::from(Prob(multinomial.pmf(&self.event_counts.borrow())))
+        LogProb::from(Prob(
+            multinomial_pdf(&self.event_probs, &self.event_counts.borrow())
+        ))
     }
 }
 
