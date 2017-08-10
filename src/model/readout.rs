@@ -190,7 +190,7 @@ impl JointModel {
                 map_expressions = Some(self.expressions.clone());
             }
 
-            info!("EM-iteration {} of {}", i, n_iterations);
+            debug!("EM-iteration {} of {}", i, n_iterations);
             debug!(
                 "e-change={}, m-change={}, %={}, L={}",
                 e_change,
