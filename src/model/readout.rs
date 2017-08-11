@@ -108,8 +108,7 @@ impl JointModel {
                     &self.expressions,
                     &mut self.miscalls_exact,
                     &mut self.miscalls_mismatch,
-                    &mut self.rng,
-                    j == self.debug_id
+                    &mut self.rng
                 );
             }
 
