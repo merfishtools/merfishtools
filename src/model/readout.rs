@@ -29,7 +29,7 @@ pub struct JointModel {
     margin: u32,
     em_run: bool,
     rng: rand::StdRng,
-    debug_id: FeatureID
+    debug_id: Option<FeatureID>
 }
 
 
@@ -71,7 +71,7 @@ impl JointModel {
             margin: window_width / 2,
             em_run: false,
             rng: rng,
-            debug_id: codebook.get_id("THBS1")
+            debug_id: None //codebook.get_id("THBS1")
         }
     }
 
@@ -131,12 +131,14 @@ impl JointModel {
                 likelihood = likelihood + l;
             }
 
-            debug!(
-                "DEBUG feature: x={}, miscalls_exact_from={}, miscalls_mismatch_from={}",
-                self.expressions[self.debug_id],
-                self.miscalls_exact.miscalls.row(self.debug_id),
-                self.miscalls_mismatch.miscalls.row(self.debug_id)
-            );
+            if let Some(debug_id) = self.debug_id {
+                debug!(
+                    "DEBUG feature: x={}, miscalls_exact_from={}, miscalls_mismatch_from={}",
+                    self.expressions[debug_id],
+                    self.miscalls_exact.miscalls.row(debug_id),
+                    self.miscalls_mismatch.miscalls.row(debug_id)
+                );
+            }
 
             // debug!("x={:?}", &self.expressions.slice(s![..10]));
 
