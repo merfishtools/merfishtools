@@ -108,7 +108,8 @@ impl JointModel {
                     &self.expressions,
                     &mut self.miscalls_exact,
                     &mut self.miscalls_mismatch,
-                    &mut self.rng
+                    &mut self.rng,
+                    j == self.debug_id
                 );
             }
 
@@ -458,7 +459,7 @@ impl FeatureModel {
             );
 
             if self.min_dist == 4 {
-                let miscall_mismatch = self.event_probs[offset_exact + i] * x as f64;
+                let miscall_mismatch = self.event_probs[offset_mismatch + i] * x as f64;
                 total_change += miscalls_mismatch.set(
                     self.feature_id, n, stochastic_round(miscall_mismatch), &mut rest
                 );
