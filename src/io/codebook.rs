@@ -28,6 +28,13 @@ pub struct Record {
 
 
 impl Record {
+    pub fn noise(len: usize) -> Self {
+        Record {
+            name: "noise".to_owned(),
+            codeword: BitVec::from_elem(len, false)
+        }
+    }
+
     /// Create new record.
     pub fn new(name: String, codeword: &[u8]) -> Self {
         let mut _codeword = BitVec::with_capacity(codeword.len());
@@ -93,7 +100,8 @@ pub struct Codebook {
     // Number of bits in the codewords.
     pub N: u8,
     // Number of 1-bits in the codewords.
-    pub m: u8
+    pub m: u8,
+    noise_record: Record
 }
 
 
@@ -156,11 +164,16 @@ impl Codebook {
             index: index,
             min_dist: min_dist,
             N: N.unwrap() as u8,
-            m: m.unwrap() as u8
+            m: m.unwrap() as u8,
+            noise_record: Record::noise(N.unwrap())
         })
     }
 
-    pub fn get_record(&self, feature: FeatureID) -> &Record {
+    pub fn noise(&self) -> &Record {
+        &self.noise_record
+    }
+
+    pub fn record(&self, feature: FeatureID) -> &Record {
         self.graph.node_weight(
             NodeIndex::new(feature)
         ).unwrap()
@@ -174,9 +187,9 @@ impl Codebook {
         self.index.keys()
     }
 
-    pub fn records<'a>(&'a mut self) -> NodeWeightsMut<Record> { //Vec<&'a Record> {
-        self.graph.node_weights_mut()
-        //self.graph.node_references().map(|n| n.weight()).collect_vec()
+    pub fn records<'a>(&'a self) -> Vec<&'a Record> {
+        //self.graph.node_weights_mut()
+        self.graph.node_indices().map(|n| self.graph.node_weight(n).unwrap()).collect_vec()
     }
 
     pub fn contains(&self, feature: &str) -> bool {
@@ -235,5 +248,9 @@ impl Codebook {
         for n in self.graph.neighbors(node) {
             self.dfs(n, d + self.min_dist, visited, neighbors, dist);
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.index.len()
     }
 }

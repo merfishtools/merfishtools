@@ -29,7 +29,8 @@ pub struct JointModel {
     margin: u32,
     em_run: bool,
     rng: rand::StdRng,
-    debug_id: Option<FeatureID>
+    debug_id: Option<FeatureID>,
+    noise_id: FeatureID
 }
 
 
@@ -48,13 +49,18 @@ impl JointModel {
                 FeatureModel::new(feature, counts.clone(), codebook, &xi)
             }
         ).collect_vec();
+        let noise_id = feature_models.len();
+        feature_models.push(FeatureModel::noise(noise_id, codebook, &xi));
         // sort feature models by id, such that we can access them by id in the array
         feature_models.sort_by_key(|m| m.feature_id);
 
+
         // calculate start values (we take raw counts as start expression)
-        let expressions = Array1::from_iter(feature_models.iter().map(
-            |model| rng.next_u32()
+        let mut expressions = Array1::from_iter(feature_models.iter().map(
+            |model| model.counts.exact + model.counts.mismatch //rng.next_u32()
         ));
+        // noise start value is sum of total expressions
+        expressions[noise_id] = expressions.scalar_sum();
 
         let miscalls_exact = Miscalls::new(&feature_models, true);
         let miscalls_mismatch = Miscalls::new(&feature_models, false);
@@ -71,7 +77,8 @@ impl JointModel {
             margin: window_width / 2,
             em_run: false,
             rng: rng,
-            debug_id: None //codebook.get_id("THBS1")
+            debug_id: None, //codebook.get_id("THBS1")
+            noise_id: noise_id
         }
     }
 
@@ -108,9 +115,17 @@ impl JointModel {
                     &self.expressions,
                     &mut self.miscalls_exact,
                     &mut self.miscalls_mismatch,
-                    &mut self.rng
+                    &mut self.rng,
+                    j == self.noise_id
                 );
             }
+
+            debug!(
+                "noise rate={}, exact miscalls={}, mismatch miscalls={}",
+                self.expressions[self.noise_id],
+                self.miscalls_exact.total_from(self.noise_id),
+                self.miscalls_mismatch.total_from(self.noise_id)
+            );
 
             // M-step: estimate expressions that maximize the probability
             debug!("M-step");
@@ -121,6 +136,16 @@ impl JointModel {
                     &self.miscalls_mismatch
                 );
             }
+
+            assert_eq!(self.miscalls_exact.total_to(self.noise_id), 0);
+            assert_eq!(self.miscalls_mismatch.total_to(self.noise_id), 0);
+
+            debug!(
+                "noise rate={}, exact miscalls={}, mismatch miscalls={}",
+                self.expressions[self.noise_id],
+                self.miscalls_exact.total_from(self.noise_id),
+                self.miscalls_mismatch.total_from(self.noise_id)
+            );
 
             let fraction_change = m_change as f64 / total as f64;
 
@@ -139,60 +164,6 @@ impl JointModel {
                     self.miscalls_mismatch.miscalls.row(debug_id)
                 );
             }
-
-            // debug!("x={:?}", &self.expressions.slice(s![..10]));
-
-            // if phase == 0 {
-            //     // phase 0: run until convergence or at least 100 steps
-            //     if i != 0 {
-            //         // store fold change in last_expressions
-            //         let max_fc = ndarray::Zip::from(&last_expressions).and(&self.expressions).fold_while(
-            //             0.0,
-            //             |max, &a, &b| {
-            //                 let fc = ((a as f64 + 10.0) / (b as f64 + 10.0)).log(1.05).abs();
-            //                 if fc > max {
-            //                     ndarray::FoldWhile::Continue(fc)
-            //                 } else {
-            //                     ndarray::FoldWhile::Continue(max)
-            //                 }
-            //             }
-            //         ).into_inner();
-            //
-            //         if max_fc <= 1.0 || i >= 100 {
-            //             phase = 1;
-            //             i = 0;
-            //         }
-            //         debug!("max-fc={}", max_fc);
-            //     }
-            //
-            //     debug!("EM-iteration (phase 0): e-change={}, m-change={}, %={}, L={}",
-            //         e_change,
-            //         m_change,
-            //         fraction_change,
-            //         *likelihood
-            //     );
-            //
-            // } else if phase == 1 {
-            //     // phase 1: take best likelihood from 100 iterations
-            //
-            //     if likelihood > map_likelihood {
-            //         map_miscalls_exact = Some(self.miscalls_exact.clone());
-            //         map_miscalls_mismatch = Some(self.miscalls_mismatch.clone());
-            //         map_expressions = Some(self.expressions.clone());
-            //     }
-            //
-            //     debug!(
-            //         "EM-iteration (phase 1): e-change={}, m-change={}, %={}, L={}",
-            //         e_change,
-            //         m_change,
-            //         fraction_change,
-            //         *likelihood
-            //     );
-            //
-            //     if i >= 101 {
-            //         break;
-            //     }
-            // }
 
             //mem::swap(&mut self.expressions, &mut last_expressions);
             if likelihood > map_likelihood {
@@ -340,6 +311,61 @@ pub struct FeatureModel {
 
 
 impl FeatureModel {
+    pub fn noise(feature_id: FeatureID, codebook: &Codebook, xi: &Xi) -> Self {
+        assert!(
+            codebook.min_dist == 2 || codebook.min_dist == 4,
+            "unsupported hamming distance: {}, supported: 2, 4",
+            codebook.min_dist
+        );
+
+        // miscalls generated from noise
+        let xi_miscall = codebook.records().iter().map(
+            |feat_rec| xi.prob_error(codebook.noise(), Some(feat_rec))
+        ).collect_vec();
+        let neighbors = codebook.records().iter().map(
+            |rec| codebook.get_id(rec.name())
+        ).collect_vec();
+
+        let mut miscall_probs = xi_miscall.iter().map(|xi| {
+            match codebook.m {
+                4 => xi[(0, 4)],
+                8 => xi[(0, 8)],
+                6 => xi[(0, 6)],
+                _ => panic!("unsupported number of 1-bits")
+            }
+        }).collect_vec();
+        if codebook.min_dist == 4 {
+            miscall_probs.extend(xi_miscall.iter().map(|xi| {
+                match codebook.m {
+                    4 => LogProb::ln_sum_exp(&[xi[(0, 3)], xi[(0, 5)]]),
+                    6 => LogProb::ln_sum_exp(&[xi[(0, 5)], xi[(0, 7)]]),
+                    8 => LogProb::ln_sum_exp(&[xi[(0, 7)], xi[(0, 9)]]),
+                    _ => panic!("unsupported number of 1-bits")
+                }
+            }));
+        }
+
+        let total_miscall_prob = LogProb::ln_sum_exp(&miscall_probs);
+
+        // no call exact or call mismatch events for noise
+        let mut event_probs = vec![0.0; 2];
+        // dropout event means noise that is not generating miscalls
+        event_probs.push(*Prob::from(total_miscall_prob.ln_one_minus_exp()));
+        // miscalls
+        event_probs.extend(miscall_probs.into_iter().map(|p| *Prob::from(p)));
+
+        debug!("noise event probs={:?}", event_probs);
+
+        FeatureModel {
+            feature_id: feature_id,
+            event_probs: event_probs,
+            neighbors: neighbors,
+            min_dist: codebook.min_dist,
+            counts: Counts { exact: 0, mismatch: 0 },
+            event_counts: RefCell::new(Vec::new())
+        }
+    }
+
     pub fn new(
         feature: &str,
         counts: Counts,
@@ -353,7 +379,7 @@ impl FeatureModel {
         );
 
         let feature = codebook.get_id(feature);
-        let feature_record = codebook.get_record(feature);
+        let feature_record = codebook.record(feature);
 
         let xi_call = xi.prob_error(feature_record, None);
 
@@ -375,11 +401,11 @@ impl FeatureModel {
         neighbors.extend(&neighbors_2);
 
         let xi_miscall_4 = codebook.neighbors(feature, 4).iter().map(|&n| {
-            xi.prob_error(feature_record, Some(codebook.get_record(n)))
+            xi.prob_error(feature_record, Some(codebook.record(n)))
         }).collect_vec();
         let xi_miscall_2 = if codebook.min_dist == 2 {
             codebook.neighbors(feature, 2).iter().map(|&n| {
-                xi.prob_error(feature_record, Some(codebook.get_record(n)))
+                xi.prob_error(feature_record, Some(codebook.record(n)))
             }).collect_vec()
         } else {
             vec![]
@@ -432,7 +458,8 @@ impl FeatureModel {
         expressions: &Expressions,
         miscalls_exact: &mut Miscalls,
         miscalls_mismatch: &mut Miscalls,
-        rng: &mut rand::StdRng
+        rng: &mut rand::StdRng,
+        debug: bool
     ) -> u32 {
         let x = expressions[self.feature_id as usize];
 
@@ -461,10 +488,15 @@ impl FeatureModel {
 
             if self.min_dist == 4 {
                 let miscall_mismatch = self.event_probs[offset_mismatch + i] * x as f64;
-                total_change += miscalls_mismatch.set(
-                    self.feature_id, n, stochastic_round(miscall_mismatch), &mut rest
+                let miscall_mismatch = stochastic_round(miscall_mismatch);
+                let change = miscalls_mismatch.set(
+                    self.feature_id, n, miscall_mismatch, &mut rest
                 );
+                total_change += change;
             }
+        }
+        if debug {
+            debug!("total miscall mismatch={}", miscalls_mismatch.total_from(self.feature_id));
         }
 
         total_change
@@ -605,6 +637,8 @@ impl Xi {
         }
     }
 
+    /// Return matrix of error probabilities.
+    /// Entry (i, j) contains the probability for i 1-0 and j 0-1 errors.
     fn prob_error(
         &self,
         source: &codebook::Record,
