@@ -41,7 +41,7 @@ impl JointModel {
         p1: &[Prob],
         codebook: &Codebook,
         window_width: u32) -> Self {
-        let mut xi = Xi::new(p0, p1, MAX_ERR);
+        let mut xi = Xi::new(p0, p1);
         let mut rng = rand::StdRng::new().unwrap();
 
         let mut feature_models = counts.map(
@@ -119,13 +119,6 @@ impl JointModel {
                     j == self.noise_id
                 );
             }
-
-            debug!(
-                "noise rate={}, exact miscalls={}, mismatch miscalls={}",
-                self.expressions[self.noise_id],
-                self.miscalls_exact.total_from(self.noise_id),
-                self.miscalls_mismatch.total_from(self.noise_id)
-            );
 
             // M-step: estimate expressions that maximize the probability
             debug!("M-step");
@@ -320,7 +313,7 @@ impl FeatureModel {
 
         // miscalls generated from noise
         let xi_miscall = codebook.records().iter().map(
-            |feat_rec| xi.prob_error(codebook.noise(), Some(feat_rec))
+            |feat_rec| xi.prob_error(codebook.noise(), Some(feat_rec), codebook.m as usize + 1)
         ).collect_vec();
         let neighbors = codebook.records().iter().map(
             |rec| codebook.get_id(rec.name())
@@ -354,8 +347,6 @@ impl FeatureModel {
         // miscalls
         event_probs.extend(miscall_probs.into_iter().map(|p| *Prob::from(p)));
 
-        debug!("noise event probs={:?}", event_probs);
-
         FeatureModel {
             feature_id: feature_id,
             event_probs: event_probs,
@@ -381,7 +372,7 @@ impl FeatureModel {
         let feature = codebook.get_id(feature);
         let feature_record = codebook.record(feature);
 
-        let xi_call = xi.prob_error(feature_record, None);
+        let xi_call = xi.prob_error(feature_record, None, 1);
 
         let prob_call_exact = xi_call[(0, 0)];
         let prob_call_mismatch = if codebook.min_dist == 4 {
@@ -401,11 +392,11 @@ impl FeatureModel {
         neighbors.extend(&neighbors_2);
 
         let xi_miscall_4 = codebook.neighbors(feature, 4).iter().map(|&n| {
-            xi.prob_error(feature_record, Some(codebook.record(n)))
+            xi.prob_error(feature_record, Some(codebook.record(n)), 3)
         }).collect_vec();
         let xi_miscall_2 = if codebook.min_dist == 2 {
             codebook.neighbors(feature, 2).iter().map(|&n| {
-                xi.prob_error(feature_record, Some(codebook.record(n)))
+                xi.prob_error(feature_record, Some(codebook.record(n)), 1)
             }).collect_vec()
         } else {
             vec![]
@@ -615,8 +606,7 @@ impl FeatureModel {
 /// Basic model for the probability of making i 1-0 and j 0-1 errors.
 pub struct Xi {
     p0: Vec<LogProb>,
-    p1: Vec<LogProb>,
-    max_err: u8
+    p1: Vec<LogProb>
 }
 
 
@@ -627,22 +617,24 @@ impl Xi {
     ///
     /// * `p0` - error probabilities for 0-1 errors
     /// * `p1` - error probabilities for 1-0 errors
-    /// * `max_err` - maximum number of errors considered
-    fn new(p0: &[Prob], p1: &[Prob], max_err: u8) -> Self {
+    fn new(p0: &[Prob], p1: &[Prob]) -> Self {
         let tolog = |&p| LogProb::from(p);
         Xi {
             p0: p0.iter().map(&tolog).collect_vec(),
-            p1: p1.iter().map(&tolog).collect_vec(),
-            max_err: max_err
+            p1: p1.iter().map(&tolog).collect_vec()
         }
     }
 
     /// Return matrix of error probabilities.
     /// Entry (i, j) contains the probability for i 1-0 and j 0-1 errors.
+    ///
+    /// # Arguments
+    /// * `max_err` - maximum number of errors considered
     fn prob_error(
         &self,
         source: &codebook::Record,
-        target: Option<&codebook::Record>
+        target: Option<&codebook::Record>,
+        max_err: usize
     ) -> Array2<LogProb> {
         let mask = if let Some(target) = target {
             Some(source.diff(target))
@@ -650,11 +642,11 @@ impl Xi {
             None
         };
 
-        self.calc(source.codeword(), mask.as_ref())
+        self.calc(source.codeword(), mask.as_ref(), max_err)
     }
 
-    fn calc(&self, codeword: &Codeword, mask: Option<&BitVec>) -> Array2<LogProb> {
-        let n = self.max_err as usize;
+    fn calc(&self, codeword: &Codeword, mask: Option<&BitVec>, max_err: usize) -> Array2<LogProb> {
+        let n = max_err + 1;
         let mut curr = Array::from_elem((n + 1, n + 1), LogProb::ln_zero());
         let mut prev = Array::from_elem((n + 1, n + 1), LogProb::ln_zero());
         prev[(1, 1)] = LogProb::ln_one();
