@@ -15,7 +15,7 @@ fn run_exp(dataset: &str, codebook: &str, params: &str) -> bool {
     Command::new("bash")
             .arg("-c")
             .arg(format!(
-                "target/release/merfishtools -v exp -t 1 {codebook} --estimate {est} {params} < {raw} > {cdf}",
+                "target/debug/merfishtools -v exp -t 1 {codebook} --estimate {est} {params} < {raw} > {cdf}",
                 codebook=format!("tests/codebook/{}.txt", codebook),
                 raw=format!("tests/data/{}.txt", dataset),
                 cdf=format!("tests/results/{}.txt", dataset),
