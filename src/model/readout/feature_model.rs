@@ -446,9 +446,11 @@ impl AbstractFeatureModel for NoiseModel {
             calls_mismatch += counts.mismatch.saturating_sub(miscalls_mismatch.total_to(id));
         }
 
-        calls_exact + calls_mismatch +
-        miscalls_exact.total_from(self.feature_id) +
-        miscalls_mismatch.total_from(self.feature_id)
+        let event_count = calls_exact + calls_mismatch +
+                          miscalls_exact.total_from(self.feature_id) +
+                          miscalls_mismatch.total_from(self.feature_id);
+
+        event_count
     }
 
     fn prob_dropout(&self) -> f64 {

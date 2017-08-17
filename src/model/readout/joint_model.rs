@@ -10,6 +10,7 @@ use ndarray::prelude::*;
 use ndarray;
 use bit_vec::BitVec;
 use rgsl::randist::multinomial::multinomial_pdf;
+use ordered_float::NotNaN;
 
 use bio::stats::{Prob, LogProb};
 
@@ -98,14 +99,12 @@ impl JointModel {
             self.feature_models.values().map(|m| Box::new(m as &AbstractFeatureModel)).collect_vec();
         feature_models.push(Box::new(&self.noise_model));
         let n_iterations = 20;
-        let mut i = 0;
 
         let mut last_changes = Array2::from_elem((self.expressions.len(), 5), 0.0);
 
         // EM iterations
-        loop {
-            let total: u32 = self.expressions.len() as u32;
-            //let total: u32 = self.expressions.iter().sum::<u32>();
+        for i in 1..n_iterations + 1 {
+            debug!("EM-iteration {} of at most {}", i + 1, n_iterations);
 
             // E-step: estimate miscalls
             debug!("E-step");
@@ -136,49 +135,17 @@ impl JointModel {
 
             // calculate mean change per feature of last 5 steps
             let mean_changes = last_changes.mean(Axis(1));
+            debug!("x={:?}", self.expressions);
             debug!("mean changes={:?}", mean_changes);
-            //debug!("mean mean change={}", mean_changes.mean(Axis(0))[(0)]);
+            let convergence = *mean_changes.iter().map(
+                |&c| NotNaN::new(c).unwrap()
+            ).max().unwrap() <= 1.0;
 
-            eprintln!("x={:?}", self.expressions);
-            //eprintln!("x={:?}", self.expressions.slice(s![..10]));
-
-            // let mut likelihood = LogProb::ln_one();
-            // for m in &self.feature_models {
-            //     let x = self.expressions[m.feature_id];
-            //     eprintln!("{} {:?} {} {:?} {:?}", x, self.miscalls_exact.miscalls.row(m.feature_id), m.feature_id, m.feature_type, m.event_probs);
-            //     let l = m.likelihood(x, &self.miscalls_exact, &self.miscalls_mismatch);
-            //     likelihood = likelihood + l;
-            // }
-            //
-            // if let Some(debug_id) = self.debug_id {
-            //     debug!(
-            //         "DEBUG feature: x={}, miscalls_exact_from={}, miscalls_mismatch_from={}",
-            //         self.expressions[debug_id],
-            //         self.miscalls_exact.miscalls.row(debug_id),
-            //         self.miscalls_mismatch.miscalls.row(debug_id)
-            //     );
-            // }
-            //
-            // //mem::swap(&mut self.expressions, &mut last_expressions);
-            // if likelihood > map_likelihood {
-            //     map_miscalls_exact = Some(self.miscalls_exact.clone());
-            //     map_miscalls_mismatch = Some(self.miscalls_mismatch.clone());
-            //     map_expressions = Some(self.expressions.clone());
-            // }
-
-            debug!("EM-iteration {} of {}", i, n_iterations);
-
-            if i == n_iterations {
+            if i >= 5 && convergence {
+                debug!("Convergence reached, stopping EM algorithm.");
                 break;
             }
-
-            i += 1;
         }
-        // update miscalls according to expressions of last iteration
-
-        // self.miscalls_exact = map_miscalls_exact.unwrap();
-        // self.miscalls_mismatch = map_miscalls_mismatch.unwrap();
-        // self.expressions = map_expressions.unwrap();
         self.em_run = true;
     }
 
