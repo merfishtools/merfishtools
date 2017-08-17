@@ -23,7 +23,8 @@ pub type Codeword = BitVec<u32>;
 #[derive(Debug)]
 pub struct Record {
     name: String,
-    codeword: BitVec<u32>
+    codeword: BitVec<u32>,
+    expressed: bool
 }
 
 
@@ -31,12 +32,13 @@ impl Record {
     pub fn noise(len: usize) -> Self {
         Record {
             name: "noise".to_owned(),
-            codeword: BitVec::from_elem(len, false)
+            codeword: BitVec::from_elem(len, false),
+            expressed: true  // there is always some noise
         }
     }
 
     /// Create new record.
-    pub fn new(name: String, codeword: &[u8]) -> Self {
+    pub fn new(name: String, codeword: &[u8], expressed: bool) -> Self {
         let mut _codeword = BitVec::with_capacity(codeword.len());
         for &b in codeword {
             if b == b'1' {
@@ -50,7 +52,8 @@ impl Record {
 
         Record {
             name: name,
-            codeword: _codeword
+            codeword: _codeword,
+            expressed: expressed
         }
     }
 
@@ -60,6 +63,10 @@ impl Record {
 
     pub fn codeword(&self) -> &BitVec<u32> {
         &self.codeword
+    }
+
+    pub fn expressed(&self) -> bool {
+        self.expressed
     }
 
     /// Get distance to other codeword.
@@ -118,9 +125,10 @@ impl Codebook {
         let index = {
             let mut index = HashMap::new();
             for rec in rdr.decode() {
-                let (feature, codeword): (String, String) = rec?;
+                let (feature, codeword, expressed): (String, String, u8) = rec?;
+                let expressed = expressed == 1;
 
-                let rec = Record::new(feature.clone(), codeword.as_bytes());
+                let rec = Record::new(feature.clone(), codeword.as_bytes(), expressed);
                 let n = rec.codeword.len();
                 let m_ = rec.codeword.iter().filter(|b| *b).count();
 

@@ -57,7 +57,7 @@ impl JointModel {
 
         // calculate start values (we take raw counts as start expression)
         let mut expressions = Array1::from_iter(feature_models.iter().map(
-            |model| model.counts.exact + model.counts.mismatch //rng.next_u32()
+            |model| if model.feature_type.is_expressed() { rng.next_u32() } else { eprintln!("misid={}", model.counts.total()); 0 }
         ));
         // noise start value is sum of total expressions
         expressions[noise_id] = expressions.scalar_sum();
@@ -90,28 +90,30 @@ impl JointModel {
         let mut idx = (0..self.feature_models.len()).collect_vec();
         let mut phase = 0;
         let mut count_no_change = 0;
-        let mut map_likelihood = LogProb::ln_zero();
-        let mut map_miscalls_exact = None;
-        let mut map_miscalls_mismatch = None;
-        let mut map_expressions = None;
+        // let mut map_likelihood = LogProb::ln_zero();
+        // let mut map_miscalls_exact = None;
+        // let mut map_miscalls_mismatch = None;
+        // let mut map_expressions = None;
         let mut last_expressions = self.expressions.clone();
         let n_iterations = 20;
+        let mut i = 0;
+
+        let mut last_changes = Array2::from_elem((self.expressions.len(), 5), 0.0);
+
         // EM iterations
-        for i in 1..n_iterations + 1 {
+        loop {
+            let total: u32 = self.expressions.len() as u32;
+            //let total: u32 = self.expressions.iter().sum::<u32>();
+
+            // E-step: estimate miscalls
+            debug!("E-step");
+
             // Shuffle models, such that miscalls can be drawn unbiased
             // this is necessary because there is a maximum miscall count for each feature.
             // If we would not shuffle, it would be easier for the first model to provide miscalls.
             self.rng.shuffle(&mut idx);
-
-            let total: u32 = self.expressions.len() as u32;
-            //let total: u32 = self.expressions.iter().sum::<u32>();
-
-            let mut e_change: u32 = 0;
-            let mut m_change: u32 = 0;
-            // E-step: estimate miscalls
-            debug!("E-step");
             for &j in &idx {
-                e_change += self.feature_models[j].mle_miscalls(
+                self.feature_models[j].mle_miscalls(
                     &self.expressions,
                     &mut self.miscalls_exact,
                     &mut self.miscalls_mismatch,
@@ -120,15 +122,30 @@ impl JointModel {
                 );
             }
 
+            if i == n_iterations {
+                break;
+            }
+
             // M-step: estimate expressions that maximize the probability
             debug!("M-step");
-            for m in &self.feature_models {
-                m_change += m.mle_expression(
+            for (i, m) in self.feature_models.iter().enumerate() {
+                last_changes[(i, i % 5)] = m.mle_expression(
                     &mut self.expressions,
                     &self.miscalls_exact,
-                    &self.miscalls_mismatch
-                );
+                    &self.miscalls_mismatch,
+                    &self.feature_models
+                ) as f64;
             }
+
+            // calculate mean change per feature of last 5 steps
+            let mean_changes = last_changes.mean(Axis(1));
+            debug!("mean changes={:?}", mean_changes);
+            debug!("misidenfication probes={:?}", self.feature_models.iter().filter_map(|m| {
+                if !m.feature_type.is_expressed() {
+                    Some((m.counts.exact, self.miscalls_exact.total_to(m.feature_id), m.counts.mismatch, self.miscalls_mismatch.total_to(m.feature_id)))
+                } else { None }
+            }).collect_vec());
+            //debug!("mean mean change={}", mean_changes.mean(Axis(0))[(0)]);
 
             assert_eq!(self.miscalls_exact.total_to(self.noise_id), 0);
             assert_eq!(self.miscalls_mismatch.total_to(self.noise_id), 0);
@@ -140,43 +157,42 @@ impl JointModel {
                 self.miscalls_mismatch.total_from(self.noise_id)
             );
 
-            let fraction_change = m_change as f64 / total as f64;
+            eprintln!("x={:?}", self.expressions);
+            //eprintln!("x={:?}", self.expressions.slice(s![..10]));
 
-            let mut likelihood = LogProb::ln_one();
-            for m in &self.feature_models {
-                let x = self.expressions[m.feature_id];
-                let l = m.likelihood(x, &self.miscalls_exact, &self.miscalls_mismatch);
-                likelihood = likelihood + l;
-            }
-
-            if let Some(debug_id) = self.debug_id {
-                debug!(
-                    "DEBUG feature: x={}, miscalls_exact_from={}, miscalls_mismatch_from={}",
-                    self.expressions[debug_id],
-                    self.miscalls_exact.miscalls.row(debug_id),
-                    self.miscalls_mismatch.miscalls.row(debug_id)
-                );
-            }
-
-            //mem::swap(&mut self.expressions, &mut last_expressions);
-            if likelihood > map_likelihood {
-                map_miscalls_exact = Some(self.miscalls_exact.clone());
-                map_miscalls_mismatch = Some(self.miscalls_mismatch.clone());
-                map_expressions = Some(self.expressions.clone());
-            }
+            // let mut likelihood = LogProb::ln_one();
+            // for m in &self.feature_models {
+            //     let x = self.expressions[m.feature_id];
+            //     eprintln!("{} {:?} {} {:?} {:?}", x, self.miscalls_exact.miscalls.row(m.feature_id), m.feature_id, m.feature_type, m.event_probs);
+            //     let l = m.likelihood(x, &self.miscalls_exact, &self.miscalls_mismatch);
+            //     likelihood = likelihood + l;
+            // }
+            //
+            // if let Some(debug_id) = self.debug_id {
+            //     debug!(
+            //         "DEBUG feature: x={}, miscalls_exact_from={}, miscalls_mismatch_from={}",
+            //         self.expressions[debug_id],
+            //         self.miscalls_exact.miscalls.row(debug_id),
+            //         self.miscalls_mismatch.miscalls.row(debug_id)
+            //     );
+            // }
+            //
+            // //mem::swap(&mut self.expressions, &mut last_expressions);
+            // if likelihood > map_likelihood {
+            //     map_miscalls_exact = Some(self.miscalls_exact.clone());
+            //     map_miscalls_mismatch = Some(self.miscalls_mismatch.clone());
+            //     map_expressions = Some(self.expressions.clone());
+            // }
 
             debug!("EM-iteration {} of {}", i, n_iterations);
-            debug!(
-                "e-change={}, m-change={}, %={}, L={}",
-                e_change,
-                m_change,
-                fraction_change,
-                *likelihood
-            );
+
+            i += 1;
         }
-        self.miscalls_exact = map_miscalls_exact.unwrap();
-        self.miscalls_mismatch = map_miscalls_mismatch.unwrap();
-        self.expressions = map_expressions.unwrap();
+        // update miscalls according to expressions of last iteration
+
+        // self.miscalls_exact = map_miscalls_exact.unwrap();
+        // self.miscalls_mismatch = map_miscalls_mismatch.unwrap();
+        // self.expressions = map_expressions.unwrap();
         self.em_run = true;
     }
 
@@ -287,8 +303,30 @@ impl Miscalls {
         self.total_to[feature]
     }
 
+    pub fn max_total_to(&self, feature: FeatureID) -> u32 {
+        self.max_total_to[feature]
+    }
+
     pub fn total(&self) -> u32 {
         self.total
+    }
+}
+
+
+#[derive(Debug)]
+pub enum FeatureType {
+    Expressed,
+    NotExpressed,
+    Noise
+}
+
+
+impl FeatureType {
+    pub fn is_expressed(&self) -> bool {
+        match self {
+            &FeatureType::NotExpressed => false,
+            _ => true
+        }
     }
 }
 
@@ -299,7 +337,8 @@ pub struct FeatureModel {
     neighbors: Vec<FeatureID>,
     min_dist: u8,
     counts: Counts,
-    event_counts: RefCell<Vec<u32>>
+    event_counts: RefCell<Vec<u32>>,
+    feature_type: FeatureType
 }
 
 
@@ -310,6 +349,9 @@ impl FeatureModel {
             "unsupported hamming distance: {}, supported: 2, 4",
             codebook.min_dist
         );
+
+
+
 
         // miscalls generated from noise
         let xi_miscall = codebook.records().iter().map(
@@ -353,7 +395,8 @@ impl FeatureModel {
             neighbors: neighbors,
             min_dist: codebook.min_dist,
             counts: Counts { exact: 0, mismatch: 0 },
-            event_counts: RefCell::new(Vec::new())
+            event_counts: RefCell::new(Vec::new()),
+            feature_type: FeatureType::Noise
         }
     }
 
@@ -431,13 +474,20 @@ impl FeatureModel {
         event_probs.extend(prob_miscall_exact.iter().map(|&p| *Prob::from(p)));
         event_probs.extend(prob_miscall_mismatch.iter().map(|&p| *Prob::from(p)));
 
+        let feature_type = if feature_record.expressed() {
+            FeatureType::Expressed
+        } else {
+            FeatureType::NotExpressed
+        };
+
         FeatureModel {
             feature_id: feature,
             event_probs: event_probs,
             neighbors: neighbors,
             min_dist: codebook.min_dist,
             counts: counts,
-            event_counts: RefCell::new(Vec::new())
+            event_counts: RefCell::new(Vec::new()),
+            feature_type: feature_type
         }
     }
 
@@ -452,10 +502,12 @@ impl FeatureModel {
         rng: &mut rand::StdRng,
         debug: bool
     ) -> u32 {
+        if !self.feature_type.is_expressed() {
+            return 0;
+        }
+
         let x = expressions[self.feature_id as usize];
 
-        let offset_exact = 3;
-        let offset_mismatch = 3 + self.neighbors.len();
         let mut total_change = 0;
 
         // We need to ensure that the sum of the estimated miscalls does not exceed x.
@@ -472,13 +524,13 @@ impl FeatureModel {
         let mut rest = x;
         for i in idx {
             let n = self.neighbors[i];
-            let miscall_exact = self.event_probs[offset_exact + i] * x as f64;
+            let miscall_exact = self.prob_miscall_exact(i) * x as f64;
             total_change += miscalls_exact.set(
                 self.feature_id, n, stochastic_round(miscall_exact), &mut rest
             );
 
             if self.min_dist == 4 {
-                let miscall_mismatch = self.event_probs[offset_mismatch + i] * x as f64;
+                let miscall_mismatch = self.prob_miscall_mismatch(i) * x as f64;
                 let miscall_mismatch = stochastic_round(miscall_mismatch);
                 let change = miscalls_mismatch.set(
                     self.feature_id, n, miscall_mismatch, &mut rest
@@ -499,34 +551,87 @@ impl FeatureModel {
         &self,
         expressions: &mut Expressions,
         miscalls_exact: &Miscalls,
-        miscalls_mismatch: &Miscalls
-    ) -> u32 {
-        let calls_exact = self.counts.exact.saturating_sub(
-            miscalls_exact.total_to(self.feature_id)
-        );
-        let calls_mismatch = self.counts.mismatch.saturating_sub(
-            miscalls_mismatch.total_to(self.feature_id)
-        );
-        let event_count = calls_exact + calls_mismatch +
-                          miscalls_exact.total_from(self.feature_id) +
-                          miscalls_mismatch.total_from(self.feature_id);
+        miscalls_mismatch: &Miscalls,
+        feature_models: &[FeatureModel]
+    ) -> i32 {
+        let x_ = match self.feature_type {
+            FeatureType::Expressed | FeatureType::Noise => {
+                let calls_exact = self.counts.exact.saturating_sub(
+                    miscalls_exact.total_to(self.feature_id)
+                );
+                let calls_mismatch = self.counts.mismatch.saturating_sub(
+                    miscalls_mismatch.total_to(self.feature_id)
+                );
+                let event_count = calls_exact + calls_mismatch +
+                                  miscalls_exact.total_from(self.feature_id) +
+                                  miscalls_mismatch.total_from(self.feature_id);
 
-        let x = event_count as f64 / (1.0 - self.event_probs[2]);
+                let x = event_count as f64 / (1.0 - self.event_probs[2]);
 
-        let x_ = cmp::max(
-            x.floor() as u32,
-            // or at least as many as we have events coming from this feature
-            event_count
-        );
+                cmp::max(
+                    x.floor() as u32,
+                    // or at least as many as we have events coming from this feature
+                    // TODO does this allow x to decrease properly?
+                    event_count
+                )
+            },
+            FeatureType::NotExpressed => 0,
+            // FeatureType::Noise => {
+            //     // get remaining free miscalls of not expressed features
+            //     // the best noise estimate should fill all of these
+            //     // self.neighbors.iter().filter_map(|&n| {
+            //     //     if let FeatureType::NotExpressed = feature_models[n].feature_type {
+            //     //         let free_miscalls = |miscalls: &Miscalls| {
+            //     //             miscalls.max_total_to(n) - miscalls.total_to(n) -
+            //     //             miscalls.get(self.feature_id, n)
+            //     //         };
+            //     //
+            //     //         free_miscalls(miscalls_exact) + free_miscalls(miscalls_mismatch)
+            //     //     } else { None }
+            //     // }
+            //     let x: f64 = self.neighbors.iter().enumerate().filter_map(|(i, &n)| {
+            //         if feature_models[n].feature_type.is_expressed() {
+            //             let free_miscalls = |miscalls: &Miscalls| {
+            //                 miscalls.max_total_to(n) - miscalls.total_to(n) -
+            //                 miscalls.get(self.feature_id, n)
+            //             };
+            //             Some(
+            //                 (
+            //                     free_miscalls(miscalls_exact) as f64 +
+            //                     free_miscalls(miscalls_mismatch) as f64
+            //                 ) / (self.prob_miscall_exact(i) + self.prob_miscall_mismatch(i))
+            //             )
+            //         } else { None }
+            //     }).sum::<f64>() / self.neighbors.len() as f64;
+            //     // let x = free_miscalls as f64 / total_prob;
+            //
+            //     cmp::max(
+            //         x.floor() as u32,
+            //         miscalls_exact.total_from(self.feature_id) +
+            //         miscalls_mismatch.total_from(self.feature_id)
+            //     )
+            // }
+        };
 
         let x = expressions.get_mut(self.feature_id as usize).unwrap();
 
-        //let change = (*x as i32 - x_ as i32).abs() as u32;
-        let change = if x_ != *x { 1 } else { 0 };
+        let change = *x as i32 - x_ as i32;
 
         *x = x_;
 
         change
+    }
+
+    pub fn prob_dropout(&self) -> f64 {
+        self.event_probs[2]
+    }
+
+    pub fn prob_miscall_exact(&self, neighbor_index: usize) -> f64 {
+        self.event_probs[3 + neighbor_index]
+    }
+
+    pub fn prob_miscall_mismatch(&self, neighbor_index: usize) -> f64 {
+        self.event_probs[3 + self.neighbors.len() + neighbor_index]
     }
 
     /// Minimum expression given fixed miscalls.
