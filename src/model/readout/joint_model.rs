@@ -1,6 +1,7 @@
 use std::mem;
 use std::cell::RefCell;
 use std::cmp;
+use std::collections::HashMap;
 
 use rand;
 use rand::Rng;
@@ -14,11 +15,13 @@ use bio::stats::{Prob, LogProb};
 
 use io::codebook::{self, Codebook, Codeword, FeatureID};
 
-use model::readout::{Expressions, Counts, Miscalls, FeatureModel, Xi};
+use model::readout::{Expressions, Counts, Miscalls, FeatureModel, NoiseModel, Xi};
+use model::readout::feature_model::AbstractFeatureModel;
 
 
 pub struct JointModel {
-    feature_models: Vec<FeatureModel>,
+    feature_models: HashMap<FeatureID, FeatureModel>,
+    noise_model: NoiseModel,
     expressions: Expressions,
     miscalls_exact: Miscalls,
     miscalls_mismatch: Miscalls,
@@ -40,33 +43,41 @@ impl JointModel {
         let mut xi = Xi::new(p0, p1);
         let mut rng = rand::StdRng::new().unwrap();
 
-        let mut feature_models = counts.map(
-            |(feature, counts)| {
-                FeatureModel::new(feature, counts.clone(), codebook, &xi)
+        // Generate feature models and info about not expressed features.
+        let mut feature_models = HashMap::new();
+        let mut not_expressed_counts = Vec::new();
+        let mut not_expressed_feature_ids = Vec::new();
+        for (feature, counts) in counts {
+            let feature = codebook.get_id(feature);
+            let rec = codebook.record(feature);
+            if rec.expressed() {
+                feature_models.insert(
+                    feature, FeatureModel::new(feature, counts.clone(), codebook, &xi)
+                );
+            } else {
+                not_expressed_counts.push(counts.clone());
+                not_expressed_feature_ids.push(feature);
             }
-        ).collect_vec();
-        let noise_id = feature_models.len();
-        feature_models.push(FeatureModel::noise(noise_id, codebook, &xi));
-        // sort feature models by id, such that we can access them by id in the array
-        feature_models.sort_by_key(|m| m.feature_id);
-
-
-        // calculate start values (we take raw counts as start expression)
-        let mut expressions = Array1::from_iter(feature_models.iter().map(
-            |model| if model.feature_type.is_expressed() { rng.next_u32() } else { eprintln!("misid={}", model.counts.total()); 0 }
-        ));
-        // noise start value is sum of total expressions
-        expressions[noise_id] = expressions.scalar_sum();
-
-        let miscalls_exact = Miscalls::new(&feature_models, true);
-        let miscalls_mismatch = Miscalls::new(&feature_models, false);
-
-        for (i, m) in feature_models.iter().enumerate() {
-            assert_eq!(i, m.feature_id);
         }
+
+        // Take value larger than maximum feature id as noise id.
+        let noise_id = codebook.len();
+        let noise_model = NoiseModel::new(
+            codebook.len(), not_expressed_feature_ids, not_expressed_counts, codebook, &xi
+        );
+        let feature_count = codebook.len() + 1;
+
+        // calculate start values (we take random numbers as start expression)
+        let mut expressions = Array1::from_iter((0..feature_count).map(
+            |model| rng.next_u32()
+        ));
+
+        let miscalls_exact = Miscalls::new(feature_count, &feature_models, &noise_model, true);
+        let miscalls_mismatch = Miscalls::new(feature_count, &feature_models, &noise_model, false);
 
         JointModel {
             feature_models: feature_models,
+            noise_model: noise_model,
             expressions: expressions,
             miscalls_exact: miscalls_exact,
             miscalls_mismatch: miscalls_mismatch,
@@ -83,14 +94,9 @@ impl JointModel {
     /// Expressions are our model parameters to estimate, miscalls are our latent variables,
     /// counts are our observed variables.
     pub fn expectation_maximization(&mut self) {
-        let mut idx = (0..self.feature_models.len()).collect_vec();
-        let mut phase = 0;
-        let mut count_no_change = 0;
-        // let mut map_likelihood = LogProb::ln_zero();
-        // let mut map_miscalls_exact = None;
-        // let mut map_miscalls_mismatch = None;
-        // let mut map_expressions = None;
-        let mut last_expressions = self.expressions.clone();
+        let mut feature_models: Vec<Box<&AbstractFeatureModel>> =
+            self.feature_models.values().map(|m| Box::new(m as &AbstractFeatureModel)).collect_vec();
+        feature_models.push(Box::new(&self.noise_model));
         let n_iterations = 20;
         let mut i = 0;
 
@@ -107,51 +113,31 @@ impl JointModel {
             // Shuffle models, such that miscalls can be drawn unbiased
             // this is necessary because there is a maximum miscall count for each feature.
             // If we would not shuffle, it would be easier for the first model to provide miscalls.
-            self.rng.shuffle(&mut idx);
-            for &j in &idx {
-                self.feature_models[j].mle_miscalls(
+            self.rng.shuffle(&mut feature_models);
+            for m in &feature_models {
+                m.mle_miscalls(
                     &self.expressions,
                     &mut self.miscalls_exact,
                     &mut self.miscalls_mismatch,
-                    &mut self.rng,
-                    j == self.noise_id
+                    &mut self.rng
                 );
-            }
-
-            if i == n_iterations {
-                break;
             }
 
             // M-step: estimate expressions that maximize the probability
             debug!("M-step");
-            for (i, m) in self.feature_models.iter().enumerate() {
-                last_changes[(i, i % 5)] = m.mle_expression(
+            for m in &feature_models {
+                let feature_id = m.feature_id();
+                last_changes[(feature_id, feature_id % 5)] = m.mle_expression(
                     &mut self.expressions,
                     &self.miscalls_exact,
-                    &self.miscalls_mismatch,
-                    &self.feature_models
+                    &self.miscalls_mismatch
                 ) as f64;
             }
 
             // calculate mean change per feature of last 5 steps
             let mean_changes = last_changes.mean(Axis(1));
             debug!("mean changes={:?}", mean_changes);
-            debug!("misidenfication probes={:?}", self.feature_models.iter().filter_map(|m| {
-                if !m.feature_type.is_expressed() {
-                    Some((m.counts.exact, self.miscalls_exact.total_to(m.feature_id), m.counts.mismatch, self.miscalls_mismatch.total_to(m.feature_id)))
-                } else { None }
-            }).collect_vec());
             //debug!("mean mean change={}", mean_changes.mean(Axis(0))[(0)]);
-
-            assert_eq!(self.miscalls_exact.total_to(self.noise_id), 0);
-            assert_eq!(self.miscalls_mismatch.total_to(self.noise_id), 0);
-
-            debug!(
-                "noise rate={}, exact miscalls={}, mismatch miscalls={}",
-                self.expressions[self.noise_id],
-                self.miscalls_exact.total_from(self.noise_id),
-                self.miscalls_mismatch.total_from(self.noise_id)
-            );
 
             eprintln!("x={:?}", self.expressions);
             //eprintln!("x={:?}", self.expressions.slice(s![..10]));
@@ -182,6 +168,10 @@ impl JointModel {
 
             debug!("EM-iteration {} of {}", i, n_iterations);
 
+            if i == n_iterations {
+                break;
+            }
+
             i += 1;
         }
         // update miscalls according to expressions of last iteration
@@ -194,7 +184,7 @@ impl JointModel {
 
     pub fn likelihood(&mut self, feature_id: FeatureID, x: u32) -> LogProb {
         assert!(self.em_run);
-        self.feature_models[feature_id as usize].likelihood(
+        self.feature_model(feature_id).likelihood(
             x, &self.miscalls_exact, &self.miscalls_mismatch
         )
     }
@@ -204,15 +194,15 @@ impl JointModel {
         self.expressions[feature_id as usize]
     }
 
-    pub fn feature_model(&self, feature_id: FeatureID) -> &FeatureModel {
-        &self.feature_models[feature_id]
+    fn feature_model(&self, feature_id: FeatureID) -> &FeatureModel {
+        self.feature_models.get(&feature_id).unwrap()
     }
 
     /// Prior window for calculating expression PMF
     pub fn window(&self, feature_id: FeatureID) -> (u32, u32) {
         assert!(self.em_run);
         let x = self.map_estimate(feature_id);
-        let xmin = self.feature_models[feature_id as usize].min_expression(
+        let xmin = self.feature_model(feature_id).min_expression(
             &self.miscalls_exact, &self.miscalls_mismatch
         );
         let xmax = x + self.margin;

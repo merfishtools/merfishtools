@@ -1,6 +1,7 @@
 use std::mem;
 use std::cell::RefCell;
 use std::cmp;
+use std::collections::HashMap;
 
 use rand;
 use rand::Rng;
@@ -19,7 +20,7 @@ pub mod feature_model;
 pub mod xi;
 
 pub use model::readout::joint_model::JointModel;
-pub use model::readout::feature_model::FeatureModel;
+pub use model::readout::feature_model::{FeatureModel, NoiseModel};
 pub use model::readout::xi::Xi;
 
 
@@ -55,12 +56,22 @@ pub struct Miscalls {
 
 impl Miscalls {
     /// Create new instance.
-    pub fn new(feature_models: &[FeatureModel], exact: bool) -> Self {
-        let feature_count = feature_models.len();
-        let mut max_total_to = vec![0; feature_models.len()];
-        for m in feature_models.iter() {
+    pub fn new(
+        feature_count: usize,
+        feature_models: &HashMap<FeatureID, FeatureModel>,
+        noise_model: &NoiseModel,
+        exact: bool
+    ) -> Self {
+        let mut max_total_to = vec![0; feature_count];
+        for m in feature_models.values() {
             max_total_to[m.feature_id] = if exact { m.counts.exact } else { m.counts.mismatch };
         }
+        for (&feature_id, counts) in noise_model.not_expressed_feature_ids.iter().zip(
+            &noise_model.not_expressed_counts
+        ) {
+            max_total_to[feature_id] = if exact { counts.exact } else { counts.mismatch };
+        }
+
         Miscalls {
             miscalls: Array::from_elem((feature_count, feature_count), 0),
             total_to: vec![0; feature_count],
