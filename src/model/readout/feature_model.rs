@@ -1,4 +1,3 @@
-use std::mem;
 use std::cell::RefCell;
 use std::cmp;
 
@@ -6,13 +5,11 @@ use rand;
 use rand::Rng;
 use itertools::Itertools;
 use ndarray::prelude::*;
-use ndarray;
-use bit_vec::BitVec;
 use rgsl::randist::multinomial::multinomial_pdf;
 
 use bio::stats::{Prob, LogProb};
 
-use io::codebook::{self, Codebook, Codeword, FeatureID};
+use io::codebook::{Codebook, FeatureID};
 
 use model::readout::{Expressions, Counts, Miscalls, Xi};
 

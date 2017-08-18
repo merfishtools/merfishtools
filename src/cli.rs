@@ -104,7 +104,7 @@ pub fn expression(p0: Vec<Prob>, p1: Vec<Prob>, codebook_path: &str, estimate_pa
             model.expectation_maximization();
 
             // Calculate CDF for all features.
-            let cdfs = counts.into_iter().filter_map(|(feature, count)| {
+            let cdfs = counts.into_iter().filter_map(|(feature, _)| {
                 let feature_id = codebook.get_id(&feature);
                 if codebook.record(feature_id).expressed() {
                     let (cdf, map_estimate) = model::expression::cdf(

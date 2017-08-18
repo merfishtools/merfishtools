@@ -11,9 +11,6 @@ use csv;
 use itertools::Itertools;
 use bit_vec::BitVec;
 use petgraph::prelude::*;
-use petgraph::visit::IntoNodeReferences;
-use petgraph::visit::NodeRef;
-use petgraph::graph::NodeWeightsMut;
 
 
 pub type Codeword = BitVec<u32>;
@@ -233,28 +230,6 @@ impl Codebook {
             panic!(
                 "unsupported distance {}, only first and second order neighbors supported", dist
             );
-        }
-    }
-
-    fn dfs(
-        &self,
-        node: NodeIndex<u32>,
-        d: u8,
-        visited: &mut HashSet<NodeIndex<u32>>,
-        neighbors: &mut Vec<FeatureID>,
-        dist: u8) {
-        if visited.contains(&node) {
-            return;
-        }
-        visited.insert(node);
-
-        if d == dist {
-            neighbors.push(node.index());
-            return;
-        }
-
-        for n in self.graph.neighbors(node) {
-            self.dfs(n, d + self.min_dist, visited, neighbors, dist);
         }
     }
 

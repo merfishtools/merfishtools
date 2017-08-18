@@ -8,7 +8,6 @@ use std::fs;
 use std::path::Path;
 use std::ops::Range;
 
-use ordered_float::NotNaN;
 use csv;
 
 
@@ -31,7 +30,7 @@ impl<W: io::Write> Writer<W> {
         let mut writer = Writer {
             inner: csv::Writer::from_writer(w).delimiter(b'\t')
         };
-        let mut fields = vec!["cell", "feat", "expr_map", "expr_ci_lower", "expr_ci_upper"];
+        let fields = vec!["cell", "feat", "expr_map", "expr_ci_lower", "expr_ci_upper"];
         writer.inner.write(fields.iter()).unwrap();
 
         writer

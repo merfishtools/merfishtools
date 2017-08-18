@@ -1,19 +1,9 @@
-use std::mem;
-use std::cell::RefCell;
 use std::cmp;
 use std::collections::HashMap;
 
-use rand;
-use rand::Rng;
-use itertools::Itertools;
 use ndarray::prelude::*;
-use ndarray;
-use bit_vec::BitVec;
-use rgsl::randist::multinomial::multinomial_pdf;
 
-use bio::stats::{Prob, LogProb};
-
-use io::codebook::{self, Codebook, Codeword, FeatureID};
+use io::codebook::FeatureID;
 
 pub mod joint_model;
 pub mod feature_model;
@@ -22,9 +12,6 @@ pub mod xi;
 pub use model::readout::joint_model::JointModel;
 pub use model::readout::feature_model::{FeatureModel, NoiseModel};
 pub use model::readout::xi::Xi;
-
-
-const MAX_ERR: u8 = 6;
 
 
 pub type Expressions = Array1<u32>;

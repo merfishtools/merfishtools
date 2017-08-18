@@ -4,8 +4,6 @@ use itertools::Itertools;
 use bio::stats::probs::cdf::CDF;
 use bio::stats::probs::cdf;
 
-use model;
-
 
 #[derive(Debug, Clone, PartialOrd, PartialEq)]
 pub struct MeanVar {

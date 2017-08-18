@@ -1,18 +1,12 @@
 use std::mem;
-use std::cell::RefCell;
-use std::cmp;
 
-use rand;
-use rand::Rng;
 use itertools::Itertools;
 use ndarray::prelude::*;
-use ndarray;
 use bit_vec::BitVec;
-use rgsl::randist::multinomial::multinomial_pdf;
 
 use bio::stats::{Prob, LogProb};
 
-use io::codebook::{self, Codebook, Codeword, FeatureID};
+use io::codebook::{self, Codeword};
 
 
 /// Basic model for the probability of making i 1-0 and j 0-1 errors.

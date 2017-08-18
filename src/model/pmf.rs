@@ -1,7 +1,6 @@
 use std::slice;
 
 use itertools::Itertools;
-use num::traits::{cast, NumCast};
 
 use bio::stats::LogProb;
 

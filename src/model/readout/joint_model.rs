@@ -1,23 +1,15 @@
-use std::mem;
-use std::cell::RefCell;
-use std::cmp;
 use std::collections::HashMap;
-use std::io;
 
 use rand;
 use rand::Rng;
 use rand::distributions::IndependentSample;
 use itertools::Itertools;
 use ndarray::prelude::*;
-use ndarray;
-use bit_vec::BitVec;
-use rgsl::randist::multinomial::multinomial_pdf;
 use ordered_float::NotNaN;
-use csv;
 
 use bio::stats::{Prob, LogProb};
 
-use io::codebook::{self, Codebook, Codeword, FeatureID};
+use io::codebook::{Codebook, FeatureID};
 
 use model::readout::{Expressions, Counts, Miscalls, FeatureModel, NoiseModel, Xi};
 use model::readout::feature_model::AbstractFeatureModel;
@@ -31,10 +23,7 @@ pub struct JointModel {
     miscalls_mismatch: Miscalls,
     margin: u32,
     em_run: bool,
-    rng: rand::StdRng,
-    debug_id: Option<FeatureID>,
-    noise_id: FeatureID,
-    iteration_logger_header: Vec<String>
+    rng: rand::StdRng
 }
 
 
@@ -46,7 +35,7 @@ impl JointModel {
         codebook: &Codebook,
         window_width: u32
     ) -> Self {
-        let mut xi = Xi::new(p0, p1);
+        let xi = Xi::new(p0, p1);
         let mut rng = rand::StdRng::new().unwrap();
 
         // Generate feature models and info about not expressed features.
@@ -71,7 +60,7 @@ impl JointModel {
         // calculate start values (we take random numbers as start expression)
         let start_range = rand::distributions::Range::new(1, 10000);
         let mut expressions = Array1::from_iter((0..feature_count).map(
-            |model| start_range.ind_sample(&mut rng)
+            |_| start_range.ind_sample(&mut rng)
         ));
         for &feat_id in &not_expressed_feature_ids {
             expressions[feat_id] = 0;
@@ -80,16 +69,11 @@ impl JointModel {
         // Take value larger than maximum feature id as noise id.
         let noise_id = codebook.len();
         let noise_model = NoiseModel::new(
-            codebook.len(), not_expressed_feature_ids, not_expressed_counts, codebook, &xi
+            noise_id, not_expressed_feature_ids, not_expressed_counts, codebook, &xi
         );
 
         let miscalls_exact = Miscalls::new(feature_count, &feature_models, &noise_model, true);
         let miscalls_mismatch = Miscalls::new(feature_count, &feature_models, &noise_model, false);
-
-        let mut header = (0..codebook.len()).map(
-            |i| codebook.record(i).name().to_owned()
-        ).collect_vec();
-        header.push("noise".to_owned());
 
         JointModel {
             feature_models: feature_models,
@@ -99,10 +83,7 @@ impl JointModel {
             miscalls_mismatch: miscalls_mismatch,
             margin: window_width / 2,
             em_run: false,
-            rng: rng,
-            debug_id: None,
-            noise_id: noise_id,
-            iteration_logger_header: header
+            rng: rng
         }
     }
 
