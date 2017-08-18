@@ -114,16 +114,18 @@ fn main() {
         cli::multi_differential_expression(&group_paths.collect_vec(), cdf_path, max_cv, pseudocounts, threads);
     } else if let Some(matches) = matches.subcommand_matches("gen-mhd4") {
         let m = value_t!(matches, "onebits", u8).unwrap();
+        let not_expressed_pattern = matches.value_of("not-expressed");
         let words = codebook::generate_mhd4(m);
-        if let Err(e) = cli::gen_codebook(&words) {
+        if let Err(e) = cli::gen_codebook(&words, not_expressed_pattern) {
             error!("{}", e);
             process::exit(1);
         }
     } else if let Some(matches) = matches.subcommand_matches("gen-mhd2") {
         let n = value_t!(matches, "bits", u8).unwrap();
         let m = value_t!(matches, "onebits", u8).unwrap();
+        let not_expressed_pattern = matches.value_of("not-expressed");
         let words = codebook::generate_mhd2(n, m);
-        if let Err(e) = cli::gen_codebook(&words) {
+        if let Err(e) = cli::gen_codebook(&words, not_expressed_pattern) {
             error!("{}", e);
             process::exit(1);
         }

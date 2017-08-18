@@ -188,6 +188,13 @@ subcommands:
             short: m
             long: onebits
             help: Number of 1-bits.
+        - not-expressed:
+            value_name: PATTERN
+            long: not-expressed
+            help: |
+              Regular expression pattern for features that should be marked
+              as not expressed. This is useful to correctly model, e.g.,
+              misidentification probes.
 
   - gen-mhd2:
       about: Generate MERFISH MHD2 codebook with given parameters.
@@ -216,3 +223,10 @@ subcommands:
             short: m
             long: onebits
             help: Number of 1-bits.
+        - not-expressed:
+            value_name: PATTERN
+            long: not-expressed
+            help: |
+              Regular expression pattern for features that should be marked
+              as not expressed. This is useful to correctly model, e.g.,
+              misidentification probes.

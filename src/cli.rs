@@ -268,22 +268,39 @@ pub fn multi_differential_expression(group_paths: &[&str], pmf_path: Option<&str
 }
 
 
-pub fn gen_codebook(words: &[codebook::Word]) -> Result<(), Box<Error>> {
+pub fn gen_codebook(
+    words: &[codebook::Word],
+    not_expressed_pattern: Option<&str>
+) -> Result<(), Box<Error>> {
+    let not_expressed_re = if not_expressed_pattern.is_some() {
+        Some(Regex::new(not_expressed_pattern.unwrap())?)
+    } else {
+        None
+    };
+
     let stdin = std::io::stdin();
     let mut reader = stdin.lock().lines();
     let mut writer = csv::Writer::from_writer(std::io::stdout()).delimiter(b'\t');
     let mut words = words.iter();
+    // TODO add expressed column and handle misidentification probes
     writer.write(["feat", "codeword"].iter()).unwrap();
 
     for i in 1.. {
         match (reader.next(), words.next()) {
             (Some(feature), Some(w)) => {
-                let feature = try!(feature);
+                let feature = feature?;
                 if feature.len() == 0 {
                     // TODO proper error handling
                     panic!("Empty feature found. All features provided at STDIN have to be non-empty.");
                 }
-                writer.write([feature, format!("{:?}", w)].into_iter()).unwrap();
+
+                let expressed = !not_expressed_re.as_ref().map_or_else(|| false, |re| re.is_match(&feature));
+
+                writer.write([
+                    feature,
+                    format!("{:?}", w),
+                    format!("{}", if expressed { "1" } else { "0" })
+                ].into_iter())?;
             },
             (None, Some(_)) => break,
             (Some(_), None) => {
