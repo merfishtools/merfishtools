@@ -283,7 +283,7 @@ pub fn gen_codebook(
     let mut writer = csv::Writer::from_writer(std::io::stdout()).delimiter(b'\t');
     let mut words = words.iter();
     // TODO add expressed column and handle misidentification probes
-    writer.write(["feat", "codeword"].iter()).unwrap();
+    writer.write(["feat", "codeword", "expressed"].iter()).unwrap();
 
     for i in 1.. {
         match (reader.next(), words.next()) {
@@ -294,7 +294,9 @@ pub fn gen_codebook(
                     panic!("Empty feature found. All features provided at STDIN have to be non-empty.");
                 }
 
-                let expressed = !not_expressed_re.as_ref().map_or_else(|| false, |re| re.is_match(&feature));
+                let expressed = !not_expressed_re.as_ref().map_or_else(
+                    || false, |re| re.is_match(&feature)
+                );
 
                 writer.write([
                     feature,
