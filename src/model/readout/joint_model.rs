@@ -98,13 +98,13 @@ impl JointModel {
         let mut feature_models: Vec<Box<&AbstractFeatureModel>> =
             self.feature_models.values().map(|m| Box::new(m as &AbstractFeatureModel)).collect_vec();
         feature_models.push(Box::new(&self.noise_model));
-        let n_iterations = 20;
+        let n_iterations = 100;
 
         let mut last_changes = Array2::from_elem((self.expressions.len(), 5), 0.0);
 
         // EM iterations
         for i in 1..n_iterations + 1 {
-            debug!("EM-iteration {} of at most {}", i + 1, n_iterations);
+            debug!("EM-iteration {} of at most {}", i, n_iterations);
 
             // E-step: estimate miscalls
             debug!("E-step");
@@ -138,7 +138,7 @@ impl JointModel {
             debug!("x={:?}", self.expressions);
             debug!("mean changes={:?}", mean_changes);
             let convergence = *mean_changes.iter().map(
-                |&c| NotNaN::new(c).unwrap()
+                |&c| NotNaN::new(c.abs()).unwrap()
             ).max().unwrap() <= 1.0;
 
             if i >= 5 && convergence {

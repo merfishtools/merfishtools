@@ -405,7 +405,7 @@ impl NoiseModel {
             prob_not_expressed_mismatch,
             prob_total_miscall_exact,
             prob_total_miscall_mismatch
-        ]);
+        ]).ln_one_minus_exp();
 
         NoiseModel {
             feature_id: feature_id,
