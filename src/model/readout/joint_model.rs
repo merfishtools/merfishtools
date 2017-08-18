@@ -5,6 +5,7 @@ use std::collections::HashMap;
 
 use rand;
 use rand::Rng;
+use rand::distributions::IndependentSample;
 use itertools::Itertools;
 use ndarray::prelude::*;
 use ndarray;
@@ -61,17 +62,22 @@ impl JointModel {
             }
         }
 
+        let feature_count = codebook.len() + 1;
+
+        // calculate start values (we take random numbers as start expression)
+        let start_range = rand::distributions::Range::new(1, 10000);
+        let mut expressions = Array1::from_iter((0..feature_count).map(
+            |model| start_range.ind_sample(&mut rng)
+        ));
+        for &feat_id in &not_expressed_feature_ids {
+            expressions[feat_id] = 0;
+        }
+
         // Take value larger than maximum feature id as noise id.
         let noise_id = codebook.len();
         let noise_model = NoiseModel::new(
             codebook.len(), not_expressed_feature_ids, not_expressed_counts, codebook, &xi
         );
-        let feature_count = codebook.len() + 1;
-
-        // calculate start values (we take random numbers as start expression)
-        let mut expressions = Array1::from_iter((0..feature_count).map(
-            |model| rng.next_u32()
-        ));
 
         let miscalls_exact = Miscalls::new(feature_count, &feature_models, &noise_model, true);
         let miscalls_mismatch = Miscalls::new(feature_count, &feature_models, &noise_model, false);
