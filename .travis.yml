@@ -13,7 +13,9 @@ matrix:
 before_install:
   - sudo apt-get -qq update
   - sudo apt-get install -y libgsl0-dev
+  - (test $TRAVIS_RUST_VERSION != "nightly" || cargo install clippy)
 
 script:
   - cargo build --verbose --release
   - cargo test --verbose --release
+  - (test $TRAVIS_RUST_VERSION != "nightly" || cargo clippy)

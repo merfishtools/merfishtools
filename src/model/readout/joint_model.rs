@@ -2,6 +2,7 @@ use std::mem;
 use std::cell::RefCell;
 use std::cmp;
 use std::collections::HashMap;
+use std::io;
 
 use rand;
 use rand::Rng;
@@ -12,6 +13,7 @@ use ndarray;
 use bit_vec::BitVec;
 use rgsl::randist::multinomial::multinomial_pdf;
 use ordered_float::NotNaN;
+use csv;
 
 use bio::stats::{Prob, LogProb};
 
@@ -31,7 +33,8 @@ pub struct JointModel {
     em_run: bool,
     rng: rand::StdRng,
     debug_id: Option<FeatureID>,
-    noise_id: FeatureID
+    noise_id: FeatureID,
+    iteration_logger_header: Vec<String>
 }
 
 
@@ -41,7 +44,8 @@ impl JointModel {
         p0: &[Prob],
         p1: &[Prob],
         codebook: &Codebook,
-        window_width: u32) -> Self {
+        window_width: u32
+    ) -> Self {
         let mut xi = Xi::new(p0, p1);
         let mut rng = rand::StdRng::new().unwrap();
 
@@ -82,6 +86,11 @@ impl JointModel {
         let miscalls_exact = Miscalls::new(feature_count, &feature_models, &noise_model, true);
         let miscalls_mismatch = Miscalls::new(feature_count, &feature_models, &noise_model, false);
 
+        let mut header = (0..codebook.len()).map(
+            |i| codebook.record(i).name().to_owned()
+        ).collect_vec();
+        header.push("noise".to_owned());
+
         JointModel {
             feature_models: feature_models,
             noise_model: noise_model,
@@ -91,8 +100,9 @@ impl JointModel {
             margin: window_width / 2,
             em_run: false,
             rng: rng,
-            debug_id: None, //codebook.get_id("THBS1")
-            noise_id: noise_id
+            debug_id: None,
+            noise_id: noise_id,
+            iteration_logger_header: header
         }
     }
 
@@ -101,9 +111,11 @@ impl JointModel {
     /// Expressions are our model parameters to estimate, miscalls are our latent variables,
     /// counts are our observed variables.
     pub fn expectation_maximization(&mut self) {
-        let mut feature_models: Vec<Box<&AbstractFeatureModel>> =
-            self.feature_models.values().map(|m| Box::new(m as &AbstractFeatureModel)).collect_vec();
+        let mut feature_models: Vec<Box<&AbstractFeatureModel>> = self.feature_models.values().map(
+            |m| Box::new(m as &AbstractFeatureModel)
+        ).collect_vec();
         feature_models.push(Box::new(&self.noise_model));
+
         let n_iterations = 100;
 
         let mut last_changes = Array2::from_elem((self.expressions.len(), 5), 0.0);
