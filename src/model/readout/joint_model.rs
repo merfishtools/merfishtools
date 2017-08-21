@@ -91,7 +91,11 @@ impl JointModel {
     ///
     /// Expressions are our model parameters to estimate, miscalls are our latent variables,
     /// counts are our observed variables.
-    pub fn expectation_maximization(&mut self) {
+    ///
+    /// # Arguments
+    ///
+    /// * ID of cell that is investigated (for debugging purposes).
+    pub fn expectation_maximization(&mut self, cell: &str) {
         let mut feature_models: Vec<Box<&AbstractFeatureModel>> = self.feature_models.values().map(
             |m| Box::new(m as &AbstractFeatureModel)
         ).collect_vec();
@@ -134,7 +138,7 @@ impl JointModel {
 
             // calculate mean change per feature of last 5 steps
             let mean_changes = last_changes.mean(Axis(1));
-            debug!("x={:?}", self.expressions);
+            debug!("TYPE=EM-iteration, CELL={}, x={:?}", cell, self.expressions);
             debug!("mean changes={:?}", mean_changes);
             let convergence = *mean_changes.iter().map(
                 |&c| NotNaN::new(c.abs()).unwrap()
@@ -146,6 +150,13 @@ impl JointModel {
             }
         }
         self.em_run = true;
+        debug!("TYPE=EM-result, CELL={}, noise-rate={}", cell, self.noise_rate());
+    }
+
+    pub fn noise_rate(&self) -> f64 {
+        assert!(self.em_run);
+        self.expressions[self.expressions.len() - 1] as f64 /
+        self.expressions.slice(s![..-1]).scalar_sum() as f64
     }
 
     pub fn likelihood(&mut self, feature_id: FeatureID, x: u32) -> LogProb {
