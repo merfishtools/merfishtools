@@ -4,7 +4,6 @@ use std::cmp;
 use rand;
 use rand::Rng;
 use itertools::Itertools;
-use ndarray::prelude::*;
 use rgsl::randist::multinomial::multinomial_pdf;
 
 use bio::stats::{Prob, LogProb};
@@ -134,11 +133,11 @@ impl FeatureModel {
 
         let feature_record = codebook.record(feature);
 
-        let xi_call = xi.prob_error(feature_record, None, 1);
+        let xi_call = xi.prob(feature_record.codeword(), feature_record.codeword());
 
-        let prob_call_exact = xi_call[(0, 0)];
+        let prob_call_exact = xi_call[0];
         let prob_call_mismatch = if codebook.min_dist == 4 {
-            xi_call[(1, 0)].ln_add_exp(xi_call[(0, 1)])
+            xi_call[1]
         } else {
             LogProb::ln_zero()
         };
@@ -154,26 +153,22 @@ impl FeatureModel {
         neighbors.extend(&neighbors_2);
 
         let xi_miscall_4 = codebook.neighbors(feature, 4).iter().map(|&n| {
-            xi.prob_error(feature_record, Some(codebook.record(n)), 3)
+            xi.prob(feature_record.codeword(), codebook.record(n).codeword())
         }).collect_vec();
         let xi_miscall_2 = if codebook.min_dist == 2 {
             codebook.neighbors(feature, 2).iter().map(|&n| {
-                xi.prob_error(feature_record, Some(codebook.record(n)), 1)
+                xi.prob(feature_record.codeword(), codebook.record(n).codeword())
             }).collect_vec()
         } else {
             vec![]
         };
 
         let prob_miscall_exact = xi_miscall_4.iter().map(|xi| {
-            xi[(2, 2)]
-        }).chain(xi_miscall_2.iter().map(|xi| xi[(1, 1)])).collect_vec();
+            xi[0]
+        }).chain(xi_miscall_2.iter().map(|xi| xi[0])).collect_vec();
 
         let prob_miscall_mismatch = if codebook.min_dist == 4 {
-            xi_miscall_4.iter().map(|xi| {
-                LogProb::ln_sum_exp(&[
-                    xi[(2, 1)], xi[(1, 2)], xi[(2, 3)], xi[(3, 2)]
-                ])
-            }).collect_vec()
+            xi_miscall_4.iter().map(|xi| xi[1]).collect_vec()
         } else {
             vec![]
         };
@@ -192,6 +187,8 @@ impl FeatureModel {
         ];
         event_probs.extend(prob_miscall_exact.iter().map(|&p| *Prob::from(p)));
         event_probs.extend(prob_miscall_mismatch.iter().map(|&p| *Prob::from(p)));
+
+        debug!("{:?}", event_probs);
 
         FeatureModel {
             feature_id: feature,
@@ -351,7 +348,7 @@ impl NoiseModel {
         // miscalls generated from noise
         let xi_miscall = codebook.records().iter().filter_map(|feat_rec| {
             if feat_rec.expressed() {
-                Some(xi.prob_error(codebook.noise(), Some(feat_rec), codebook.m as usize + 1))
+                Some(xi.prob(codebook.noise().codeword(), feat_rec.codeword()))
             } else { None }
         }).collect_vec();
         let neighbors = codebook.records().iter().filter_map(|rec| {
@@ -360,27 +357,9 @@ impl NoiseModel {
             } else { None }
         }).collect_vec();
 
-        let prob_exact = |xi: &Array2<LogProb>| {
-            match codebook.m {
-                4 => xi[(0, 4)],
-                8 => xi[(0, 8)],
-                6 => xi[(0, 6)],
-                _ => panic!("unsupported number of 1-bits")
-            }
-        };
-
-        let prob_mismatch = |xi: &Array2<LogProb>| {
-            match codebook.m {
-                4 => LogProb::ln_sum_exp(&[xi[(0, 3)], xi[(0, 5)]]),
-                6 => LogProb::ln_sum_exp(&[xi[(0, 5)], xi[(0, 7)]]),
-                8 => LogProb::ln_sum_exp(&[xi[(0, 7)], xi[(0, 9)]]),
-                _ => panic!("unsupported number of 1-bits")
-            }
-        };
-
-        let probs_miscall_exact = xi_miscall.iter().map(&prob_exact).collect_vec();
+        let probs_miscall_exact = xi_miscall.iter().map(|xi| xi[0]).collect_vec();
         let probs_miscall_mismatch = if codebook.min_dist == 4 {
-            xi_miscall.iter().map(&prob_mismatch).collect_vec()
+            xi_miscall.iter().map(|xi| xi[1]).collect_vec()
         } else {
             vec![]
         };
@@ -390,11 +369,15 @@ impl NoiseModel {
 
         // probs for calls of not expressed features
         let xi_not_expressed = not_expressed_feature_ids.iter().map(|&f| {
-            xi.prob_error(codebook.noise(), Some(codebook.record(f)), codebook.m as usize + 1)
+            xi.prob(codebook.noise().codeword(), codebook.record(f).codeword())
         }).collect_vec();
 
-        let prob_not_expressed_exact = LogProb::ln_sum_exp(&xi_not_expressed.iter().map(&prob_exact).collect_vec());
-        let prob_not_expressed_mismatch = LogProb::ln_sum_exp(&xi_not_expressed.iter().map(&prob_mismatch).collect_vec());
+        let prob_not_expressed_exact = LogProb::ln_sum_exp(
+            &xi_not_expressed.iter().map(|xi| xi[0]).collect_vec()
+        );
+        let prob_not_expressed_mismatch = LogProb::ln_sum_exp(
+            &xi_not_expressed.iter().map(|xi| xi[1]).collect_vec()
+        );
 
         // dropout
         let prob_dropout = LogProb::ln_sum_exp(&[
