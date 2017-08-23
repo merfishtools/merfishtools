@@ -12,15 +12,18 @@ fn test_output(result: &str, expected: &str) {
 
 
 fn run_exp(dataset: &str, codebook: &str, params: &str) -> bool {
+    let build = if cfg!(debug_assertions) { "debug" } else { "release" };
+
     Command::new("bash")
             .arg("-c")
             .arg(format!(
-                "target/release/merfishtools -v exp -t 1 {codebook} --estimate {est} {params} < {raw} > {cdf}",
+                "target/{build}/merfishtools -v exp -t 1 {codebook} --estimate {est} {params} < {raw} > {cdf}",
                 codebook=format!("tests/codebook/{}.txt", codebook),
                 raw=format!("tests/data/{}.txt", dataset),
                 cdf=format!("tests/results/{}.txt", dataset),
                 est=format!("tests/results/{}.est.txt", dataset),
-                params=params
+                params=params,
+                build=build
             ))
             .spawn().unwrap().wait().unwrap().success()
 }
