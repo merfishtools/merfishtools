@@ -178,7 +178,7 @@ impl FeatureModel {
         total.extend(&prob_miscall_mismatch);
 
         let prob_total = LogProb::ln_sum_exp(&total);
-        assert!(*prob_total <= 0.0, "prob_total > 0 ({})", *prob_total);
+        assert!(*prob_total <= 0.0, "prob_total > 0 ({}, {}, {})", *prob_total, *LogProb::ln_sum_exp(&prob_miscall_exact), *LogProb::ln_sum_exp(&prob_miscall_mismatch));
 
         let mut event_probs = vec![
             *Prob::from(prob_call_exact),
