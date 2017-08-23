@@ -219,8 +219,8 @@ impl Codebook {
             let mut neighbors = HashSet::new();
             for n in self.graph.neighbors(feature) {
                 for n_ in self.graph.neighbors(n) {
-                    if self.graph.find_edge(feature, n_).is_none() {
-                        // consider if not a direct neighbor
+                    if self.graph.find_edge(feature, n_).is_none() && n_ != feature {
+                        // consider if not a direct neighbor nor feature itself
                         neighbors.insert(n_.index());
                     }
                 }

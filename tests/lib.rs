@@ -42,3 +42,9 @@ fn test_exp_mhd4_thbs_bias() {
 fn test_exp_mhd2() {
     assert!(run_exp("1001genesData.3.cell0", "1001genesData", ""));
 }
+
+
+/// This is a longrunning test that should be activated only on purpose.
+fn test_exp_mhd2_8() {
+    assert!(run_exp("simulated-MHD2-8.25.all", "simulated-MHD2-8", "--p0 0.005 --p1 0.01"));
+}
