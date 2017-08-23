@@ -173,17 +173,16 @@ impl FeatureModel {
             vec![]
         };
 
-        let prob_total = LogProb::ln_sum_exp(&[
-            prob_call_exact,
-            prob_call_mismatch,
-            LogProb::ln_sum_exp(&prob_miscall_exact),
-            LogProb::ln_sum_exp(&prob_miscall_mismatch)
-        ]);
+        let mut total = vec![prob_call_exact, prob_call_mismatch];
+        total.extend(&prob_miscall_exact);
+        total.extend(&prob_miscall_mismatch);
+
+        let prob_total = LogProb::ln_sum_exp(&total);
 
         let mut event_probs = vec![
             *Prob::from(prob_call_exact),
             *Prob::from(prob_call_mismatch),
-            *Prob::from(prob_total.ln_one_minus_exp()),
+            *Prob::from(prob_total.ln_one_minus_exp())
         ];
         event_probs.extend(prob_miscall_exact.iter().map(|&p| *Prob::from(p)));
         event_probs.extend(prob_miscall_mismatch.iter().map(|&p| *Prob::from(p)));
