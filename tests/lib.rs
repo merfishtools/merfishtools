@@ -51,3 +51,8 @@ fn test_exp_mhd2() {
 fn test_exp_mhd2_8() {
     assert!(run_exp("simulated-MHD2-8.25.all", "simulated-MHD2-8", "--p0 0.005 --p1 0.01"));
 }
+
+#[test]
+fn test_exp_mhd4_sim() {
+    assert!(run_exp("simulated-MHD4.35.1", "simulated-MHD4", "--p0 0.04 --p1 0.1"));
+}

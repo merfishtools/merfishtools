@@ -427,6 +427,8 @@ impl AbstractFeatureModel for NoiseModel {
         let event_count = calls_exact + calls_mismatch +
                           miscalls_exact.total_from(self.feature_id) +
                           miscalls_mismatch.total_from(self.feature_id);
+        debug!("not expressed counts {:?}", self.not_expressed_counts);
+        debug!("not expressed event count {} {} {}", event_count, calls_exact, calls_mismatch);
 
         event_count
     }
