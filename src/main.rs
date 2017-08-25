@@ -70,6 +70,7 @@ fn main() {
         let p0 = values_t!(matches, "p0", f64).unwrap_or_else(|e| e.exit());
         let p1 = values_t!(matches, "p1", f64).unwrap_or_else(|e| e.exit());
         let estimate_path = matches.value_of("estimate");
+        let stats_path = matches.value_of("stats");
         let codebook_path = matches.value_of("codebook").unwrap();
         let cells = matches.value_of("cells").unwrap();
         let window_width = value_t!(matches, "pmf-window-width", u32).unwrap_or_else(|e| e.exit());
@@ -90,6 +91,7 @@ fn main() {
             convert_err_rates(p1),
             &codebook_path,
             estimate_path,
+            stats_path,
             threads,
             &cells,
             window_width

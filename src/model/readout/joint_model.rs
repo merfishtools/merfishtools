@@ -102,8 +102,9 @@ impl JointModel {
         feature_models.push(Box::new(&self.noise_model));
 
         let n_iterations = 100;
+        let change_window = 10;
 
-        let mut last_changes = Array2::from_elem((self.expressions.len(), 5), 0.0);
+        let mut last_changes = Array2::from_elem((self.expressions.len(), change_window), 0.0);
 
         // EM iterations
         for i in 1..n_iterations + 1 {
@@ -129,7 +130,7 @@ impl JointModel {
             debug!("M-step");
             for m in &feature_models {
                 let feature_id = m.feature_id();
-                last_changes[(feature_id, feature_id % 5)] = m.mle_expression(
+                last_changes[(feature_id, feature_id % change_window)] = m.mle_expression(
                     &mut self.expressions,
                     &self.miscalls_exact,
                     &self.miscalls_mismatch
@@ -144,7 +145,7 @@ impl JointModel {
                 |&c| NotNaN::new(c.abs()).unwrap()
             ).max().unwrap() <= 1.0;
 
-            if i >= 5 && convergence {
+            if i >= change_window && convergence {
                 debug!("Convergence reached, stopping EM algorithm.");
                 break;
             }

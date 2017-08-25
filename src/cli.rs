@@ -53,11 +53,25 @@ pub struct Selection {
 
 
 /// Estimate expressions.
-pub fn expression(p0: Vec<Prob>, p1: Vec<Prob>, codebook_path: &str, estimate_path: Option<&str>, threads: usize, cells: &str, window_width: u32) {
+pub fn expression(
+    p0: Vec<Prob>,
+    p1: Vec<Prob>,
+    codebook_path: &str,
+    estimate_path: Option<&str>,
+    stats_path: Option<&str>,
+    threads: usize,
+    cells: &str,
+    window_width: u32
+) {
     let codebook = io::codebook::Codebook::from_file(codebook_path).unwrap();
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
     let mut cdf_writer = io::cdf::expression::Writer::from_writer(std::io::stdout());
     let mut est_writer = estimate_path.map(|path| io::estimation::expression::Writer::from_file(path));
+
+    let mut stats_writer = stats_path.map(|path| csv::Writer::from_file(path).unwrap().delimiter(b'\t'));
+    if let Some(ref mut writer) = stats_writer {
+        writer.write(["cell", "noise-rate"].iter()).unwrap();
+    }
 
     let cells = Regex::new(cells).ok().expect("Invalid regular expression for cells.");
 
@@ -114,9 +128,9 @@ pub fn expression(p0: Vec<Prob>, p1: Vec<Prob>, codebook_path: &str, estimate_pa
                     Some((feature, cdf, map_estimate))
                 } else { None }
             }).collect_vec();
-            (cell, cdfs)
+            (cell, cdfs, model.noise_rate())
         },
-        |(cell, cdfs)| {
+        |(cell, cdfs, noise_rate)| {
             for (feature, cdf, map_estimate) in cdfs {
                 cdf_writer.write(&cell, &feature, &cdf);
 
@@ -128,6 +142,9 @@ pub fn expression(p0: Vec<Prob>, p1: Vec<Prob>, codebook_path: &str, estimate_pa
                         cdf.credible_interval(0.95).expect("bug: empty CDF")
                     );
                 }
+            }
+            if let Some(ref mut stats_writer) = stats_writer {
+                stats_writer.write([&cell, &format!("{:.4}", noise_rate)].iter()).unwrap();
             }
         }
     );

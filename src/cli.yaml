@@ -44,15 +44,21 @@ subcommands:
       args:
         - codebook:
             required: true
-            value_name: FILE
+            value_name: TSV-FILE
             help: "Path to codebook definition consisting of tab separated columns: feature, codeword. Misidentification probes (see Chen et al. Science 2015) should not be contained in the codebook."
         - estimate:
             long: estimate
             short: e
-            value_name: FILE
+            value_name: TSV-FILE
             help: |
               Path to write expected value and standard deviation estimates of expression to.
               Output is formatted into columns: cell, feature, expected value, standard deviation
+        - stats:
+            long: stats
+            value_name: TSV-FILE
+            help: |
+              Path to write global statistics per cell to.
+              Output is formatted into columns: cell, noise-rate
         - p0:
             long: p0
             value_name: FLOAT
