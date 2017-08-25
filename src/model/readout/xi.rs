@@ -30,6 +30,7 @@ impl Xi {
         }
     }
 
+    /// Calculate the probability of transforming source into target during a MERFISH experiment.
     pub fn prob(&self, source: &Codeword, target: &Codeword) -> [LogProb; 2] {
         let mut curr = Array1::from_elem(3, LogProb::ln_zero());
         let mut prev = Array1::from_elem(3, LogProb::ln_zero());
@@ -81,10 +82,14 @@ mod tests {
         assert_relative_eq!(*p[0], *truth);
 
         let truth_mismatch = LogProb::ln_sum_exp(&[
-            truth - p1.ln_one_minus_exp() + p1, // mismatch in matching 1-bits
-            truth - p0.ln_one_minus_exp() + p0, // mismatch in matching 0-bits
-            truth - p1 + p1.ln_one_minus_exp(), // mismatch in mismatching 1-bits
-            truth - p0 + p0.ln_one_minus_exp()  // mismatch in mismatching 0-bits
+            // mismatch in matching 1-bits, 4 positions
+            LogProb::from(Prob(*Prob::from(truth - p1.ln_one_minus_exp() + p1) * 4.0)),
+            // mismatch in matching 0-bits, 2 positions
+            LogProb::from(Prob(*Prob::from(truth - p0.ln_one_minus_exp() + p0) * 2.0)),
+            // mismatch in mismatching 1-bits, 1 position
+            truth - p1 + p1.ln_one_minus_exp(),
+            // mismatch in mismatching 0-bits, 1 position
+            truth - p0 + p0.ln_one_minus_exp()
         ]);
 
         assert_relative_eq!(*p[1], *truth_mismatch, epsilon=0.001);
@@ -106,5 +111,30 @@ mod tests {
         let p = LogProb::ln_sum_exp(&probs);
 
         assert_relative_eq!(*p, *LogProb::ln_one());
+    }
+
+    #[test]
+    fn test_xi_noise() {
+        let p0 = LogProb::from(Prob(0.04));
+        let p1 = LogProb::from(Prob(0.1));
+        let xi = Xi::new(&[Prob::from(p0); 16], &[Prob::from(p1); 16]);
+
+        let noise = BitVec::from_elem(16, false);
+        let mut target = BitVec::from_bytes(&[0b10001100, 0b00000010]);
+
+        let p = xi.prob(&noise, &target);
+
+        let truth_exact = LogProb(*p0 * 4.0) +
+                          LogProb(*p0.ln_one_minus_exp() * 12.0);
+
+        let truth_mismatch = LogProb::ln_sum_exp(&[
+            // mismatch in matching 0-bits, 12 possible positions
+            LogProb::from(Prob(*Prob::from(truth_exact - p0.ln_one_minus_exp() + p0) * 12.0)),
+            // mismatch in mismatching 1-bits
+            LogProb::from(Prob(*Prob::from(truth_exact - p0 + p0.ln_one_minus_exp()) * 4.0))
+        ]);
+
+        assert_relative_eq!(*p[0], *truth_exact, epsilon=0.0001);
+        assert_relative_eq!(*p[1], *truth_mismatch);
     }
 }
