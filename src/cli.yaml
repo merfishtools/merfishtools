@@ -249,7 +249,6 @@ subcommands:
 
         The input file should contain the columns
 
-        experiment
         cell
         feature (e.g. gene or transcript)
         readout (binary word as a string of 0 and 1)

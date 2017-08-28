@@ -77,7 +77,7 @@ fn test_exp_mhd4_sim() {
 fn test_estimate_error_rates_real() {
     assert!(run_cmd(
         "merfishtools -v est-error-rates tests/codebook/140genesData.1.txt > tests/results/140genesData.error-rates.tsv",
-        Some("grep -P '^1\\t' tests/data/140genesData.readouts.txt | ")
+        Some("grep -P '^3\\t' tests/data/140genesData.readouts.txt | cut -f2,3,4 | ")
     ));
 }
 

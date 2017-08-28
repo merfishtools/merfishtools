@@ -344,7 +344,7 @@ pub fn estimate_error_rates(
     let (p0, p1) = error_rates::estimate(
         &codebook,
         readouts.decode().map(|rec| {
-            let (exp, cell, feat, readout): (String, String, String, String) = rec.unwrap();
+            let (cell, feat, readout): (String, String, String) = rec.unwrap();
             (feat, io::codebook::parse_codeword(readout.as_bytes()))
         })
     );

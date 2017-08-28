@@ -59,8 +59,6 @@ pub fn estimate<I: Iterator<Item=(String, Readout)>>(
         }
     }
 
-    debug!("10: {:?}", observed_10_errors);
-
     // calculate observed (joint) error rates
     let observed_p0 = observed_01_errors / &exact_count;
     let observed_p1 = observed_10_errors / &exact_count;
@@ -68,9 +66,6 @@ pub fn estimate<I: Iterator<Item=(String, Readout)>>(
     // estimate error rates
     let feat_p0 = observed_p0.map(|&o| o / (1.0 + o));
     let feat_p1 = observed_p1.map(|&o| o / (1.0 + o));
-
-    //debug!("p0 {:?}", feat_p0);
-    debug!("p1 {:?}", feat_p1);
 
     let mut p0 = Vec::new();
     let mut p1 = Vec::new();
