@@ -67,50 +67,58 @@ pub fn estimate<I: Iterator<Item=(String, Readout)>>(
         for feature_id in 0..codebook.len() {
             let encoding = codebook.record(feature_id).codeword();
             for k in 0..codebook.N as usize {
-                prob_no_error[(feature_id, k)] = LogProb((0..codebook.N as usize).filter_map(|l| {
+                let p = LogProb((0..codebook.N as usize).filter_map(|l| {
                     if l != k {
                         let p_err = if encoding[l] == false {
                             p0[k]
                         } else {
                             p1[k]
                         };
-                        Some((1.0f64 - p_err).ln())
+                        Some(*LogProb((p_err as f64).ln()).ln_one_minus_exp())
                     } else { None }
                 }).sum());
+                prob_no_error[(feature_id, k)] = p;
             }
         }
-        //debug!("{:?}", prob_no_error);
 
         // M-step: find p0 and p1 that maximizes the likelihood
         mem::swap(&mut p0, &mut p0_last);
         mem::swap(&mut p1, &mut p1_last);
         for k in 0..codebook.N as usize {
-            let p = |observed_p: &Array2<f64>| {
-                (0..codebook.len()).filter_map(|feature_id| {
-                    if feat_count[(feature_id, 0)] < 20.0 {
+            // solve least squares: take mean of all estimates
+            let p = |observed_p: &Array2<f64>, bit: bool| {
+                let mut count = 0.0;
+                let p = (0..codebook.len()).filter_map(|feature_id| {
+                    let encoding = codebook.record(feature_id).codeword();
+                    if feat_count[(feature_id, 0)] < 10.0 || encoding[k] != bit {
                         None
                     } else {
-                        let p = observed_p[(feature_id, k)] / prob_no_error[(feature_id, k)].exp();
-                        if p > 1.0 { Some(1.0) } else { Some(p) }
+                        count += 1.0;
+                        let p = observed_p[(feature_id, k)] * prob_no_error[(feature_id, k)].exp();
+                        Some(p)
                     }
-                }).sum::<f64>() / codebook.len() as f64
+                }).sum::<f64>() / count;
+                if count == 0.0 {
+                    panic!("not enough counts to estimate error rate");
+                }
+                p
             };
-            // solve least squares: take mean of all estimates
-            // TODO discard features with too low count?
-            p0[k] = p(&observed_p0);
-            p1[k] = p(&observed_p1);
+            //debug!("----------- p0 ------------");
+            p0[k] = p(&observed_p0, false);
+            //debug!("DEBUG: p0={}", p0[k]);
+            //debug!("----------- p1 ------------");
+            p1[k] = p(&observed_p1, true);
+            //debug!("DEBUG: p1={}", p1[k]);
         }
 
         // check convergence
         let abs = |d: &f64| NotNaN::new(d.abs()).unwrap();
-        debug!("{:?}", p0);
-        //debug!("{:?}", p0_last);
-        // let convergence = **(&p0 - &p0_last).map(&abs).iter().max().unwrap() <= max_diff &&
-        //                   **(&p1 - &p1_last).map(&abs).iter().max().unwrap() <= max_diff;
+        //debug!("{:?}", p0);
         let convergence = p0.all_close(&p0_last, max_diff) && p1.all_close(&p1_last, max_diff);
 
         if convergence && i >= 5 {
             debug!("convergence reached");
+            debug!("{:?}", p1);
             break;
         }
 
