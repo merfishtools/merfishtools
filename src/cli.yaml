@@ -260,10 +260,3 @@ subcommands:
             required: true
             value_name: TSV-FILE
             help: Path to codebook file.
-        - not-expressed:
-            value_name: PATTERN
-            long: not-expressed
-            help: |
-              Regular expression pattern for features that should be marked
-              as not expressed. This is useful to correctly model, e.g.,
-              misidentification probes.

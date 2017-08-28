@@ -134,8 +134,7 @@ fn main() {
         }
     } else if let Some(matches) = matches.subcommand_matches("est-error-rates") {
         let codebook = matches.value_of("codebook").unwrap();
-        let not_expressed_pattern = matches.value_of("not-expressed");
-        if let Err(e) = cli::estimate_error_rates(codebook, not_expressed_pattern) {
+        if let Err(e) = cli::estimate_error_rates(codebook) {
             error!("{}", e);
             process::exit(1);
         }

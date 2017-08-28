@@ -74,9 +74,18 @@ fn test_exp_mhd4_sim() {
 }
 
 #[test]
-fn test_estimate_error_rates() {
+fn test_estimate_error_rates_real() {
     assert!(run_cmd(
-        "merfishtools -v est-error-rates --not-expressed '(notarget|blank).*' tests/codebook/140genesData.1.txt > tests/results/140genesData.error-rates.tsv",
+        "merfishtools -v est-error-rates tests/codebook/140genesData.1.txt > tests/results/140genesData.error-rates.tsv",
         Some("grep -P '^1\\t' tests/data/140genesData.readouts.txt | ")
+    ));
+}
+
+
+#[test]
+fn test_estimate_error_rates_simulated() {
+    assert!(run_cmd(
+        "merfishtools -v est-error-rates tests/codebook/140genesData.1.txt < tests/data/simulated-MHD4.35.readouts.txt > tests/results/simulated-MHD4.35.error-rates.tsv",
+        None
     ));
 }
