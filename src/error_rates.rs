@@ -99,7 +99,7 @@ pub fn estimate<I: Iterator<Item=(String, Readout)>>(
                     }
                 }).sum::<f64>() / count;
                 if count == 0.0 {
-                    panic!("not enough counts to estimate error rate");
+                    panic!("not enough counts to estimate error rate (at least 1 feature with 50 counts over all cells required)");
                 }
                 p
             };
