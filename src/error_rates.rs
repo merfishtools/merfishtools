@@ -90,7 +90,7 @@ pub fn estimate<I: Iterator<Item=(String, Readout)>>(
                 let mut count = 0.0;
                 let p = (0..codebook.len()).filter_map(|feature_id| {
                     let encoding = codebook.record(feature_id).codeword();
-                    if feat_count[(feature_id, 0)] < 10.0 || encoding[k] != bit {
+                    if feat_count[(feature_id, 0)] < 50.0 || encoding[k] != bit {
                         None
                     } else {
                         count += 1.0;
