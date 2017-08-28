@@ -26,6 +26,7 @@ extern crate bit_set;
 extern crate petgraph;
 extern crate ordered_float;
 extern crate rand;
+extern crate ndarray_rand;
 
 use std::process;
 
@@ -39,6 +40,7 @@ pub mod model;
 pub mod io;
 pub mod cli;
 pub mod codebook;
+pub mod error_rates;
 
 
 #[allow(non_snake_case)]
@@ -127,6 +129,13 @@ fn main() {
         let not_expressed_pattern = matches.value_of("not-expressed");
         let words = codebook::generate_mhd2(n, m);
         if let Err(e) = cli::gen_codebook(&words, not_expressed_pattern) {
+            error!("{}", e);
+            process::exit(1);
+        }
+    } else if let Some(matches) = matches.subcommand_matches("est-error-rates") {
+        let codebook = matches.value_of("codebook").unwrap();
+        let not_expressed_pattern = matches.value_of("not-expressed");
+        if let Err(e) = cli::estimate_error_rates(codebook, not_expressed_pattern) {
             error!("{}", e);
             process::exit(1);
         }

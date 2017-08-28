@@ -236,3 +236,34 @@ subcommands:
               Regular expression pattern for features that should be marked
               as not expressed. This is useful to correctly model, e.g.,
               misidentification probes.
+
+  - est-error-rates:
+      about: Estimate 0-1 and 1-0 error rates.
+      after_help: |
+        This command estimates 0-1 and 1-0 error rates from given MERFISH
+        readouts.
+
+        Example usage:
+
+        merfishtools est-error-rates < readouts.tsv > error-rates.tsv
+
+        The input file should contain the columns
+
+        experiment
+        cell
+        feature (e.g. gene or transcript)
+        readout (binary word as a string of 0 and 1)
+
+      settings: ArgRequiredElseHelp
+      args:
+        - codebook:
+            required: true
+            value_name: TSV-FILE
+            help: Path to codebook file.
+        - not-expressed:
+            value_name: PATTERN
+            long: not-expressed
+            help: |
+              Regular expression pattern for features that should be marked
+              as not expressed. This is useful to correctly model, e.g.,
+              misidentification probes.

@@ -24,7 +24,9 @@ extern crate ndarray;
 extern crate bit_vec;
 extern crate petgraph;
 extern crate ordered_float;
+extern crate ndarray_rand;
 
 pub mod model;
 pub mod io;
 pub mod codebook;
+pub mod error_rates;

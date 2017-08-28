@@ -23,6 +23,7 @@ use model::foldchange::LogFC;
 use model::cv::CV;
 use codebook;
 use model::readout::Counts;
+use error_rates;
 
 
 pub struct Selection {
@@ -328,6 +329,44 @@ pub fn gen_codebook(
             },
             (None, None) => break
         }
+    }
+    Ok(())
+}
+
+
+pub fn estimate_error_rates(
+    codebook: &str,
+    not_expressed_pattern: Option<&str>
+) -> Result<(), Box<Error>> {
+    let not_expressed_re = if not_expressed_pattern.is_some() {
+        Some(Regex::new(not_expressed_pattern.unwrap())?)
+    } else {
+        None
+    };
+
+    let codebook = io::codebook::Codebook::from_file(codebook).unwrap();
+    let mut readouts = csv::Reader::from_reader(std::io::stdin()).delimiter(b'\t');
+
+    let (p0, p1) = error_rates::estimate(
+        &codebook,
+        readouts.decode().filter_map(|rec| {
+            let (exp, cell, feat, readout): (String, String, String, String) = rec.unwrap();
+            let expressed = !not_expressed_re.as_ref().map_or_else(
+                || false, |re| re.is_match(&feat)
+            );
+
+            if expressed {
+                Some((feat, io::codebook::parse_codeword(readout.as_bytes())))
+            } else {
+                None
+            }
+        })
+    );
+
+    let mut writer = csv::Writer::from_writer(std::io::stdout()).delimiter(b'\t');
+    writer.write(["p0", "p1"].iter())?;
+    for (p0, p1) in p0.into_iter().zip(p1.into_iter()) {
+        writer.write([format!("{}", *p0), format!("{}", *p1)].iter())?;
     }
     Ok(())
 }

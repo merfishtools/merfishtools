@@ -16,6 +16,22 @@ use petgraph::prelude::*;
 pub type Codeword = BitVec<u32>;
 
 
+pub fn parse_codeword(codeword: &[u8]) -> Codeword {
+    let mut _codeword = BitVec::with_capacity(codeword.len());
+    for &b in codeword {
+        if b == b'1' {
+            _codeword.push(true);
+        } else if b == b'0' {
+            _codeword.push(false)
+        } else {
+            panic!("invalid codeword {:?}", codeword)
+        }
+    }
+
+    _codeword
+}
+
+
 /// A codebook record.
 #[derive(Debug)]
 pub struct Record {
@@ -36,20 +52,9 @@ impl Record {
 
     /// Create new record.
     pub fn new(name: String, codeword: &[u8], expressed: bool) -> Self {
-        let mut _codeword = BitVec::with_capacity(codeword.len());
-        for &b in codeword {
-            if b == b'1' {
-                _codeword.push(true);
-            } else if b == b'0' {
-                _codeword.push(false)
-            } else {
-                panic!("invalid codeword {:?}", codeword)
-            }
-        }
-
         Record {
             name: name,
-            codeword: _codeword,
+            codeword: parse_codeword(codeword),
             expressed: expressed
         }
     }
