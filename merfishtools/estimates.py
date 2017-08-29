@@ -19,7 +19,7 @@ def plot_estimate(ylim, map_value=None, credible_interval=None, legend=True):
         ci_lower, ci_upper = credible_interval
         plt.fill([ci_lower, ci_upper, ci_upper, ci_lower], [0, 0, ylim[1], ylim[1]], "red", lw=0, label="95% credible interval", alpha=0.5)
     if map_value is not None:
-        plt.vlines([map_value], *ylim, colors="red", linestyles="-", label="expected value")
+        plt.vlines([map_value], *ylim, colors="red", linestyles="-", label="MAP")
     if legend:
         plt.legend(loc="best")
     plt.ylim(ylim)
