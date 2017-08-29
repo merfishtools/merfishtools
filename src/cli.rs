@@ -62,7 +62,8 @@ pub fn expression(
     stats_path: Option<&str>,
     threads: usize,
     cells: &str,
-    window_width: u32
+    window_width: u32,
+    seed: usize
 ) {
     let codebook = io::codebook::Codebook::from_file(codebook_path).unwrap();
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
@@ -114,7 +115,7 @@ pub fn expression(
         |(cell, counts)| {
             // Generate joint model.
             let mut model = model::readout::JointModel::new(
-                counts.iter(), &p0, &p1, &codebook, window_width
+                counts.iter(), &p0, &p1, &codebook, window_width, seed
             );
             model.expectation_maximization(&cell);
 

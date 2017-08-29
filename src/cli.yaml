@@ -59,6 +59,12 @@ subcommands:
             help: |
               Path to write global statistics per cell to.
               Output is formatted into columns: cell, noise-rate
+        - seed:
+            long: seed
+            value_name: INT
+            required: true
+            help: |
+              Seed for shuffling that occurs in EM algorithm.
         - p0:
             long: p0
             value_name: FLOAT

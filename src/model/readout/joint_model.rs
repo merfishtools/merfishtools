@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use rand;
-use rand::Rng;
+use rand::{Rng, SeedableRng};
 use rand::distributions::IndependentSample;
 use itertools::Itertools;
 use ndarray::prelude::*;
@@ -33,10 +33,11 @@ impl JointModel {
         p0: &[Prob],
         p1: &[Prob],
         codebook: &Codebook,
-        window_width: u32
+        window_width: u32,
+        seed: usize
     ) -> Self {
         let xi = Xi::new(p0, p1);
-        let mut rng = rand::StdRng::new().unwrap();
+        let mut rng = rand::StdRng::from_seed(&[seed]);
 
         // Generate feature models and info about not expressed features.
         let mut feature_models = HashMap::new();

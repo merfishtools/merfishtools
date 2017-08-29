@@ -77,6 +77,7 @@ fn main() {
         let cells = matches.value_of("cells").unwrap();
         let window_width = value_t!(matches, "pmf-window-width", u32).unwrap_or_else(|e| e.exit());
         let threads = value_t!(matches, "threads", usize).unwrap_or_else(|e| e.exit());
+        let seed = value_t!(matches, "seed", usize).unwrap_or_else(|e| e.exit());
 
         let convert_err_rates = |values: Vec<f64>| {
             if values.len() == 1 {
@@ -96,7 +97,8 @@ fn main() {
             stats_path,
             threads,
             &cells,
-            window_width
+            window_width,
+            seed
         );
     } else if let Some(matches) = matches.subcommand_matches("diffexp") {
         let group1_path = matches.value_of("group1").unwrap();
