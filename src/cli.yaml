@@ -253,6 +253,12 @@ subcommands:
         feature (e.g. gene or transcript)
         readout (binary word as a string of 0 and 1)
 
+        The produced output will have the three columns
+
+        pos
+        p0
+        p1
+
       settings: ArgRequiredElseHelp
       args:
         - codebook:

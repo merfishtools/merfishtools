@@ -350,9 +350,9 @@ pub fn estimate_error_rates(
     );
 
     let mut writer = csv::Writer::from_writer(std::io::stdout()).delimiter(b'\t');
-    writer.write(["p0", "p1"].iter())?;
-    for (p0, p1) in p0.into_iter().zip(p1.into_iter()) {
-        writer.write([format!("{}", *p0), format!("{}", *p1)].iter())?;
+    writer.write(["pos", "p0", "p1"].iter())?;
+    for (i, (p0, p1)) in p0.into_iter().zip(p1.into_iter()).enumerate() {
+        writer.write([format!("{}", i), format!("{}", *p0), format!("{}", *p1)].iter())?;
     }
     Ok(())
 }
