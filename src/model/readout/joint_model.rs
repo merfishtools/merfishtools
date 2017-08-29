@@ -99,7 +99,7 @@ impl JointModel {
         let mut feature_models: Vec<Box<&AbstractFeatureModel>> = self.feature_models.values().map(
             |m| Box::new(m as &AbstractFeatureModel)
         ).collect_vec();
-        //feature_models.push(Box::new(&self.noise_model));
+        feature_models.push(Box::new(&self.noise_model));
 
         let n_iterations = 100;
         let change_window = 10;
@@ -151,7 +151,7 @@ impl JointModel {
             }
         }
         self.em_run = true;
-        //debug!("TYPE=EM-result, CELL={}, noise-rate={}", cell, self.noise_rate());
+        debug!("TYPE=EM-result, CELL={}, noise-rate={}", cell, self.noise_rate());
     }
 
     pub fn noise_rate(&self) -> f64 {
