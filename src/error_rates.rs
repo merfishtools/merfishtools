@@ -26,6 +26,7 @@ pub fn estimate<I: Iterator<Item=(String, Readout)>>(
     let mut observed_01_errors = Array2::from_elem(shape, 0.0);
     let mut observed_10_errors = Array2::from_elem(shape, 0.0);
     let mut exact_count = Array2::from_elem((codebook.len(), 1), 0.0);
+    let mut feat_count = Array1::from_elem(codebook.len(), 0);
 
     for (feat, readout) in readouts {
         let feature_id = codebook.get_id(&feat);
@@ -34,6 +35,7 @@ pub fn estimate<I: Iterator<Item=(String, Readout)>>(
             continue;
         }
         let encoding = rec.codeword();
+        feat_count[feature_id] += 1;
 
         let mut err_count = 0;
         for k in 0..codebook.N as usize {
@@ -71,18 +73,19 @@ pub fn estimate<I: Iterator<Item=(String, Readout)>>(
     let mut p1 = Vec::new();
     for k in 0..codebook.N as usize {
         let p = |feat_p: &Array2<f64>, bit: bool| {
-            let mut count = 0.0;
+            let mut total_weight = 0.0;
             let p = (0..codebook.len()).filter_map(|feature_id| {
                 let encoding = codebook.record(feature_id).codeword();
-                if exact_count[(feature_id, 0)] < 100.0 || encoding[k] != bit {
+                if encoding[k] != bit || exact_count[(feature_id, 0)] == 0.0 {
                     None
                 } else {
-                    count += 1.0;
-                    Some(feat_p[(feature_id, k)])
+                    let w = feat_count[feature_id] as f64;
+                    total_weight += w;
+                    Some(feat_p[(feature_id, k)] * w)
                 }
-            }).sum::<f64>() / count;
-            if count == 0.0 {
-                panic!("not enough counts to estimate error rate (at least 1 feature with 50 counts over all cells required)");
+            }).sum::<f64>() / total_weight;
+            if total_weight == 0.0 {
+                panic!("no readouts to estimate error rate at position {}", k);
             }
             p
         };
