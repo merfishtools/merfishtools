@@ -432,7 +432,8 @@ impl AbstractFeatureModel for NoiseModel {
     }
 
     fn prob_dropout(&self) -> f64 {
-        *self.prob_dropout
+        //*self.prob_dropout
+        1.0
     }
 
     fn prob_miscall_exact(&self, neighbor_index: usize) -> f64 {
