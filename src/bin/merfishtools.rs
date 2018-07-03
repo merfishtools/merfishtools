@@ -27,6 +27,10 @@ extern crate petgraph;
 extern crate ordered_float;
 extern crate rand;
 extern crate ndarray_rand;
+#[macro_use]
+extern crate serde_derive;
+extern crate bincode;
+extern crate serde;
 
 use std::process;
 

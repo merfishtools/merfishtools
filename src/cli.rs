@@ -66,7 +66,7 @@ pub fn expression(
     seed: usize
 ) {
     let codebook = io::codebook::Codebook::from_file(codebook_path).unwrap();
-    let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
+    let mut reader = io::merfishdata::tsv::Reader::from_reader(std::io::stdin());
     let mut cdf_writer = io::cdf::expression::Writer::from_writer(std::io::stdout());
     let mut est_writer = estimate_path.map(|path| io::estimation::expression::Writer::from_file(path));
 
