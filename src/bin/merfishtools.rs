@@ -3,56 +3,31 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-extern crate merfishtools;
-#[macro_use]
-extern crate log;
-extern crate fern;
 extern crate bio;
-extern crate csv;
-extern crate itertools;
-extern crate num;
-extern crate rustc_serialize;
-extern crate cue;
-extern crate regex;
-extern crate rgsl;
-#[macro_use]
-extern crate approx;
 #[macro_use]
 extern crate clap;
-#[macro_use(s)]
-extern crate ndarray;
-extern crate bit_vec;
-extern crate bit_set;
-extern crate petgraph;
-extern crate ordered_float;
-extern crate rand;
-extern crate ndarray_rand;
+extern crate fern;
+extern crate itertools;
 #[macro_use]
-extern crate serde_derive;
-extern crate bincode;
-extern crate serde;
-
-use std::process;
-
-use clap::App;
-use itertools::Itertools;
-use ordered_float::NotNaN;
+extern crate log;
+extern crate merfishtools;
+extern crate ordered_float;
 
 use bio::stats::Prob;
-
-pub mod model;
-pub mod io;
-pub mod cli;
-pub mod codebook;
-pub mod error_rates;
+use clap::App;
+use itertools::Itertools;
+use merfishtools::cli;
+use merfishtools::codebook;
+use ordered_float::NotNaN;
+use std::process;
 
 
 #[allow(non_snake_case)]
 fn main() {
-    let yaml = load_yaml!("cli.yaml");
+    let yaml = load_yaml!("../cli.yaml");
     let matches = App::from_yaml(yaml)
-                      .version(env!("CARGO_PKG_VERSION"))
-                      .get_matches();
+        .version(env!("CARGO_PKG_VERSION"))
+        .get_matches();
 
     let logger_config = fern::DispatchConfig {
         format: Box::new(|msg: &str, level: &log::LogLevel, _: &log::LogLocation| {
@@ -67,7 +42,7 @@ fn main() {
 
     if let Err(e) = fern::init_global_logger(
         logger_config,
-        if matches.is_present("verbose") { log::LogLevelFilter::Debug } else { log::LogLevelFilter::Info }
+        if matches.is_present("verbose") { log::LogLevelFilter::Debug } else { log::LogLevelFilter::Info },
     ) {
         panic!("Failed to initialize logger: {}", e);
     }
@@ -102,7 +77,7 @@ fn main() {
             threads,
             &cells,
             window_width,
-            seed
+            seed,
         );
     } else if let Some(matches) = matches.subcommand_matches("diffexp") {
         let group1_path = matches.value_of("group1").unwrap();
