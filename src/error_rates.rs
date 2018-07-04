@@ -1,14 +1,9 @@
-use std::mem;
 use std::f64;
 
-use itertools::Itertools;
 use ndarray::prelude::*;
 use bit_vec::BitVec;
-use ordered_float::NotNaN;
-use ndarray_rand::RandomExt;
-use rand::distributions::Range;
 
-use bio::stats::{Prob, LogProb};
+use bio::stats::Prob;
 
 use io::codebook::Codebook;
 
@@ -20,7 +15,7 @@ pub fn estimate<I: Iterator<Item=(String, Readout)>>(
     codebook: &Codebook,
     readouts: I
 ) -> (Vec<Prob>, Vec<Prob>) {
-    let max_diff = 0.001;
+    let _max_diff = 0.001;
     let shape = (codebook.len(), codebook.N as usize);
 
     let mut observed_01_errors = Array2::from_elem(shape, 0.0);

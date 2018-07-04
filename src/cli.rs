@@ -55,8 +55,8 @@ pub struct Selection {
 
 /// Estimate expressions.
 pub fn expression(
-    p0: Vec<Prob>,
-    p1: Vec<Prob>,
+    p0: &[Prob],
+    p1: &[Prob],
     codebook_path: &str,
     estimate_path: Option<&str>,
     stats_path: Option<&str>,
@@ -68,14 +68,14 @@ pub fn expression(
     let codebook = io::codebook::Codebook::from_file(codebook_path).unwrap();
     let mut reader = io::merfishdata::tsv::Reader::from_reader(std::io::stdin());
     let mut cdf_writer = io::cdf::expression::Writer::from_writer(std::io::stdout());
-    let mut est_writer = estimate_path.map(|path| io::estimation::expression::Writer::from_file(path));
+    let mut est_writer = estimate_path.map(io::estimation::expression::Writer::from_file);
 
     let mut stats_writer = stats_path.map(|path| csv::Writer::from_file(path).unwrap().delimiter(b'\t'));
     if let Some(ref mut writer) = stats_writer {
         writer.write(["cell", "noise-rate"].iter()).unwrap();
     }
 
-    let cells = Regex::new(cells).ok().expect("Invalid regular expression for cells.");
+    let cells = Regex::new(cells).expect("Invalid regular expression for cells.");
 
     let mut counts = collections::HashMap::new();
     for record in reader.records().filter_map(|res| {
@@ -102,7 +102,7 @@ pub fn expression(
         }
     }
     // add missing features from codebook
-    for (_, cell_counts) in counts.iter_mut() {
+    for cell_counts in counts.values_mut() {
         for feature in codebook.features() {
             cell_counts.entry(feature.clone()).or_insert(Counts{ exact: 0, mismatch: 0});
         }
@@ -141,7 +141,7 @@ pub fn expression(
                         &cell,
                         &feature,
                         map_estimate,
-                        cdf.credible_interval(0.95).expect("bug: empty CDF")
+                        &cdf.credible_interval(0.95).expect("bug: empty CDF")
                     );
                 }
             }
@@ -308,7 +308,7 @@ pub fn gen_codebook(
         match (reader.next(), words.next()) {
             (Some(feature), Some(w)) => {
                 let feature = feature?;
-                if feature.len() == 0 {
+                if feature.is_empty() {
                     // TODO proper error handling
                     panic!("Empty feature found. All features provided at STDIN have to be non-empty.");
                 }
@@ -320,7 +320,7 @@ pub fn gen_codebook(
                 writer.write([
                     feature,
                     format!("{:?}", w),
-                    format!("{}", if expressed { "1" } else { "0" })
+                    if expressed { "1" } else { "0" }.to_string()
                 ].into_iter())?;
             },
             (None, Some(_)) => break,
@@ -345,7 +345,7 @@ pub fn estimate_error_rates(
     let (p0, p1) = error_rates::estimate(
         &codebook,
         readouts.decode().map(|rec| {
-            let (cell, feat, readout): (String, String, String) = rec.unwrap();
+            let (_cell, feat, readout): (String, String, String) = rec.unwrap();
             (feat, io::codebook::parse_codeword(readout.as_bytes()))
         })
     );

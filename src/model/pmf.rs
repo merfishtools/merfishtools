@@ -22,7 +22,7 @@ impl<T: Clone + Sized> PMF<T> {
 
     /// Create a new PMF from sorted vector.
     pub fn new(inner: Vec<Entry<T>>) -> Self {
-        PMF { inner: inner }
+        PMF { inner }
     }
 
     pub fn iter(&self) -> slice::Iter<Entry<T>> {
@@ -60,7 +60,7 @@ impl<T: Clone + Sized + Copy> PMF<T> {
 
 impl PMF<f32> {
     pub fn scale(&mut self, scale: f32) {
-        for e in self.inner.iter_mut() {
+        for e in &mut self.inner {
             e.value *= scale;
         }
     }

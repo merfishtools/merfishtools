@@ -3,6 +3,7 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
+// TODO define trait for commonalities between tsv::Record and binary::Record
 pub trait MerfishRecord {
     fn get_cell_id(&self) -> u32;
 }
@@ -49,7 +50,7 @@ pub mod tsv {
     impl Reader<fs::File> {
         /// Read from a given file path.
         pub fn from_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {
-            fs::File::open(path).map(|f| Reader::from_reader(f))
+            fs::File::open(path).map(Reader::from_reader)
         }
     }
 
@@ -61,7 +62,7 @@ pub mod tsv {
             }
         }
 
-        pub fn records<'a>(&'a mut self) -> csv::DecodedRecords<'a, R, Record> {
+        pub fn records(&mut self) -> csv::DecodedRecords<R, Record> {
             self.inner.decode()
         }
     }
@@ -88,17 +89,15 @@ pub mod binary {
     }
 
     impl Header {
-        pub fn version(self) -> u8 {
-            self.version
-        }
-        pub fn is_corrupt(self) -> u8 {
+        pub fn version(&self) -> u8 { self.version }
+        pub fn is_corrupt(&self) -> u8 {
             self.is_corrupt
         }
-        pub fn num_entries(self) -> u32 {
+        pub fn num_entries(&self) -> u32 {
             self.num_entries
         }
         /// Length of the line giving the field names of a record
-        pub fn header_length(self) -> u32 {
+        pub fn header_length(&self) -> u32 {
             self.header_length
         }
     }
@@ -263,7 +262,7 @@ mod tests {
         distNucleus,1  1,double,distPeriphery,1  1,double\
         \x1c\x10\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\xdb\x1e\xb4A\xae\x00\xe9\x05\x14\x87.C\xe2\x17\xbdD\x9b\xe7\xaf\xc4\x10*8\xc5\x03\x00\xdf>\x1b;\x943\x06><\xee\xeb>\x8b\x97\x95>z\x05C?j\x9c\xe6;lw]=\x1fWp;\xa5\xbfz8\x00\x00\x00\x00 _@<\x87\xff\x8f<\x0c\x11\x88>3\xb1\xdc=_\x03\x8c<\xcd\xee\x99=\xe8\x8c[;AN2=v\x0b\x1d=#S\xd5<\xed\x8a<;\xcf\x81<;wYL=\xf3\xb8;;YN\xb18\x00\x00\x00\x00\x89\x03\xa1;Xh\xc7<zwD=u\xfa:=L\xe9O<\xb7\xe3\x1a=\x01\x00\x00\xcc&\xef>\x02\x00\x00\x00\x01\x00\x00\x00\x80a\xaf\x08@\x00\x00\x00\x809\xfc(@";
 
-        let mut reader = binary::Reader::new(io::Cursor::new(&data[..])).unwrap();
+        let reader = binary::Reader::new(io::Cursor::new(&data[..])).unwrap();
         let expected_record = binary::Record {
             barcode: 4124,
             barcode_id: 1,

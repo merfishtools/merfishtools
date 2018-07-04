@@ -37,7 +37,7 @@ pub fn parse_codeword(codeword: &[u8]) -> Codeword {
 pub struct Record {
     name: String,
     codeword: BitVec<u32>,
-    expressed: bool
+    expressed: bool,
 }
 
 
@@ -46,16 +46,16 @@ impl Record {
         Record {
             name: "noise".to_owned(),
             codeword: BitVec::from_elem(len, false),
-            expressed: true  // there is always some noise
+            expressed: true,  // there is always some noise
         }
     }
 
     /// Create new record.
     pub fn new(name: String, codeword: &[u8], expressed: bool) -> Self {
         Record {
-            name: name,
+            name,
             codeword: parse_codeword(codeword),
-            expressed: expressed
+            expressed,
         }
     }
 
@@ -110,9 +110,8 @@ pub struct Codebook {
     pub N: u8,
     // Number of 1-bits in the codewords.
     pub m: u8,
-    noise_record: Record
+    noise_record: Record,
 }
-
 
 
 impl Codebook {
@@ -148,7 +147,7 @@ impl Codebook {
                 let idx = graph.add_node(rec);
                 index.insert(
                     feature,
-                    idx.index()
+                    idx.index(),
                 );
             }
             index
@@ -170,12 +169,12 @@ impl Codebook {
         }
 
         Ok(Codebook {
-            graph: graph,
-            index: index,
-            min_dist: min_dist,
+            graph,
+            index,
+            min_dist,
             N: N.unwrap() as u8,
             m: m.unwrap() as u8,
-            noise_record: Record::noise(N.unwrap())
+            noise_record: Record::noise(N.unwrap()),
         })
     }
 
@@ -241,4 +240,6 @@ impl Codebook {
     pub fn len(&self) -> usize {
         self.index.len()
     }
+
+    pub fn is_empty(&self) -> bool { self.index.is_empty() }
 }

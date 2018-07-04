@@ -77,14 +77,14 @@ impl JointModel {
         let miscalls_mismatch = Miscalls::new(feature_count, &feature_models, &noise_model, false);
 
         JointModel {
-            feature_models: feature_models,
-            noise_model: noise_model,
-            expressions: expressions,
-            miscalls_exact: miscalls_exact,
-            miscalls_mismatch: miscalls_mismatch,
+            feature_models,
+            noise_model,
+            expressions,
+            miscalls_exact,
+            miscalls_mismatch,
             margin: window_width / 2,
             em_run: false,
-            rng: rng
+            rng
         }
     }
 
@@ -139,7 +139,7 @@ impl JointModel {
             }
 
             // calculate mean change per feature of last 5 steps
-            let mean_changes = last_changes.mean(Axis(1));
+            let mean_changes = last_changes.mean_axis(Axis(1));
             debug!("TYPE=EM-iteration, CELL={}, x={:?}", cell, self.expressions);
             debug!("mean changes={:?}", mean_changes);
             let convergence = *mean_changes.iter().map(
@@ -174,7 +174,7 @@ impl JointModel {
     }
 
     fn feature_model(&self, feature_id: FeatureID) -> &FeatureModel {
-        self.feature_models.get(&feature_id).unwrap()
+        &self.feature_models[&feature_id]
     }
 
     /// Prior window for calculating expression PMF

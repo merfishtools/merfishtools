@@ -18,7 +18,7 @@ use bio::stats::probs::cdf;
 use model::expression::{CDF, NormalizedCDF};
 
 
-const HEADER: [&'static str; 4] = ["cell", "feat", "expr", "prob"];
+const HEADER: [&str; 4] = ["cell", "feat", "expr", "prob"];
 
 
 /// A container for feature expression CDFs from multiple cells.
@@ -40,7 +40,7 @@ impl CDFs {
         self.inner.get_mut(feature)
     }
 
-    pub fn features(&self) -> collections::hash_map::Keys<String, Vec<NormalizedCDF>>  {
+    pub fn features(&self) -> collections::hash_map::Keys<String, Vec<NormalizedCDF>> {
         self.inner.keys()
     }
 
@@ -56,7 +56,7 @@ pub struct Record {
     pub cell: String,
     pub feature: String,
     pub expression: f64,
-    pub prob: LogProb
+    pub prob: LogProb,
 }
 
 
@@ -69,7 +69,7 @@ pub struct Reader<R: io::Read> {
 impl Reader<fs::File> {
     /// Read from a given file path.
     pub fn from_file<P: AsRef<Path>>(path: P) -> Option<Self> {
-        fs::File::open(path).map(|f| Reader::from_reader(f)).ok().expect("Error opening file.")
+        fs::File::open(path).map(Reader::from_reader).expect("Error opening file.")
     }
 }
 
@@ -78,11 +78,8 @@ impl<R: io::Read> Reader<R> {
     pub fn from_reader(rdr: R) -> Option<Self> {
         let mut inner = csv::Reader::from_reader(rdr).delimiter(b'\t');
         if inner.headers().unwrap() == HEADER {
-            Some(Reader {
-                inner: inner
-            })
-        }
-        else {
+            Some(Reader { inner })
+        } else {
             None
         }
     }
@@ -92,14 +89,14 @@ impl<R: io::Read> Reader<R> {
         let groups = self.inner.decode().map(|res| res.ok().expect("Error reading record")).group_by(
             |rec: &Record| (rec.cell.clone(), rec.feature.clone())
         );
-        for ((_, feature), records) in groups.into_iter() {
+        for ((_, feature), records) in &groups {
             let cdf = NormalizedCDF::from_cdf(records.map(|rec| {
                 cdf::Entry {
-                    value: NotNaN::new(rec.expression.clone()).unwrap(),
-                    prob: rec.prob.clone()
+                    value: NotNaN::new(rec.expression).unwrap(),
+                    prob: rec.prob,
                 }
             }));
-            let mut cdfs = features.entry(feature).or_insert(Vec::new());
+            let mut cdfs = features.entry(feature).or_insert_with(Vec::new);
             cdfs.push(cdf);
         }
         CDFs { inner: features }
@@ -115,7 +112,7 @@ pub struct Writer<W: io::Write> {
 impl Writer<fs::File> {
     /// Write to a given file path.
     pub fn from_file<P: AsRef<Path>>(path: P) -> Self {
-        fs::File::create(path).map(|f| Writer::from_writer(f)).unwrap()
+        fs::File::create(path).map(Writer::from_writer).unwrap()
     }
 }
 

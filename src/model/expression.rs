@@ -29,7 +29,7 @@ pub fn cdf(feature: FeatureID, model: &mut model::readout::JointModel) -> (CDF, 
             if prob >= model::MIN_PROB {
                 Some(probs::cdf::Entry {
                     value: xmin + x as u32,
-                    prob: prob
+                    prob
                 })
             }
             else {
@@ -59,13 +59,13 @@ pub fn cdf(feature: FeatureID, model: &mut model::readout::JointModel) -> (CDF, 
 mod tests {
     #![allow(non_upper_case_globals)]
 
-    use nalgebra::ApproxEq;
-
-    use bio::stats::{Prob, LogProb};
-
-    use super::*;
-    use model;
-    use io;
+//    use nalgebra::ApproxEq;
+//
+//    use bio::stats::{Prob, LogProb};
+//
+//    use super::*;
+//    use model;
+//    use io;
 
 /*
 

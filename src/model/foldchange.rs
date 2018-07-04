@@ -21,7 +21,7 @@ pub fn cdf(a: &model::expressionset::CDF, b: &model::expressionset::CDF) -> CDF 
 
     for a in a_pmf {
         let a_mean = *a.value;
-        for b in b_pmf.iter() {
+        for b in &b_pmf {
             let b_mean = *b.value;
             // the PMFs should not contain NaNs.
             let log2fc = NotNaN::new((a_mean).log2() - (b_mean).log2()).unwrap();

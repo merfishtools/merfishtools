@@ -20,7 +20,7 @@ pub struct Writer<W: io::Write> {
 impl Writer<fs::File> {
     /// Write to a given file path.
     pub fn from_file<P: AsRef<Path>>(path: P) -> Self {
-        fs::File::create(path).map(|f| Writer::from_writer(f)).unwrap()
+        fs::File::create(path).map( Writer::from_writer).unwrap()
     }
 }
 
@@ -41,7 +41,7 @@ impl<W: io::Write> Writer<W> {
         cell: &str,
         feature: &str,
         map: u32,
-        credible_interval: Range<&u32>
+        credible_interval: &Range<&u32>
     ) {
         self.inner.write([
             cell,

@@ -31,8 +31,8 @@ fn main() {
 
     let logger_config = fern::DispatchConfig {
         format: Box::new(|msg: &str, level: &log::LogLevel, _: &log::LogLocation| {
-            match level {
-                &log::LogLevel::Debug => format!("DEBUG: {}", msg),
+            match *level {
+                log::LogLevel::Debug => format!("DEBUG: {}", msg),
                 _ => msg.to_owned()
             }
         }),
@@ -69,8 +69,8 @@ fn main() {
         };
 
         cli::expression(
-            convert_err_rates(p0),
-            convert_err_rates(p1),
+            &convert_err_rates(p0),
+            &convert_err_rates(p1),
             &codebook_path,
             estimate_path,
             stats_path,
