@@ -118,14 +118,14 @@ impl Codebook {
     /// Read from a given file path.
     #[allow(non_snake_case)]
     pub fn from_file<P: AsRef<Path>>(path: P) -> csv::Result<Self> {
-        let mut rdr = (csv::Reader::from_file(path)?).delimiter(b'\t');
+        let mut rdr = csv::ReaderBuilder::new().delimiter(b'\t').from_path(path)?;
 
         let mut N = None;
         let mut m = None;
         let mut graph = Graph::default();
         let index = {
             let mut index = HashMap::new();
-            for rec in rdr.decode() {
+            for rec in rdr.deserialize() {
                 let (feature, codeword, expressed): (String, String, u8) = rec?;
                 let expressed = expressed == 1;
 

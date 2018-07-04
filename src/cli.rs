@@ -70,9 +70,9 @@ pub fn expression(
     let mut cdf_writer = io::cdf::expression::Writer::from_writer(std::io::stdout());
     let mut est_writer = estimate_path.map(io::estimation::expression::Writer::from_file);
 
-    let mut stats_writer = stats_path.map(|path| csv::Writer::from_file(path).unwrap().delimiter(b'\t'));
+    let mut stats_writer = stats_path.map(|path| csv::WriterBuilder::new().delimiter(b'\t').from_path(path).unwrap());
     if let Some(ref mut writer) = stats_writer {
-        writer.write(["cell", "noise-rate"].iter()).unwrap();
+        writer.serialize(["cell", "noise-rate"]).unwrap();
     }
 
     let cells = Regex::new(cells).expect("Invalid regular expression for cells.");
@@ -146,7 +146,7 @@ pub fn expression(
                 }
             }
             if let Some(ref mut stats_writer) = stats_writer {
-                stats_writer.write([&cell, &format!("{:.4}", noise_rate)].iter()).unwrap();
+                stats_writer.serialize([&cell, &format!("{:.4}", noise_rate)]).unwrap();
             }
         }
     );
@@ -299,10 +299,10 @@ pub fn gen_codebook(
 
     let stdin = std::io::stdin();
     let mut reader = stdin.lock().lines();
-    let mut writer = csv::Writer::from_writer(std::io::stdout()).delimiter(b'\t');
+    let mut writer = csv::WriterBuilder::new().delimiter(b'\t').from_writer(std::io::stdout());
     let mut words = words.iter();
     // TODO add expressed column and handle misidentification probes
-    writer.write(["feat", "codeword", "expressed"].iter()).unwrap();
+    writer.serialize(["feat", "codeword", "expressed"]).unwrap();
 
     for i in 1.. {
         match (reader.next(), words.next()) {
@@ -317,11 +317,11 @@ pub fn gen_codebook(
                     || false, |re| re.is_match(&feature)
                 );
 
-                writer.write([
+                writer.serialize([
                     feature,
                     format!("{:?}", w),
                     if expressed { "1" } else { "0" }.to_string()
-                ].into_iter())?;
+                ])?;
             },
             (None, Some(_)) => break,
             (Some(_), None) => {
@@ -340,20 +340,20 @@ pub fn estimate_error_rates(
 ) -> Result<(), Box<Error>> {
 
     let codebook = io::codebook::Codebook::from_file(codebook).unwrap();
-    let mut readouts = csv::Reader::from_reader(std::io::stdin()).delimiter(b'\t');
+    let mut readouts = csv::ReaderBuilder::new().delimiter(b'\t').from_reader(std::io::stdin());
 
     let (p0, p1) = error_rates::estimate(
         &codebook,
-        readouts.decode().map(|rec| {
+        readouts.deserialize().map(|rec| {
             let (_cell, feat, readout): (String, String, String) = rec.unwrap();
             (feat, io::codebook::parse_codeword(readout.as_bytes()))
         })
     );
 
-    let mut writer = csv::Writer::from_writer(std::io::stdout()).delimiter(b'\t');
-    writer.write(["pos", "p0", "p1"].iter())?;
+    let mut writer = csv::WriterBuilder::new().delimiter(b'\t').from_writer(std::io::stdout());
+    writer.write_record(&["pos", "p0", "p1"])?;
     for (i, (p0, p1)) in p0.into_iter().zip(p1.into_iter()).enumerate() {
-        writer.write([format!("{}", i), format!("{}", *p0), format!("{}", *p1)].iter())?;
+        writer.write_record(&[format!("{}", i), format!("{}", *p0), format!("{}", *p1)])?;
     }
     Ok(())
 }

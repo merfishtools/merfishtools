@@ -18,7 +18,7 @@ use bio::stats::probs::cdf;
 use model::expression::{CDF, NormalizedCDF};
 
 
-const HEADER: [&str; 4] = ["cell", "feat", "expr", "prob"];
+const HEADER: &[&str] = &["cell", "feat", "expr", "prob"];
 
 
 /// A container for feature expression CDFs from multiple cells.
@@ -51,7 +51,7 @@ impl CDFs {
 
 
 /// A CDF record.
-#[derive(RustcDecodable, RustcEncodable)]
+#[derive(Serialize, Deserialize)]
 pub struct Record {
     pub cell: String,
     pub feature: String,
@@ -76,8 +76,8 @@ impl Reader<fs::File> {
 
 impl<R: io::Read> Reader<R> {
     pub fn from_reader(rdr: R) -> Option<Self> {
-        let mut inner = csv::Reader::from_reader(rdr).delimiter(b'\t');
-        if inner.headers().unwrap() == HEADER {
+        let mut inner = csv::ReaderBuilder::new().delimiter(b'\t').from_reader(rdr);
+        if inner.headers().unwrap().eq(HEADER) {
             Some(Reader { inner })
         } else {
             None
@@ -86,9 +86,9 @@ impl<R: io::Read> Reader<R> {
 
     pub fn cdfs(&mut self) -> CDFs {
         let mut features = collections::HashMap::new();
-        let groups = self.inner.decode().map(|res| res.ok().expect("Error reading record")).group_by(
-            |rec: &Record| (rec.cell.clone(), rec.feature.clone())
-        );
+        let groups = self.inner.deserialize()
+            .map(|res| res.expect("Error reading record"))
+            .group_by(|rec: &Record| (rec.cell.clone(), rec.feature.clone()));
         for ((_, feature), records) in &groups {
             let cdf = NormalizedCDF::from_cdf(records.map(|rec| {
                 cdf::Entry {
@@ -120,21 +120,21 @@ impl Writer<fs::File> {
 impl<W: io::Write> Writer<W> {
     pub fn from_writer(w: W) -> Self {
         let mut writer = Writer {
-            inner: csv::Writer::from_writer(w).delimiter(b'\t')
+            inner: csv::WriterBuilder::new().delimiter(b'\t').from_writer(w)
         };
-        writer.inner.write(HEADER.iter()).unwrap();
+        writer.inner.write_record(HEADER).unwrap();
 
         writer
     }
 
     pub fn write(&mut self, cell: &str, feature: &str, cdf: &CDF) {
         for x in cdf.iter() {
-            self.inner.write([
+            self.inner.write_record(&[
                 cell,
                 feature,
                 &format!("{:.0}", x.value)[..],
                 &format!("{}", *x.prob)[..]
-            ].iter()).unwrap();
+            ]).unwrap();
         }
     }
 }

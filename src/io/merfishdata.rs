@@ -17,7 +17,7 @@ pub mod tsv {
     use io::merfishdata::MerfishRecord;
 
     /// A 2D position in the microscope.
-    #[derive(RustcDecodable)]
+    #[derive(Serialize, Deserialize, Debug)]
     pub struct Position {
         pub x: f32,
         pub y: f32,
@@ -25,7 +25,7 @@ pub mod tsv {
 
 
     /// A MERFISH raw data record.
-    #[derive(RustcDecodable)]
+    #[derive(Serialize, Deserialize, Debug)]
     pub struct Record {
         pub cell_id: String,
         pub feature: String,
@@ -58,12 +58,12 @@ pub mod tsv {
     impl<R: io::Read> Reader<R> {
         pub fn from_reader(rdr: R) -> Self {
             Reader {
-                inner: csv::Reader::from_reader(rdr).delimiter(b'\t')
+                inner: csv::ReaderBuilder::new().delimiter(b'\t').from_reader(rdr)
             }
         }
 
-        pub fn records(&mut self) -> csv::DecodedRecords<R, Record> {
-            self.inner.decode()
+        pub fn records(&mut self) -> csv::DeserializeRecordsIter<R, Record> {
+            self.inner.deserialize()
         }
     }
 }

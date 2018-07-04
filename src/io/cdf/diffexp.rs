@@ -29,20 +29,20 @@ impl Writer<fs::File> {
 impl<W: io::Write> Writer<W> {
     pub fn from_writer(w: W, measure_label: &str) -> Self {
         let mut writer = Writer {
-            inner: csv::Writer::from_writer(w).delimiter(b'\t')
+            inner: csv::WriterBuilder::new().delimiter(b'\t').from_writer(w)
         };
-        writer.inner.write(["feat", measure_label, "prob"].iter()).unwrap();
+        writer.inner.write_record(&["feat", measure_label, "prob"]).unwrap();
 
         writer
     }
 
     pub fn write(&mut self, feature: &str, cdf: &CDF) {
         for e in cdf.iter() {
-            self.inner.write([
+            self.inner.write_record(&[
                 feature,
                 &format!("{}", e.value)[..],
                 &format!("{}", *e.prob)[..]
-            ].iter()).unwrap();
+            ]).unwrap();
         }
     }
 }

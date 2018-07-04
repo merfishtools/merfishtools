@@ -31,9 +31,9 @@ impl Writer<fs::File> {
 impl<W: io::Write> Writer<W> {
     pub fn from_writer(w: W, measure_label: &str) -> Self {
         let mut writer = Writer {
-            inner: csv::Writer::from_writer(w).delimiter(b'\t')
+            inner: csv::WriterBuilder::new().delimiter(b'\t').from_writer(w)
         };
-        writer.inner.write([
+        writer.inner.write_record(&[
             "feat",
             "diff_pep",
             "diff_fdr",
@@ -41,7 +41,7 @@ impl<W: io::Write> Writer<W> {
             &format!("{}_map", measure_label)[..],
             &format!("{}_ci_lower", measure_label)[..],
             &format!("{}_ci_upper", measure_label)[..]
-        ].iter()).unwrap();
+        ]).unwrap();
 
         writer
     }
@@ -55,7 +55,7 @@ impl<W: io::Write> Writer<W> {
         map: model::diffexp::DiffexpMeasure,
         credible_interval: (model::diffexp::DiffexpMeasure, model::diffexp::DiffexpMeasure)
     ) {
-        self.inner.write([
+        self.inner.write_record(&[
             feature,
             &format!("{:.*e}", 2, differential_expression_pep.exp())[..],
             &format!("{:.*e}", 2, fdr.exp())[..],
@@ -63,6 +63,6 @@ impl<W: io::Write> Writer<W> {
             &format!("{:.*}", 2, map)[..],
             &format!("{:.*}", 2, credible_interval.0)[..],
             &format!("{:.*}", 2, credible_interval.1)[..]
-        ].iter()).unwrap();
+        ]).unwrap();
     }
 }
