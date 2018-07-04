@@ -19,9 +19,7 @@ pub mod tsv {
     /// A 2D position in the microscope.
     #[derive(Serialize, Deserialize, Debug)]
     pub struct Position {
-        #[serde(rename = "Position_X")]
         pub x: f32,
-        #[serde(rename = "Position_Y")]
         pub y: f32,
     }
 
@@ -30,20 +28,20 @@ pub mod tsv {
     /// // "Cell_ID	Gene_Name	Hamming_Distance	Cell_Position_X	Cell_Position_Y	RNA_Position_X	RNA_Position_Y
     #[derive(Serialize, Deserialize, Debug)]
     pub struct Record {
-        #[serde(rename = "Cell_ID")]
+        #[serde(rename = "cell")]
         pub cell_id: String,
-        #[serde(rename = "Gene_Name")]
+        #[serde(rename = "feat")]
         pub feature: String,
-        #[serde(rename = "Hamming_Distance")]
+        #[serde(rename = "dist")]
         pub hamming_dist: u8,
         #[serde(flatten, with = "prefix_cell")]
         pub cell_position: Position,
-        #[serde(flatten, with = "prefix_rna")]
+        #[serde(flatten, with = "prefix_none")]
         pub rna_position: Position,
     }
 
-    with_prefix!(prefix_cell "Cell_");
-    with_prefix!(prefix_rna "RNA_");
+    with_prefix!(prefix_cell "cell_");
+    with_prefix!(prefix_none "");
 
     impl MerfishRecord for Record {
         fn get_cell_id(&self) -> u32 {
@@ -246,7 +244,7 @@ mod tests {
 
     #[test]
     fn test_tsv_records() {
-        let data = b"Cell_ID	Gene_Name	Hamming_Distance	Cell_Position_X	Cell_Position_Y	RNA_Position_X	RNA_Position_Y
+        let data = b"cell	feat	dist	cell_x	cell_y	x	y
 0	SCUBE3	1	475.5	630.6	13146.86026973	25793.5656964
 0	SCUBE3	1	475.5	630.6	13576.7356895	38396.4273422
 ";
