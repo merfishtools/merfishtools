@@ -19,20 +19,31 @@ pub mod tsv {
     /// A 2D position in the microscope.
     #[derive(Serialize, Deserialize, Debug)]
     pub struct Position {
+        #[serde(rename = "Position_X")]
         pub x: f32,
+        #[serde(rename = "Position_Y")]
         pub y: f32,
     }
 
 
     /// A MERFISH raw data record.
+    /// // "Cell_ID	Gene_Name	Hamming_Distance	Cell_Position_X	Cell_Position_Y	RNA_Position_X	RNA_Position_Y
     #[derive(Serialize, Deserialize, Debug)]
     pub struct Record {
+        #[serde(rename = "Cell_ID")]
         pub cell_id: String,
+        #[serde(rename = "Gene_Name")]
         pub feature: String,
+        #[serde(rename = "Hamming_Distance")]
         pub hamming_dist: u8,
+        #[serde(flatten, with = "prefix_cell")]
         pub cell_position: Position,
+        #[serde(flatten, with = "prefix_rna")]
         pub rna_position: Position,
     }
+
+    with_prefix!(prefix_cell "Cell_");
+    with_prefix!(prefix_rna "RNA_");
 
     impl MerfishRecord for Record {
         fn get_cell_id(&self) -> u32 {
