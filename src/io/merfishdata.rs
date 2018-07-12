@@ -3,9 +3,13 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-// TODO define trait for commonalities between tsv::Record and binary::Record
 pub trait MerfishRecord {
     fn get_cell_id(&self) -> u32;
+    fn get_cell_name(&self) -> String;
+    fn get_cell_pos(&self) -> (f32, f32);
+    fn get_feature_id(&self) -> u16;
+    fn get_feature_name(&self) -> String;
+    fn get_hamming_dist(&self) -> u8;
 }
 
 pub mod tsv {
@@ -47,6 +51,16 @@ pub mod tsv {
         fn get_cell_id(&self) -> u32 {
             self.cell_id.parse().expect("Failed parsing cell_id")
         }
+
+        fn get_cell_name(&self) -> String { self.cell_id.clone() }
+
+        fn get_cell_pos(&self) -> (f32, f32) { (self.cell_position.x, self.cell_position.y) }
+
+        fn get_feature_id(&self) -> u16 { self.feature.parse().expect("Failed parsing feature_id") }
+
+        fn get_feature_name(&self) -> String { self.feature.clone() }
+
+        fn get_hamming_dist(&self) -> u8 { self.hamming_dist }
     }
 
 
@@ -160,6 +174,16 @@ pub mod binary {
         fn get_cell_id(&self) -> u32 {
             self.cell_id
         }
+
+        fn get_cell_name(&self) -> String { self.cell_id.to_string() }
+
+        fn get_cell_pos(&self) -> (f32, f32) { (self.abs_position[0], self.abs_position[1]) }
+
+        fn get_feature_id(&self) -> u16 { self.barcode_id }
+
+        fn get_feature_name(&self) -> String { self.barcode_id.to_string() }
+
+        fn get_hamming_dist(&self) -> u8 { 1 - self.is_exact }
     }
 
     pub struct Reader<R: io::Read> {
