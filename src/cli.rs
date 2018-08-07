@@ -82,7 +82,7 @@ pub fn expression(
     for record in reader.records().filter_map(|res| {
             let rec = res.unwrap();
             // consider record if it is contained in the codebook and has a valid cell id
-            if cells.is_match(&rec.get_cell_name()) && codebook.contains(&rec.get_feature_name()) {
+            if cells.is_match(&rec.cell_name()) && codebook.contains(&rec.feature_name()) {
                 Some(rec)
             }
             else {
@@ -90,12 +90,12 @@ pub fn expression(
             }
         }
     ) {
-        let cell_counts = counts.entry(record.get_cell_name()).or_insert_with(collections::HashMap::new);
-        let feature_counts = cell_counts.entry(record.get_feature_name()).or_insert(Counts{ exact: 0, mismatch: 0});
-        if record.get_hamming_dist() == 0 {
+        let cell_counts = counts.entry(record.cell_name()).or_insert_with(collections::HashMap::new);
+        let feature_counts = cell_counts.entry(record.feature_name()).or_insert(Counts{ exact: 0, mismatch: 0});
+        if record.hamming_dist() == 0 {
             feature_counts.exact += 1;
         }
-        else if record.get_hamming_dist() == 1 {
+        else if record.hamming_dist() == 1 {
             feature_counts.mismatch += 1;
         }
         else {
