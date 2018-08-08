@@ -192,6 +192,10 @@ pub mod binary {
         item: usize,
     }
 
+    pub trait Captures<'a> {}
+
+    impl<'a, T: ?Sized> Captures<'a> for T {}
+
     impl<R: io::Read> Reader<R> {
         /// Constructs a new `merfish::Reader<R>` where `R: io::Read`.
         ///
@@ -222,6 +226,23 @@ pub mod binary {
         pub fn header(&self) -> &Header {
             &self.header
         }
+
+        //        pub fn records<'a, 'b: 'a>(&'a mut self) -> impl Iterator<Item=io::Result<Record>> + Captures<'b> {
+        pub fn records(&mut self) -> impl Iterator<Item=io::Result<Record>> {
+            (0..self.header.num_entries).map(|i| {
+                match bincode::deserialize_from::<_, Record>(&mut self.reader) {
+                    Ok(record) => {
+                        Ok(record)
+                    }
+                    // TODO: propagate bincode's Error
+                    Err(_) =>
+                        Err(io::Error::new(
+                            io::ErrorKind::Other,
+                            format!("Failed deserializing record {} from reader.", 0), )
+                        )
+                }
+            })
+        }
     }
 
     impl Reader<fs::File> {
@@ -230,32 +251,6 @@ pub mod binary {
         /// This delegates work to `merfish::Reader::new`.
         pub fn from_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {
             fs::File::open(path).map(|r| { Reader::new(r).unwrap() })
-        }
-    }
-
-    impl<R: io::Read> Iterator for Reader<R> {
-        type Item = io::Result<Record>;
-
-        /// Reads a single `merfish::Record` from the file, advancing the iterator.
-        fn next(&mut self) -> Option<<Self as Iterator>::Item> {
-            let (l, _) = self.size_hint();
-            if l == 0 {
-                None
-            } else {
-                match bincode::deserialize_from::<_, Record>(&mut self.reader) {
-                    Ok(record) => {
-                        self.item += 1;
-                        Some(Ok(record))
-                    }
-                    // TODO: propagate bincode's Error
-                    Err(_) => Some(Err(io::Error::new(io::ErrorKind::Other,
-                                                      "Failed deserializing record from reader.")))
-                }
-            }
-        }
-
-        fn size_hint(&self) -> (usize, Option<usize>) {
-            (self.header.num_entries as usize - self.item, Some(self.header.num_entries as usize - self.item))
         }
     }
 }
@@ -295,7 +290,7 @@ mod tests {
         distNucleus,1  1,double,distPeriphery,1  1,double\
         \x1c\x10\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\xdb\x1e\xb4A\xae\x00\xe9\x05\x14\x87.C\xe2\x17\xbdD\x9b\xe7\xaf\xc4\x10*8\xc5\x03\x00\xdf>\x1b;\x943\x06><\xee\xeb>\x8b\x97\x95>z\x05C?j\x9c\xe6;lw]=\x1fWp;\xa5\xbfz8\x00\x00\x00\x00 _@<\x87\xff\x8f<\x0c\x11\x88>3\xb1\xdc=_\x03\x8c<\xcd\xee\x99=\xe8\x8c[;AN2=v\x0b\x1d=#S\xd5<\xed\x8a<;\xcf\x81<;wYL=\xf3\xb8;;YN\xb18\x00\x00\x00\x00\x89\x03\xa1;Xh\xc7<zwD=u\xfa:=L\xe9O<\xb7\xe3\x1a=\x01\x00\x00\xcc&\xef>\x02\x00\x00\x00\x01\x00\x00\x00\x80a\xaf\x08@\x00\x00\x00\x809\xfc(@";
 
-        let reader = binary::Reader::new(io::Cursor::new(&data[..])).unwrap();
+        let mut reader = binary::Reader::new(io::Cursor::new(&data[..])).unwrap();
         let expected_record = binary::Record {
             barcode: 4124,
             barcode_id: 1,
@@ -316,7 +311,7 @@ mod tests {
             dist_nucleus: 3.085635185241699,
             dist_periphery: 12.492626190185547,
         };
-        for record in reader {
+        for record in reader.records() {
             match record {
                 Ok(r) => {
                     assert_eq!(r, expected_record);
