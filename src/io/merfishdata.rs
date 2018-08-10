@@ -3,6 +3,8 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use std::io;
+
 pub trait MerfishRecord {
     fn cell_id(&self) -> u32;
     fn cell_name(&self) -> String;
@@ -11,6 +13,15 @@ pub trait MerfishRecord {
     fn feature_name(&self) -> String;
     fn hamming_dist(&self) -> u8;
 }
+
+
+pub trait Reader {
+    type M: MerfishRecord;
+    type I: Iterator<Item=Result<Self::M, io::Error>>;
+
+    fn records(&mut self) -> Self::I;
+}
+
 
 pub mod tsv {
     use std::io;
@@ -73,13 +84,13 @@ pub mod tsv {
     impl Reader<fs::File> {
         /// Read from a given file path.
         pub fn from_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {
-            fs::File::open(path).map(Reader::from_reader)
+            fs::File::open(path).map(Reader::new)
         }
     }
 
 
     impl<R: io::Read> Reader<R> {
-        pub fn from_reader(rdr: R) -> Self {
+        pub fn new(rdr: R) -> Self {
             Reader {
                 inner: csv::ReaderBuilder::new().delimiter(b'\t').from_reader(rdr)
             }
@@ -241,12 +252,6 @@ pub mod binary {
             }
         }
 
-        pub fn records(&mut self) -> RecordIterator<R> {
-            RecordIterator {
-                reader: self, i: 0
-            }
-        }
-
         // pub fn records<'a>(&'a mut self) -> impl Iterator<Item=io::Result<Record>> + Captures<'a> {
         // //pub fn records(&mut self) -> impl Iterator<Item=io::Result<Record>> {
         //     (0..self.header.num_entries).map(|i| {
@@ -263,6 +268,14 @@ pub mod binary {
         //         }
         //     })
         // }
+    }
+
+    impl super::Reader for Reader {
+        pub fn records(&mut self) -> RecordIterator<R> {
+            RecordIterator {
+                reader: self, i: 0
+            }
+        }
     }
 
     impl Reader<fs::File> {
@@ -308,7 +321,7 @@ mod tests {
 0	SCUBE3	1	475.5	630.6	13146.86026973	25793.5656964
 0	SCUBE3	1	475.5	630.6	13576.7356895	38396.4273422
 ";
-        let mut reader = tsv::Reader::from_reader(io::Cursor::new(&data[..]));
+        let mut reader = tsv::Reader::new(io::Cursor::new(&data[..]));
         for r in reader.records() {
             match r {
                 Ok(rec) => {

@@ -55,9 +55,10 @@ pub struct Selection {
 
 
 /// Estimate expressions.
-pub fn expression(
+pub fn expression<R: io::merfishdata::Reader>(
     p0: &[Prob],
     p1: &[Prob],
+    reader: &mut R,
     codebook_path: &str,
     estimate_path: Option<&str>,
     stats_path: Option<&str>,
@@ -67,7 +68,6 @@ pub fn expression(
     seed: usize
 ) {
     let codebook = io::codebook::Codebook::from_file(codebook_path).unwrap();
-    let mut reader = io::merfishdata::tsv::Reader::from_reader(std::io::stdin());
     let mut cdf_writer = io::cdf::expression::Writer::from_writer(std::io::stdout());
     let mut est_writer = estimate_path.map(io::estimation::expression::Writer::from_file);
 

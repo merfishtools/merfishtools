@@ -18,8 +18,10 @@ use clap::App;
 use itertools::Itertools;
 use merfishtools::cli;
 use merfishtools::codebook;
+use merfishtools::io::merfishdata;
 use ordered_float::NotNaN;
 use std::process;
+use std::io;
 
 
 #[allow(non_snake_case)]
@@ -57,6 +59,7 @@ fn main() {
         let window_width = value_t!(matches, "pmf-window-width", u32).unwrap_or_else(|e| e.exit());
         let threads = value_t!(matches, "threads", usize).unwrap_or_else(|e| e.exit());
         let seed = value_t!(matches, "seed", usize).unwrap_or_else(|e| e.exit());
+        let is_binary_input = matches.is_present("is_binary_input");
 
         let convert_err_rates = |values: Vec<f64>| {
             if values.len() == 1 {
@@ -68,17 +71,26 @@ fn main() {
             }
         };
 
-        cli::expression(
-            &convert_err_rates(p0),
-            &convert_err_rates(p1),
-            &codebook_path,
-            estimate_path,
-            stats_path,
-            threads,
-            &cells,
-            window_width,
-            seed,
-        );
+        let expression = |reader| {
+            cli::expression(
+                &convert_err_rates(p0),
+                &convert_err_rates(p1),
+                &mut reader,
+                &codebook_path,
+                estimate_path,
+                stats_path,
+                threads,
+                &cells,
+                window_width,
+                seed,
+            )
+        };
+
+        if is_binary_input {
+            expression(merfishdata::binary::Reader::new(io::stdin()).unwrap())
+        } else {
+            expression(merfishdata::tsv::Reader::new(io::stdin()))
+        }
     } else if let Some(matches) = matches.subcommand_matches("diffexp") {
         let group1_path = matches.value_of("group1").unwrap();
         let group2_path = matches.value_of("group2").unwrap();
