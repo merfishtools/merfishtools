@@ -65,6 +65,8 @@ fn test_exp_mhd2() {
 
 
 /// This is a longrunning test that should be activated only on purpose.
+#[test]
+#[ignore]
 fn test_exp_mhd2_8() {
     assert!(run_exp("simulated-MHD2-8.25.all", "simulated-MHD2-8", "--p0 0.005 --p1 0.01"));
 }

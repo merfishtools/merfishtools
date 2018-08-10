@@ -227,22 +227,42 @@ pub mod binary {
             &self.header
         }
 
-        //        pub fn records<'a, 'b: 'a>(&'a mut self) -> impl Iterator<Item=io::Result<Record>> + Captures<'b> {
-        pub fn records(&mut self) -> impl Iterator<Item=io::Result<Record>> {
-            (0..self.header.num_entries).map(|i| {
-                match bincode::deserialize_from::<_, Record>(&mut self.reader) {
-                    Ok(record) => {
-                        Ok(record)
-                    }
-                    // TODO: propagate bincode's Error
-                    Err(_) =>
-                        Err(io::Error::new(
-                            io::ErrorKind::Other,
-                            format!("Failed deserializing record {} from reader.", 0), )
-                        )
+        pub fn read(&mut self) -> Result<Record, io::Error> {
+            match bincode::deserialize_from::<_, Record>(&mut self.reader) {
+                Ok(record) => {
+                    Ok(record)
                 }
-            })
+                // TODO: propagate bincode's Error
+                Err(_) =>
+                    Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        format!("Failed deserializing record {} from reader.", 0), )
+                    )
+            }
         }
+
+        pub fn records(&mut self) -> RecordIterator<R> {
+            RecordIterator {
+                reader: self, i: 0
+            }
+        }
+
+        // pub fn records<'a>(&'a mut self) -> impl Iterator<Item=io::Result<Record>> + Captures<'a> {
+        // //pub fn records(&mut self) -> impl Iterator<Item=io::Result<Record>> {
+        //     (0..self.header.num_entries).map(|i| {
+        //         match bincode::deserialize_from::<_, Record>(&mut self.reader) {
+        //             Ok(record) => {
+        //                 Ok(record)
+        //             }
+        //             // TODO: propagate bincode's Error
+        //             Err(_) =>
+        //                 Err(io::Error::new(
+        //                     io::ErrorKind::Other,
+        //                     format!("Failed deserializing record {} from reader.", 0), )
+        //                 )
+        //         }
+        //     })
+        // }
     }
 
     impl Reader<fs::File> {
@@ -251,6 +271,27 @@ pub mod binary {
         /// This delegates work to `merfish::Reader::new`.
         pub fn from_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {
             fs::File::open(path).map(|r| { Reader::new(r).unwrap() })
+        }
+    }
+
+
+
+    pub struct RecordIterator<'a, R: io::Read + 'a> {
+        reader: &'a mut Reader<R>,
+        i: u32
+    }
+
+
+    impl<'a, R: io::Read> Iterator for RecordIterator<'a, R> {
+        type Item = Result<Record, io::Error>;
+
+        fn next(&mut self) -> Option<Result<Record, io::Error>> {
+            if self.i >= self.reader.header.num_entries {
+                None
+            } else {
+                self.i += 1;
+                Some(self.reader.read())
+            }
         }
     }
 }
