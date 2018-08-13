@@ -12,7 +12,7 @@ use csv;
 
 
 /// A writer for expression estimates.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Writer<W: io::Write> {
     inner: csv::Writer<W>
 }
