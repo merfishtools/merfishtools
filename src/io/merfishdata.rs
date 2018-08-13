@@ -5,6 +5,8 @@
 
 use std::io;
 
+use failure::Error;
+
 pub trait MerfishRecord {
     fn cell_id(&self) -> u32;
     fn cell_name(&self) -> String;
@@ -15,11 +17,8 @@ pub trait MerfishRecord {
 }
 
 
-pub trait Reader {
-    type M: MerfishRecord;
-    type I: Iterator<Item=Result<Self::M, io::Error>>;
-
-    fn records(&mut self) -> Self::I;
+pub trait Reader<'a, M: MerfishRecord, I: Iterator<Item=Result<M, Error>> + 'a> {
+    fn records(&'a mut self) -> I;
 }
 
 
@@ -95,8 +94,11 @@ pub mod tsv {
                 inner: csv::ReaderBuilder::new().delimiter(b'\t').from_reader(rdr)
             }
         }
+    }
 
-        pub fn records(&mut self) -> csv::DeserializeRecordsIter<R, Record> {
+    impl<'a, R: io::Read> super::Reader<'a, Record, csv::DeserializeRecordsIter<'a, R, Record>> for Reader<R> {
+
+        fn records(&mut self) -> csv::DeserializeRecordsIter<'a, R, Record> {
             self.inner.deserialize()
         }
     }
@@ -270,8 +272,8 @@ pub mod binary {
         // }
     }
 
-    impl super::Reader for Reader {
-        pub fn records(&mut self) -> RecordIterator<R> {
+    impl<'a, R: io::Read> super::Reader<'a, Record, RecordIterator<'a, R>> for Reader<R> {
+        fn records(&'a mut self) -> RecordIterator<'a, R> {
             RecordIterator {
                 reader: self, i: 0
             }

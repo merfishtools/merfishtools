@@ -32,6 +32,9 @@ extern crate serde;
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_with;
+extern crate failure;
+#[macro_use]
+extern crate failure_derive;
 
 pub mod model;
 pub mod io;
