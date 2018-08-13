@@ -119,6 +119,7 @@ pub mod binary {
     use bincode;
     use std::path::Path;
     use io::merfishdata::MerfishRecord;
+    use failure::Error;
 
     /// Header of a binary merfish file.
     #[derive(Serialize, Deserialize, Debug)]
@@ -207,40 +208,41 @@ pub mod binary {
         fn hamming_dist(&self) -> u8 { 1 - self.is_exact }
     }
 
+    #[derive(Debug, Fail)]
+    pub enum ReaderError {
+        #[fail(display = "unsupported version: {}", version)]
+        UnsupportedVersion {
+            version: u8,
+        },
+        #[fail(display = "header is corrupt, i.e. might not have been written properly (while in append mode)")]
+        Corrupt
+    }
+
     pub struct Reader<R: io::Read> {
         reader: io::BufReader<R>,
         header: Header,
-        item: usize,
     }
-
-    pub trait Captures<'a> {}
-
-    impl<'a, T: ?Sized> Captures<'a> for T {}
 
     impl<R: io::Read> Reader<R> {
         /// Constructs a new `merfish::Reader<R>` where `R: io::Read`.
         ///
         /// This will read the header in order to check if the version matches.
-        pub fn new(reader: R) -> Result<Self, &'static str> {
+        pub fn new(reader: R) -> Result<Self, Error> {
             let mut reader = io::BufReader::new(reader);
             let header: Result<Header, _> = bincode::deserialize_from(&mut reader);
             match header {
-                Ok(ref header) if header.version != 1 => Err("Unsupported version {}"),
-                Ok(ref header) if header.is_corrupt != 0 => Err("Header is corrupt, i.e. might not have been written properly (while in append mode)"),
+                Ok(ref header) if header.version != 1 => Err(ReaderError::UnsupportedVersion{ version: header.version })?,
+                Ok(ref header) if header.is_corrupt != 0 => Err(ReaderError::Corrupt)?,
                 Ok(header) => {
                     // Read (discard) table header
                     let mut header_buf = vec![0u8; header.header_length as usize];
-                    let r = reader.read_exact(&mut header_buf);
-                    match r {
-                        Err(_) => Err("Failed reading table header"),
-                        Ok(()) => Ok(Reader {
-                            reader,
-                            header,
-                            item: 0,
-                        })
-                    }
+                    reader.read_exact(&mut header_buf)?;
+                    Ok(Reader {
+                        reader,
+                        header
+                    })
                 }
-                Err(_) => Err("Failed reading header")
+                Err(e) => Err(e)?
             }
         }
 
@@ -261,23 +263,6 @@ pub mod binary {
                     )
             }
         }
-
-        // pub fn records<'a>(&'a mut self) -> impl Iterator<Item=io::Result<Record>> + Captures<'a> {
-        // //pub fn records(&mut self) -> impl Iterator<Item=io::Result<Record>> {
-        //     (0..self.header.num_entries).map(|i| {
-        //         match bincode::deserialize_from::<_, Record>(&mut self.reader) {
-        //             Ok(record) => {
-        //                 Ok(record)
-        //             }
-        //             // TODO: propagate bincode's Error
-        //             Err(_) =>
-        //                 Err(io::Error::new(
-        //                     io::ErrorKind::Other,
-        //                     format!("Failed deserializing record {} from reader.", 0), )
-        //                 )
-        //         }
-        //     })
-        // }
     }
 
     impl<'a, R: io::Read + 'a> super::Reader<'a> for Reader<R> {

@@ -12,6 +12,7 @@ extern crate itertools;
 extern crate log;
 extern crate merfishtools;
 extern crate ordered_float;
+extern crate failure;
 
 use bio::stats::Prob;
 use clap::App;
@@ -22,10 +23,11 @@ use merfishtools::io::merfishdata;
 use ordered_float::NotNaN;
 use std::process;
 use std::io;
+use failure::Error;
 
 
 #[allow(non_snake_case)]
-fn main() {
+fn main() -> Result<(), Error> {
     let yaml = load_yaml!("../cli.yaml");
     let matches = App::from_yaml(yaml)
         .version(env!("CARGO_PKG_VERSION"))
@@ -71,26 +73,22 @@ fn main() {
             }
         };
 
-        fn expression<R>(reader: R) {
-            cli::expression(
-                &convert_err_rates(p0),
-                &convert_err_rates(p1),
-                &mut reader,
-                &codebook_path,
-                estimate_path,
-                stats_path,
-                threads,
-                &cells,
-                window_width,
-                seed,
-            )
+        let expression = cli::ExpressionBuilder::default().p0(convert_err_rates(p0))
+                                                          .p1(convert_err_rates(p1))
+                                                          .codebook_path(codebook_path)
+                                                          .estimate_path(estimate_path)
+                                                          .stats_path(stats_path)
+                                                          .threads(threads)
+                                                          .cells(Regex::new(cells).unwrap())
+                                                          .window_width(window_width)
+                                                          .seed(seed).build()?;
+        if is_binary_input {
+          expression.load_counts(&mut merfishdata::binary::Reader::new(io::stdin())?)?;
+        } else {
+          expression.load_counts(&mut merfishdata::tsv::Reader::new(io::stdin()))?;
         }
 
-        if is_binary_input {
-            expression(merfishdata::binary::Reader::new(io::stdin()).unwrap())
-        } else {
-            expression(merfishdata::tsv::Reader::new(io::stdin()))
-        }
+        expression.infer()
     } else if let Some(matches) = matches.subcommand_matches("diffexp") {
         let group1_path = matches.value_of("group1").unwrap();
         let group2_path = matches.value_of("group2").unwrap();
