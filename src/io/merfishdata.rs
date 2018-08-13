@@ -3,9 +3,10 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::io;
-
 use failure::Error;
+
+use failure::Fail;
+use csv;
 
 pub trait MerfishRecord {
     fn cell_id(&self) -> u32;
@@ -17,7 +18,7 @@ pub trait MerfishRecord {
 }
 
 
-pub trait Reader<'a, M: MerfishRecord, I: Iterator<Item=Result<M, Error>> + 'a> {
+pub trait Reader<'a, M: MerfishRecord, F: Fail, I: Iterator<Item=Result<M, F>> + 'a> {
     fn records(&'a mut self) -> I;
 }
 
@@ -96,9 +97,9 @@ pub mod tsv {
         }
     }
 
-    impl<'a, R: io::Read> super::Reader<'a, Record, csv::DeserializeRecordsIter<'a, R, Record>> for Reader<R> {
+    impl<'a, R: io::Read> super::Reader<'a, Record, csv::Error, csv::DeserializeRecordsIter<'a, R, Record>> for Reader<R> {
 
-        fn records(&mut self) -> csv::DeserializeRecordsIter<'a, R, Record> {
+        fn records(&'a mut self) -> csv::DeserializeRecordsIter<'a, R, Record> {
             self.inner.deserialize()
         }
     }
@@ -272,7 +273,7 @@ pub mod binary {
         // }
     }
 
-    impl<'a, R: io::Read> super::Reader<'a, Record, RecordIterator<'a, R>> for Reader<R> {
+    impl<'a, R: io::Read> super::Reader<'a, Record, io::Error, RecordIterator<'a, R>> for Reader<R> {
         fn records(&'a mut self) -> RecordIterator<'a, R> {
             RecordIterator {
                 reader: self, i: 0

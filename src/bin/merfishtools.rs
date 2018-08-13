@@ -71,7 +71,7 @@ fn main() {
             }
         };
 
-        let expression = |reader| {
+        fn expression<R>(reader: R) {
             cli::expression(
                 &convert_err_rates(p0),
                 &convert_err_rates(p1),
@@ -84,7 +84,7 @@ fn main() {
                 window_width,
                 seed,
             )
-        };
+        }
 
         if is_binary_input {
             expression(merfishdata::binary::Reader::new(io::stdin()).unwrap())

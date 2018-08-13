@@ -33,7 +33,7 @@ pub fn parse_codeword(codeword: &[u8]) -> Codeword {
 
 
 /// A codebook record.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Record {
     name: String,
     codeword: BitVec<u32>,
@@ -102,6 +102,7 @@ pub type FeatureID = usize;
 
 /// Codebook representation.\
 #[allow(non_snake_case)]
+#[derive(Clone, Debug)]
 pub struct Codebook {
     index: HashMap<String, FeatureID>,
     graph: UnGraph<Record, ()>,
