@@ -18,7 +18,11 @@ pub trait MerfishRecord {
 }
 
 
-pub trait Reader<'a, M: MerfishRecord, F: Fail, I: Iterator<Item=Result<M, F>> + 'a> {
+pub trait Reader<'a, I> where
+I: Iterator<Item=Result<Self::Record, Self::Error>> + 'a {
+    type Record: MerfishRecord;
+    type Error: Fail;
+
     fn records(&'a mut self) -> I;
 }
 
@@ -97,7 +101,9 @@ pub mod tsv {
         }
     }
 
-    impl<'a, R: io::Read> super::Reader<'a, Record, csv::Error, csv::DeserializeRecordsIter<'a, R, Record>> for Reader<R> {
+    impl<'a, R: io::Read> super::Reader<'a, csv::DeserializeRecordsIter<'a, R, Record>> for Reader<R> {
+        type Record = Record;
+        type Error = csv::Error;
 
         fn records(&'a mut self) -> csv::DeserializeRecordsIter<'a, R, Record> {
             self.inner.deserialize()
@@ -273,7 +279,10 @@ pub mod binary {
         // }
     }
 
-    impl<'a, R: io::Read> super::Reader<'a, Record, io::Error, RecordIterator<'a, R>> for Reader<R> {
+    impl<'a, R: io::Read> super::Reader<'a, RecordIterator<'a, R>> for Reader<R> {
+        type Record = Record;
+        type Error = io::Error;
+
         fn records(&'a mut self) -> RecordIterator<'a, R> {
             RecordIterator {
                 reader: self, i: 0

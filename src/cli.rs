@@ -57,8 +57,9 @@ pub struct Selection {
 
 #[derive(Builder)]
 #[builder(pattern = "owned")]
-pub struct Expression<'a, M, F, I, R: io::merfishdata::Reader<'a, M, F, I>> where
-M: io::merfishdata::MerfishRecord, F: Fail, I: Iterator<Item=Result<M, F>> + 'a
+pub struct Expression<'a, I, R> where
+R: io::merfishdata::Reader<'a, I>,
+I: Iterator<Item=Result<R::Record, R::Error>> + 'a
 {
     p0: Vec<Prob>,
     p1: Vec<Prob>,
@@ -70,14 +71,13 @@ M: io::merfishdata::MerfishRecord, F: Fail, I: Iterator<Item=Result<M, F>> + 'a
     cells: Regex,
     window_width: u32,
     seed: usize,
-    phantom_m: PhantomData<M>,
-    phantom_f: PhantomData<F>,
-    phantom_I: PhantomData<I>
+    phantom_I: PhantomData<&'a I>
 }
 
 
-impl<'a, M, F, I, R: io::merfishdata::Reader<'a, M, F, I>> Expression<'a, M, F, I, R> where
-M: io::merfishdata::MerfishRecord, F: Fail, I: Iterator<Item=Result<M, F>> + 'a
+impl<'a, I, R> Expression<'a, I, R> where
+R: io::merfishdata::Reader<'a, I>,
+I: Iterator<Item=Result<R::Record, R::Error>> + 'a
 {
     pub fn run(&mut self) -> Result<(), Error> {
 
@@ -86,7 +86,7 @@ M: io::merfishdata::MerfishRecord, F: Fail, I: Iterator<Item=Result<M, F>> + 'a
 
 
 /// Estimate expressions.
-pub fn expression<'a, M, F, I, R: io::merfishdata::Reader<'a, M, F, I>>(
+pub fn expression<'a, I, R>(
     p0: &[Prob],
     p1: &[Prob],
     reader: &'a mut R,
@@ -98,7 +98,8 @@ pub fn expression<'a, M, F, I, R: io::merfishdata::Reader<'a, M, F, I>>(
     window_width: u32,
     seed: usize
 )
-where M: io::merfishdata::MerfishRecord, F: Fail, I: Iterator<Item=Result<M, F>> + 'a
+where R: io::merfishdata::Reader<'a, I>,
+I: Iterator<Item=Result<R::Record, R::Error>> + 'a
 {
     let codebook = io::codebook::Codebook::from_file(codebook_path).unwrap();
     let mut cdf_writer = io::cdf::expression::Writer::from_writer(std::io::stdout());
