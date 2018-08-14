@@ -1,17 +1,15 @@
-use ordered_float::NotNaN;
-use num::rational;
 use itertools::Itertools;
+use num::rational;
+use ordered_float::NotNaN;
 
 use bio::stats::probs;
 
 use model;
 
-
 pub type LogFC = NotNaN<f64>;
 pub type FC = rational::Ratio<u64>;
 
 pub type CDF = probs::cdf::CDF<LogFC>;
-
 
 /// PMF of log2 fold change of a vs b. Specifically, we calculate log2((mean(a) + c) / (mean(b) + c))
 pub fn cdf(a: &model::expressionset::CDF, b: &model::expressionset::CDF) -> CDF {
@@ -25,12 +23,14 @@ pub fn cdf(a: &model::expressionset::CDF, b: &model::expressionset::CDF) -> CDF 
             let b_mean = *b.value;
             // the PMFs should not contain NaNs.
             let log2fc = NotNaN::new((a_mean).log2() - (b_mean).log2()).unwrap();
-            pmf.push(probs::cdf::Entry { value: log2fc, prob: a.prob + b.prob });
+            pmf.push(probs::cdf::Entry {
+                value: log2fc,
+                prob: a.prob + b.prob,
+            });
         }
     }
     CDF::from_pmf(pmf).reduce().sample(100)
 }
-
 
 // #[cfg(test)]
 // mod tests {

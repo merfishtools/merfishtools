@@ -1,11 +1,11 @@
-pub mod readout;
+pub mod cv;
+pub mod diffexp;
 pub mod expression;
 pub mod expressionset;
-pub mod diffexp;
 pub mod foldchange;
 pub mod meanvar;
-pub mod cv;
 pub mod pmf;
+pub mod readout;
 
 use bio::stats::LogProb;
 

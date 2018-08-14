@@ -6,24 +6,23 @@
 extern crate bio;
 #[macro_use]
 extern crate clap;
+extern crate failure;
 extern crate fern;
 extern crate itertools;
 extern crate log;
 extern crate merfishtools;
 extern crate ordered_float;
-extern crate failure;
 extern crate regex;
 
 use bio::stats::Prob;
 use clap::App;
+use failure::Error;
 use itertools::Itertools;
 use merfishtools::cli;
 use merfishtools::codebook;
 use merfishtools::io::merfishdata;
 use ordered_float::NotNaN;
-use failure::Error;
 use regex::Regex;
-
 
 #[allow(non_snake_case)]
 fn main() -> Result<(), Error> {
@@ -33,19 +32,23 @@ fn main() -> Result<(), Error> {
         .get_matches();
 
     let logger_config = fern::DispatchConfig {
-        format: Box::new(|msg: &str, level: &log::LogLevel, _: &log::LogLocation| {
-            match *level {
+        format: Box::new(
+            |msg: &str, level: &log::LogLevel, _: &log::LogLocation| match *level {
                 log::LogLevel::Debug => format!("DEBUG: {}", msg),
-                _ => msg.to_owned()
-            }
-        }),
+                _ => msg.to_owned(),
+            },
+        ),
         output: vec![fern::OutputConfig::stderr()],
         level: log::LogLevelFilter::Debug,
     };
 
     if let Err(e) = fern::init_global_logger(
         logger_config,
-        if matches.is_present("verbose") { log::LogLevelFilter::Debug } else { log::LogLevelFilter::Info },
+        if matches.is_present("verbose") {
+            log::LogLevelFilter::Debug
+        } else {
+            log::LogLevelFilter::Info
+        },
     ) {
         panic!("Failed to initialize logger: {}", e);
     }
@@ -67,25 +70,29 @@ fn main() -> Result<(), Error> {
             if values.len() == 1 {
                 vec![Prob::checked(values[0]).unwrap(); 32]
             } else {
-                values.into_iter().map(|p| {
-                    Prob::checked(p).unwrap()
-                }).collect_vec()
+                values
+                    .into_iter()
+                    .map(|p| Prob::checked(p).unwrap())
+                    .collect_vec()
             }
         };
 
-        let mut expression = cli::ExpressionBuilder::default().p0(convert_err_rates(p0))
-                                                          .p1(convert_err_rates(p1))
-                                                          .codebook_path(codebook_path.to_owned())
-                                                          .estimate_path(estimate_path.map(|v| v.to_owned()))
-                                                          .stats_path(stats_path.map(|v| v.to_owned()))
-                                                          .threads(threads)
-                                                          .cells(Regex::new(cells)?)
-                                                          .window_width(window_width)
-                                                          .seed(seed).build().unwrap();
+        let mut expression = cli::ExpressionBuilder::default()
+            .p0(convert_err_rates(p0))
+            .p1(convert_err_rates(p1))
+            .codebook_path(codebook_path.to_owned())
+            .estimate_path(estimate_path.map(|v| v.to_owned()))
+            .stats_path(stats_path.map(|v| v.to_owned()))
+            .threads(threads)
+            .cells(Regex::new(cells)?)
+            .window_width(window_width)
+            .seed(seed)
+            .build()
+            .unwrap();
         if is_binary_input {
-          expression.load_counts(&mut merfishdata::binary::Reader::from_file(raw_data)?)?;
+            expression.load_counts(&mut merfishdata::binary::Reader::from_file(raw_data)?)?;
         } else {
-          expression.load_counts(&mut merfishdata::tsv::Reader::from_file(raw_data)?)?;
+            expression.load_counts(&mut merfishdata::tsv::Reader::from_file(raw_data)?)?;
         }
 
         expression.infer()
@@ -93,19 +100,34 @@ fn main() -> Result<(), Error> {
         let group1_path = matches.value_of("group1").unwrap();
         let group2_path = matches.value_of("group2").unwrap();
         let cdf_path = matches.value_of("cdf");
-        let max_fc = NotNaN::new(value_t!(matches, "max-null-log2fc", f64).unwrap_or(1.0)).expect("NaN not allowed for --max-null-log2fc.");
+        let max_fc = NotNaN::new(value_t!(matches, "max-null-log2fc", f64).unwrap_or(1.0))
+            .expect("NaN not allowed for --max-null-log2fc.");
         let pseudocounts = value_t!(matches, "pseudocounts", f64).unwrap_or(1.0);
         let threads = value_t!(matches, "threads", usize).unwrap_or(1);
 
-        cli::differential_expression(&group1_path, &group2_path, cdf_path, max_fc, pseudocounts, threads)
+        cli::differential_expression(
+            &group1_path,
+            &group2_path,
+            cdf_path,
+            max_fc,
+            pseudocounts,
+            threads,
+        )
     } else if let Some(matches) = matches.subcommand_matches("multidiffexp") {
         let group_paths = matches.values_of("groups").unwrap();
         let cdf_path = matches.value_of("cdf");
-        let max_cv = NotNaN::new(value_t!(matches, "max-null-cv", f64).unwrap_or(0.5)).expect("NaN not allowed for --max-null-cv.");
+        let max_cv = NotNaN::new(value_t!(matches, "max-null-cv", f64).unwrap_or(0.5))
+            .expect("NaN not allowed for --max-null-cv.");
         let pseudocounts = value_t!(matches, "pseudocounts", f64).unwrap_or(1.0);
         let threads = value_t!(matches, "threads", usize).unwrap_or(1);
 
-        cli::multi_differential_expression(&group_paths.collect_vec(), cdf_path, max_cv, pseudocounts, threads)
+        cli::multi_differential_expression(
+            &group_paths.collect_vec(),
+            cdf_path,
+            max_cv,
+            pseudocounts,
+            threads,
+        )
     } else if let Some(matches) = matches.subcommand_matches("gen-mhd4") {
         let m = value_t!(matches, "onebits", u8).unwrap();
         let not_expressed_pattern = matches.value_of("not-expressed");

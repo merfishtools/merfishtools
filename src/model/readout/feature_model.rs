@@ -1,17 +1,16 @@
 use std::cell::RefCell;
 use std::cmp;
 
+use itertools::Itertools;
 use rand;
 use rand::Rng;
-use itertools::Itertools;
 use rgsl::randist::multinomial::multinomial_pdf;
 
-use bio::stats::{Prob, LogProb};
+use bio::stats::{LogProb, Prob};
 
 use io::codebook::{Codebook, FeatureID};
 
-use model::readout::{Expressions, Counts, Miscalls, Xi};
-
+use model::readout::{Counts, Expressions, Miscalls, Xi};
 
 pub trait AbstractFeatureModel {
     /// FeatureID of this feature.
@@ -27,7 +26,7 @@ pub trait AbstractFeatureModel {
     fn event_count_non_dropout(
         &self,
         miscalls_exact: &Miscalls,
-        miscalls_mismatch: &Miscalls
+        miscalls_mismatch: &Miscalls,
     ) -> u32;
 
     /// Dropout probability.
@@ -47,7 +46,7 @@ pub trait AbstractFeatureModel {
         expressions: &Expressions,
         miscalls_exact: &mut Miscalls,
         miscalls_mismatch: &mut Miscalls,
-        rng: &mut rand::StdRng
+        rng: &mut rand::StdRng,
     ) {
         let x = expressions[self.feature_id()];
 
@@ -67,15 +66,16 @@ pub trait AbstractFeatureModel {
             let n = self.neighbors()[i];
             let miscall_exact = self.prob_miscall_exact(i) * x as f64;
             miscalls_exact.set(
-                self.feature_id(), n, stochastic_round(miscall_exact), &mut rest
+                self.feature_id(),
+                n,
+                stochastic_round(miscall_exact),
+                &mut rest,
             );
 
             if self.min_dist() == 4 {
                 let miscall_mismatch = self.prob_miscall_mismatch(i) * x as f64;
                 let miscall_mismatch = stochastic_round(miscall_mismatch);
-                miscalls_mismatch.set(
-                    self.feature_id(), n, miscall_mismatch, &mut rest
-                );
+                miscalls_mismatch.set(self.feature_id(), n, miscall_mismatch, &mut rest);
             }
         }
     }
@@ -86,7 +86,7 @@ pub trait AbstractFeatureModel {
         &self,
         expressions: &mut Expressions,
         miscalls_exact: &Miscalls,
-        miscalls_mismatch: &Miscalls
+        miscalls_mismatch: &Miscalls,
     ) -> i32 {
         let event_count = self.event_count_non_dropout(miscalls_exact, miscalls_mismatch);
 
@@ -94,7 +94,7 @@ pub trait AbstractFeatureModel {
             (event_count as f64 / (1.0 - self.prob_dropout())).floor() as u32,
             // or at least as many as we have events coming from this feature
             // TODO does this allow x to decrease properly?
-            event_count
+            event_count,
         );
 
         let x = expressions.get_mut(self.feature_id()).unwrap();
@@ -107,24 +107,17 @@ pub trait AbstractFeatureModel {
     }
 }
 
-
 pub struct FeatureModel {
     pub(crate) feature_id: FeatureID,
     event_probs: Vec<f64>,
     neighbors: Vec<FeatureID>,
     min_dist: u8,
     pub(crate) counts: Counts,
-    event_counts: RefCell<Vec<u32>>
+    event_counts: RefCell<Vec<u32>>,
 }
 
-
 impl FeatureModel {
-    pub fn new(
-        feature: FeatureID,
-        counts: Counts,
-        codebook: &Codebook,
-        xi: &Xi
-    ) -> Self {
+    pub fn new(feature: FeatureID, counts: Counts, codebook: &Codebook, xi: &Xi) -> Self {
         assert!(
             codebook.min_dist == 2 || codebook.min_dist == 4,
             "unsupported hamming distance: {}, supported: 2, 4",
@@ -152,20 +145,26 @@ impl FeatureModel {
         let mut neighbors = neighbors_4.clone();
         neighbors.extend(&neighbors_2);
 
-        let xi_miscall_4 = codebook.neighbors(feature, 4).iter().map(|&n| {
-            xi.prob(feature_record.codeword(), codebook.record(n).codeword())
-        }).collect_vec();
+        let xi_miscall_4 = codebook
+            .neighbors(feature, 4)
+            .iter()
+            .map(|&n| xi.prob(feature_record.codeword(), codebook.record(n).codeword()))
+            .collect_vec();
         let xi_miscall_2 = if codebook.min_dist == 2 {
-            codebook.neighbors(feature, 2).iter().map(|&n| {
-                xi.prob(feature_record.codeword(), codebook.record(n).codeword())
-            }).collect_vec()
+            codebook
+                .neighbors(feature, 2)
+                .iter()
+                .map(|&n| xi.prob(feature_record.codeword(), codebook.record(n).codeword()))
+                .collect_vec()
         } else {
             vec![]
         };
 
-        let prob_miscall_exact = xi_miscall_4.iter().map(|xi| {
-            xi[0]
-        }).chain(xi_miscall_2.iter().map(|xi| xi[0])).collect_vec();
+        let prob_miscall_exact = xi_miscall_4
+            .iter()
+            .map(|xi| xi[0])
+            .chain(xi_miscall_2.iter().map(|xi| xi[0]))
+            .collect_vec();
 
         let prob_miscall_mismatch = if codebook.min_dist == 4 {
             xi_miscall_4.iter().map(|xi| xi[1]).collect_vec()
@@ -183,7 +182,7 @@ impl FeatureModel {
         let mut event_probs = vec![
             *Prob::from(prob_call_exact),
             *Prob::from(prob_call_mismatch),
-            *Prob::from(prob_total.ln_one_minus_exp())
+            *Prob::from(prob_total.ln_one_minus_exp()),
         ];
         event_probs.extend(prob_miscall_exact.iter().map(|&p| *Prob::from(p)));
         event_probs.extend(prob_miscall_mismatch.iter().map(|&p| *Prob::from(p)));
@@ -194,7 +193,7 @@ impl FeatureModel {
             neighbors,
             min_dist: codebook.min_dist,
             counts,
-            event_counts: RefCell::new(Vec::new())
+            event_counts: RefCell::new(Vec::new()),
         }
     }
 
@@ -203,7 +202,7 @@ impl FeatureModel {
         &self,
         x: u32,
         miscalls_exact: &Miscalls,
-        miscalls_mismatch: &Miscalls
+        miscalls_mismatch: &Miscalls,
     ) -> LogProb {
         let count_exact_miscalled = miscalls_exact.total_to(self.feature_id);
         let count_mismatch_miscalled = miscalls_mismatch.total_to(self.feature_id);
@@ -214,10 +213,13 @@ impl FeatureModel {
         if self.counts.mismatch < count_mismatch_miscalled {
             panic!("bug: likelihood cannot be calculated if mismatch miscalls exceed counts: counts={}, miscalls={}", self.counts.mismatch, count_mismatch_miscalled);
         }
-        let total_count = self.counts.exact - count_exact_miscalled +
-                          self.counts.mismatch - count_mismatch_miscalled;
+        let total_count = self.counts.exact - count_exact_miscalled + self.counts.mismatch
+            - count_mismatch_miscalled;
         if total_count > x {
-            panic!("bug: event count exceeds expression: x={}, event count={}", x, total_count);
+            panic!(
+                "bug: event count exceeds expression: x={}, event count={}",
+                x, total_count
+            );
         }
 
         let calls_exact = self.counts.exact - count_exact_miscalled;
@@ -229,48 +231,61 @@ impl FeatureModel {
             event_counts.clear();
             event_counts.push(
                 // exact calls
-                calls_exact
+                calls_exact,
             );
             event_counts.push(
                 // mismatch calls
-                calls_mismatch
+                calls_mismatch,
             );
             event_counts.push(
                 // dropouts (fill in later)
-                0
+                0,
             );
             // miscalls
-            event_counts.extend(self.neighbors.iter().map(
-                |&n| miscalls_exact.get(self.feature_id, n)
-            ));
+            event_counts.extend(
+                self.neighbors
+                    .iter()
+                    .map(|&n| miscalls_exact.get(self.feature_id, n)),
+            );
             if self.min_dist == 4 {
                 event_counts.extend(
-                    self.neighbors.iter().map(
-                        |&n| miscalls_mismatch.get(self.feature_id, n)
-                    )
+                    self.neighbors
+                        .iter()
+                        .map(|&n| miscalls_mismatch.get(self.feature_id, n)),
                 );
             }
 
             // set dropouts
             let total_counts = event_counts.iter().sum();
-            assert!(x >= total_counts, "total event counts exceed expression: x={} {:?}", x, event_counts);
+            assert!(
+                x >= total_counts,
+                "total event counts exceed expression: x={} {:?}",
+                x,
+                event_counts
+            );
             let dropouts = x - total_counts;
             event_counts[2] = dropouts;
         }
 
-        LogProb::from(Prob(
-            multinomial_pdf(&self.event_probs, &self.event_counts.borrow())
-        ))
+        LogProb::from(Prob(multinomial_pdf(
+            &self.event_probs,
+            &self.event_counts.borrow(),
+        )))
     }
 
     /// Minimum expression given fixed miscalls.
     pub fn min_expression(&self, miscalls_exact: &Miscalls, miscalls_mismatch: &Miscalls) -> u32 {
-        self.counts.exact.saturating_sub(miscalls_exact.total_to(self.feature_id)) +
-        self.counts.mismatch.saturating_sub(miscalls_mismatch.total_to(self.feature_id)) +
-        miscalls_exact.total_from(self.feature_id) + miscalls_mismatch.total_from(self.feature_id)
+        self.counts
+            .exact
+            .saturating_sub(miscalls_exact.total_to(self.feature_id))
+            + self
+                .counts
+                .mismatch
+                .saturating_sub(miscalls_mismatch.total_to(self.feature_id))
+            + miscalls_exact.total_from(self.feature_id)
+            + miscalls_mismatch.total_from(self.feature_id)
     }
 }
-
 
 impl AbstractFeatureModel for FeatureModel {
     fn feature_id(&self) -> FeatureID {
@@ -288,18 +303,21 @@ impl AbstractFeatureModel for FeatureModel {
     fn event_count_non_dropout(
         &self,
         miscalls_exact: &Miscalls,
-        miscalls_mismatch: &Miscalls
+        miscalls_mismatch: &Miscalls,
     ) -> u32 {
-        let calls_exact = self.counts.exact.saturating_sub(
-            miscalls_exact.total_to(self.feature_id)
-        );
-        let calls_mismatch = self.counts.mismatch.saturating_sub(
-            miscalls_mismatch.total_to(self.feature_id)
-        );
+        let calls_exact = self
+            .counts
+            .exact
+            .saturating_sub(miscalls_exact.total_to(self.feature_id));
+        let calls_mismatch = self
+            .counts
+            .mismatch
+            .saturating_sub(miscalls_mismatch.total_to(self.feature_id));
 
-        calls_exact + calls_mismatch +
-        miscalls_exact.total_from(self.feature_id) +
-        miscalls_mismatch.total_from(self.feature_id)
+        calls_exact
+            + calls_mismatch
+            + miscalls_exact.total_from(self.feature_id)
+            + miscalls_mismatch.total_from(self.feature_id)
     }
 
     fn prob_dropout(&self) -> f64 {
@@ -315,8 +333,6 @@ impl AbstractFeatureModel for FeatureModel {
     }
 }
 
-
-
 pub struct NoiseModel {
     pub(crate) feature_id: FeatureID,
     pub(crate) not_expressed_feature_ids: Vec<FeatureID>,
@@ -328,14 +344,13 @@ pub struct NoiseModel {
     min_dist: u8,
 }
 
-
 impl NoiseModel {
     pub fn new(
         feature_id: FeatureID,
         not_expressed_feature_ids: Vec<FeatureID>,
         not_expressed_counts: Vec<Counts>,
         codebook: &Codebook,
-        xi: &Xi
+        xi: &Xi,
     ) -> Self {
         assert!(
             codebook.min_dist == 2 || codebook.min_dist == 4,
@@ -344,16 +359,28 @@ impl NoiseModel {
         );
 
         // miscalls generated from noise
-        let xi_miscall = codebook.records().iter().filter_map(|feat_rec| {
-            if feat_rec.expressed() {
-                Some(xi.prob(codebook.noise().codeword(), feat_rec.codeword()))
-            } else { None }
-        }).collect_vec();
-        let neighbors = codebook.records().iter().filter_map(|rec| {
-            if rec.expressed() {
-                Some(codebook.get_id(rec.name()))
-            } else { None }
-        }).collect_vec();
+        let xi_miscall = codebook
+            .records()
+            .iter()
+            .filter_map(|feat_rec| {
+                if feat_rec.expressed() {
+                    Some(xi.prob(codebook.noise().codeword(), feat_rec.codeword()))
+                } else {
+                    None
+                }
+            })
+            .collect_vec();
+        let neighbors = codebook
+            .records()
+            .iter()
+            .filter_map(|rec| {
+                if rec.expressed() {
+                    Some(codebook.get_id(rec.name()))
+                } else {
+                    None
+                }
+            })
+            .collect_vec();
 
         let probs_miscall_exact = xi_miscall.iter().map(|xi| xi[0]).collect_vec();
         let probs_miscall_mismatch = if codebook.min_dist == 4 {
@@ -366,38 +393,42 @@ impl NoiseModel {
         let prob_total_miscall_mismatch = LogProb::ln_sum_exp(&probs_miscall_mismatch);
 
         // probs for calls of not expressed features
-        let xi_not_expressed = not_expressed_feature_ids.iter().map(|&f| {
-            xi.prob(codebook.noise().codeword(), codebook.record(f).codeword())
-        }).collect_vec();
+        let xi_not_expressed = not_expressed_feature_ids
+            .iter()
+            .map(|&f| xi.prob(codebook.noise().codeword(), codebook.record(f).codeword()))
+            .collect_vec();
 
-        let prob_not_expressed_exact = LogProb::ln_sum_exp(
-            &xi_not_expressed.iter().map(|xi| xi[0]).collect_vec()
-        );
-        let prob_not_expressed_mismatch = LogProb::ln_sum_exp(
-            &xi_not_expressed.iter().map(|xi| xi[1]).collect_vec()
-        );
+        let prob_not_expressed_exact =
+            LogProb::ln_sum_exp(&xi_not_expressed.iter().map(|xi| xi[0]).collect_vec());
+        let prob_not_expressed_mismatch =
+            LogProb::ln_sum_exp(&xi_not_expressed.iter().map(|xi| xi[1]).collect_vec());
 
         // dropout
         let prob_dropout = LogProb::ln_sum_exp(&[
             prob_not_expressed_exact,
             prob_not_expressed_mismatch,
             prob_total_miscall_exact,
-            prob_total_miscall_mismatch
+            prob_total_miscall_mismatch,
         ]).ln_one_minus_exp();
 
         NoiseModel {
             feature_id,
             not_expressed_feature_ids,
             not_expressed_counts,
-            probs_miscall_exact: probs_miscall_exact.iter().map(|&p| Prob::from(p)).collect_vec(),
-            probs_miscall_mismatch: probs_miscall_mismatch.iter().map(|&p| Prob::from(p)).collect_vec(),
+            probs_miscall_exact: probs_miscall_exact
+                .iter()
+                .map(|&p| Prob::from(p))
+                .collect_vec(),
+            probs_miscall_mismatch: probs_miscall_mismatch
+                .iter()
+                .map(|&p| Prob::from(p))
+                .collect_vec(),
             prob_dropout: Prob::from(prob_dropout),
             neighbors,
-            min_dist: codebook.min_dist
+            min_dist: codebook.min_dist,
         }
     }
 }
-
 
 impl AbstractFeatureModel for NoiseModel {
     fn feature_id(&self) -> FeatureID {
@@ -415,18 +446,25 @@ impl AbstractFeatureModel for NoiseModel {
     fn event_count_non_dropout(
         &self,
         miscalls_exact: &Miscalls,
-        miscalls_mismatch: &Miscalls
+        miscalls_mismatch: &Miscalls,
     ) -> u32 {
         let mut calls_exact = 0;
         let mut calls_mismatch = 0;
-        for (&id, counts) in self.not_expressed_feature_ids.iter().zip(&self.not_expressed_counts) {
+        for (&id, counts) in self
+            .not_expressed_feature_ids
+            .iter()
+            .zip(&self.not_expressed_counts)
+        {
             calls_exact += counts.exact.saturating_sub(miscalls_exact.total_to(id));
-            calls_mismatch += counts.mismatch.saturating_sub(miscalls_mismatch.total_to(id));
+            calls_mismatch += counts
+                .mismatch
+                .saturating_sub(miscalls_mismatch.total_to(id));
         }
 
-        calls_exact + calls_mismatch +
-            miscalls_exact.total_from(self.feature_id) +
-            miscalls_mismatch.total_from(self.feature_id)
+        calls_exact
+            + calls_mismatch
+            + miscalls_exact.total_from(self.feature_id)
+            + miscalls_mismatch.total_from(self.feature_id)
     }
 
     fn prob_dropout(&self) -> f64 {

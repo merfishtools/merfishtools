@@ -7,7 +7,6 @@ use model;
 pub type MeanExpression = NotNaN<f64>;
 pub type CDF = probs::cdf::CDF<MeanExpression>;
 
-
 pub fn cdf(expression_cdfs: &[model::expression::NormalizedCDF], pseudocounts: f64) -> CDF {
     let pseudocounts = NotNaN::new(pseudocounts).unwrap();
 
@@ -20,10 +19,9 @@ pub fn cdf(expression_cdfs: &[model::expression::NormalizedCDF], pseudocounts: f
     }
 
     let cdf = model::meanvar::cdf(expression_cdfs, |mean, _| mean + pseudocounts);
-    assert_relative_eq!(cdf.total_prob().exp(), 1.0, epsilon=0.001);
+    assert_relative_eq!(cdf.total_prob().exp(), 1.0, epsilon = 0.001);
     cdf.reduce().sample(1000)
 }
-
 
 // #[cfg(test)]
 // mod tests {

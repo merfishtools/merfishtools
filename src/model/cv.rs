@@ -9,16 +9,15 @@ use bio::stats::probs;
 
 use model;
 
-
 pub type CV = NotNaN<f64>;
 pub type CDF = probs::cdf::CDF<CV>;
 
-
 /// Calculate CDF for differential expression.
 pub fn cdf(cdfs: &[model::expressionset::CDF]) -> CDF {
-        model::meanvar::cdf(cdfs, |mean, var| NotNaN::new(var.sqrt()).unwrap() / mean).reduce().sample(100)
+    model::meanvar::cdf(cdfs, |mean, var| NotNaN::new(var.sqrt()).unwrap() / mean)
+        .reduce()
+        .sample(100)
 }
-
 
 // #[cfg(test)]
 // mod tests {

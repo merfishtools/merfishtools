@@ -3,14 +3,13 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-pub mod merfishdata;
-pub mod codebook;
 pub mod cdf;
+pub mod codebook;
 pub mod estimation;
-
+pub mod merfishdata;
 
 #[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct Cell {
     pub experiment: u32,
-    pub cell: u32
+    pub cell: u32,
 }

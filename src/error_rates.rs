@@ -1,7 +1,7 @@
 use std::f64;
 
-use ndarray::prelude::*;
 use bit_vec::BitVec;
+use ndarray::prelude::*;
 
 use bio::stats::Prob;
 
@@ -9,11 +9,10 @@ use io::codebook::Codebook;
 
 pub type Readout = BitVec;
 
-
 /// Estimate position-wise error rates as presented by Chen et al. 2015.
-pub fn estimate<I: Iterator<Item=(String, Readout)>>(
+pub fn estimate<I: Iterator<Item = (String, Readout)>>(
     codebook: &Codebook,
-    readouts: I
+    readouts: I,
 ) -> (Vec<Prob>, Vec<Prob>) {
     let _max_diff = 0.001;
     let shape = (codebook.len(), codebook.N as usize);
@@ -38,12 +37,12 @@ pub fn estimate<I: Iterator<Item=(String, Readout)>>(
                 (false, true) => {
                     observed_01_errors[(feature_id, k)] += 1.0;
                     err_count += 1;
-                },
+                }
                 (true, false) => {
                     observed_10_errors[(feature_id, k)] += 1.0;
                     err_count += 1;
-                },
-                _ => ()
+                }
+                _ => (),
             };
         }
         assert!(
@@ -69,16 +68,18 @@ pub fn estimate<I: Iterator<Item=(String, Readout)>>(
     for k in 0..codebook.N as usize {
         let p = |feat_p: &Array2<f64>, bit: bool| {
             let mut total_weight = 0.0;
-            let p = (0..codebook.len()).filter_map(|feature_id| {
-                let encoding = codebook.record(feature_id).codeword();
-                if encoding[k] != bit || exact_count[(feature_id, 0)] == 0.0 {
-                    None
-                } else {
-                    let w = feat_count[feature_id] as f64;
-                    total_weight += w;
-                    Some(feat_p[(feature_id, k)] * w)
-                }
-            }).sum::<f64>() / total_weight;
+            let p = (0..codebook.len())
+                .filter_map(|feature_id| {
+                    let encoding = codebook.record(feature_id).codeword();
+                    if encoding[k] != bit || exact_count[(feature_id, 0)] == 0.0 {
+                        None
+                    } else {
+                        let w = feat_count[feature_id] as f64;
+                        total_weight += w;
+                        Some(feat_p[(feature_id, k)] * w)
+                    }
+                })
+                .sum::<f64>() / total_weight;
             if total_weight == 0.0 {
                 panic!("no readouts to estimate error rate at position {}", k);
             }

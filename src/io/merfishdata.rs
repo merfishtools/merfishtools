@@ -14,19 +14,17 @@ pub trait MerfishRecord {
     fn hamming_dist(&self) -> u8;
 }
 
-
 pub trait Reader<'a> {
     type Record: MerfishRecord;
     type Error: Fail;
-    type Iterator: Iterator<Item=Result<Self::Record, Self::Error>> + 'a;
+    type Iterator: Iterator<Item = Result<Self::Record, Self::Error>> + 'a;
 
     fn records(&'a mut self) -> Self::Iterator;
 }
 
-
 pub mod tsv {
-    use std::io;
     use std::fs;
+    use std::io;
     use std::path::Path;
 
     use csv;
@@ -38,7 +36,6 @@ pub mod tsv {
         pub x: f32,
         pub y: f32,
     }
-
 
     /// A MERFISH raw data record.
     /// // "Cell_ID	Gene_Name	Hamming_Distance	Cell_Position_X	Cell_Position_Y	RNA_Position_X	RNA_Position_Y
@@ -64,23 +61,31 @@ pub mod tsv {
             self.cell_id.parse().expect("Failed parsing cell_id")
         }
 
-        fn cell_name(&self) -> String { self.cell_id.clone() }
+        fn cell_name(&self) -> String {
+            self.cell_id.clone()
+        }
 
-        fn cell_pos(&self) -> (f32, f32) { (self.cell_position.x, self.cell_position.y) }
+        fn cell_pos(&self) -> (f32, f32) {
+            (self.cell_position.x, self.cell_position.y)
+        }
 
-        fn feature_id(&self) -> u16 { self.feature.parse().expect("Failed parsing feature_id") }
+        fn feature_id(&self) -> u16 {
+            self.feature.parse().expect("Failed parsing feature_id")
+        }
 
-        fn feature_name(&self) -> String { self.feature.clone() }
+        fn feature_name(&self) -> String {
+            self.feature.clone()
+        }
 
-        fn hamming_dist(&self) -> u8 { self.hamming_dist }
+        fn hamming_dist(&self) -> u8 {
+            self.hamming_dist
+        }
     }
-
 
     /// A reader for MERFISH raw data.
     pub struct Reader<R: io::Read> {
-        inner: csv::Reader<R>
+        inner: csv::Reader<R>,
     }
-
 
     impl Reader<fs::File> {
         /// Read from a given file path.
@@ -89,11 +94,10 @@ pub mod tsv {
         }
     }
 
-
     impl<R: io::Read> Reader<R> {
         pub fn new(rdr: R) -> Self {
             Reader {
-                inner: csv::ReaderBuilder::new().delimiter(b'\t').from_reader(rdr)
+                inner: csv::ReaderBuilder::new().delimiter(b'\t').from_reader(rdr),
             }
         }
     }
@@ -110,13 +114,13 @@ pub mod tsv {
 }
 
 pub mod binary {
+    use bincode;
+    use failure::Error;
+    use io::merfishdata::MerfishRecord;
+    use std::fs;
     use std::io;
     use std::io::Read;
-    use std::fs;
-    use bincode;
     use std::path::Path;
-    use io::merfishdata::MerfishRecord;
-    use failure::Error;
 
     /// Header of a binary merfish file.
     #[derive(Serialize, Deserialize, Debug)]
@@ -131,7 +135,9 @@ pub mod binary {
     }
 
     impl Header {
-        pub fn version(&self) -> u8 { self.version }
+        pub fn version(&self) -> u8 {
+            self.version
+        }
         pub fn is_corrupt(&self) -> u8 {
             self.is_corrupt
         }
@@ -194,25 +200,35 @@ pub mod binary {
             self.cell_id
         }
 
-        fn cell_name(&self) -> String { self.cell_id.to_string() }
+        fn cell_name(&self) -> String {
+            self.cell_id.to_string()
+        }
 
-        fn cell_pos(&self) -> (f32, f32) { (self.abs_position[0], self.abs_position[1]) }
+        fn cell_pos(&self) -> (f32, f32) {
+            (self.abs_position[0], self.abs_position[1])
+        }
 
-        fn feature_id(&self) -> u16 { self.barcode_id }
+        fn feature_id(&self) -> u16 {
+            self.barcode_id
+        }
 
-        fn feature_name(&self) -> String { self.barcode_id.to_string() }
+        fn feature_name(&self) -> String {
+            self.barcode_id.to_string()
+        }
 
-        fn hamming_dist(&self) -> u8 { 1 - self.is_exact }
+        fn hamming_dist(&self) -> u8 {
+            1 - self.is_exact
+        }
     }
 
     #[derive(Debug, Fail)]
     pub enum ReaderError {
         #[fail(display = "unsupported version: {}", version)]
-        UnsupportedVersion {
-            version: u8,
-        },
-        #[fail(display = "header is corrupt, i.e. might not have been written properly (while in append mode)")]
-        Corrupt
+        UnsupportedVersion { version: u8 },
+        #[fail(
+            display = "header is corrupt, i.e. might not have been written properly (while in append mode)"
+        )]
+        Corrupt,
     }
 
     pub struct Reader<R: io::Read> {
@@ -228,18 +244,17 @@ pub mod binary {
             let mut reader = io::BufReader::new(reader);
             let header: Result<Header, _> = bincode::deserialize_from(&mut reader);
             match header {
-                Ok(ref header) if header.version != 1 => Err(ReaderError::UnsupportedVersion{ version: header.version })?,
+                Ok(ref header) if header.version != 1 => Err(ReaderError::UnsupportedVersion {
+                    version: header.version,
+                })?,
                 Ok(ref header) if header.is_corrupt != 0 => Err(ReaderError::Corrupt)?,
                 Ok(header) => {
                     // Read (discard) table header
                     let mut header_buf = vec![0u8; header.header_length as usize];
                     reader.read_exact(&mut header_buf)?;
-                    Ok(Reader {
-                        reader,
-                        header
-                    })
+                    Ok(Reader { reader, header })
                 }
-                Err(e) => Err(e)?
+                Err(e) => Err(e)?,
             }
         }
 
@@ -249,15 +264,12 @@ pub mod binary {
 
         pub fn read(&mut self) -> Result<Record, io::Error> {
             match bincode::deserialize_from::<_, Record>(&mut self.reader) {
-                Ok(record) => {
-                    Ok(record)
-                }
+                Ok(record) => Ok(record),
                 // TODO: propagate bincode's Error
-                Err(_) =>
-                    Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("Failed deserializing record {} from reader.", 0), )
-                    )
+                Err(_) => Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("Failed deserializing record {} from reader.", 0),
+                )),
             }
         }
     }
@@ -268,9 +280,7 @@ pub mod binary {
         type Iterator = RecordIterator<'a, R>;
 
         fn records(&'a mut self) -> RecordIterator<'a, R> {
-            RecordIterator {
-                reader: self, i: 0
-            }
+            RecordIterator { reader: self, i: 0 }
         }
     }
 
@@ -279,17 +289,14 @@ pub mod binary {
         ///
         /// This delegates work to `merfish::Reader::new`.
         pub fn from_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {
-            fs::File::open(path).map(|r| { Reader::new(r).unwrap() })
+            fs::File::open(path).map(|r| Reader::new(r).unwrap())
         }
     }
 
-
-
     pub struct RecordIterator<'a, R: io::Read + 'a> {
         reader: &'a mut Reader<R>,
-        i: u32
+        i: u32,
     }
-
 
     impl<'a, R: io::Read> Iterator for RecordIterator<'a, R> {
         type Item = Result<Record, io::Error>;
@@ -304,7 +311,6 @@ pub mod binary {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -324,7 +330,7 @@ mod tests {
                     assert_eq!(rec.feature, "SCUBE3");
                     assert_eq!(rec.cell_position.x, 475.5);
                 }
-                Err(e) => panic!("{:?}", e)
+                Err(e) => panic!("{:?}", e),
             }
         }
     }
@@ -350,8 +356,42 @@ mod tests {
             weighted_pixel_centroid: [174.52765, 1512.7463],
             abs_position: [-1407.2377, -2946.629],
             area: 3,
-            pixel_trace_mean: [0.0023688597, 0.13105613, 0.46080196, 0.2921718, 0.7618023, 0.007037689, 0.054068968, 0.0036673022, 0.000059783128, 0.0, 0.01174143, 0.0175779, 0.26575506, 0.107759856, 0.017091451, 0.07516251],
-            pixel_trace_std: [0.0033500735, 0.04353166, 0.038341008, 0.02604062, 0.002876933, 0.0028763895, 0.049890008, 0.0028644174, 0.00008454611, 0.0, 0.0049137515, 0.024341747, 0.047965504, 0.04564901, 0.0126899, 0.037814822],
+            pixel_trace_mean: [
+                0.0023688597,
+                0.13105613,
+                0.46080196,
+                0.2921718,
+                0.7618023,
+                0.007037689,
+                0.054068968,
+                0.0036673022,
+                0.000059783128,
+                0.0,
+                0.01174143,
+                0.0175779,
+                0.26575506,
+                0.107759856,
+                0.017091451,
+                0.07516251,
+            ],
+            pixel_trace_std: [
+                0.0033500735,
+                0.04353166,
+                0.038341008,
+                0.02604062,
+                0.002876933,
+                0.0028763895,
+                0.049890008,
+                0.0028644174,
+                0.00008454611,
+                0.0,
+                0.0049137515,
+                0.024341747,
+                0.047965504,
+                0.04564901,
+                0.0126899,
+                0.037814822,
+            ],
             is_exact: 1,
             error_bit: 0,
             error_dir: 0,

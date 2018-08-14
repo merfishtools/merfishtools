@@ -1,6 +1,5 @@
 use std::process::Command;
 
-
 // fn test_output(result: &str, expected: &str) {
 //     assert!(Command::new("cmp")
 //             .arg(result)
@@ -9,23 +8,29 @@ use std::process::Command;
 //     fs::remove_file(result).unwrap();
 // }
 
-
 fn run_cmd(cmd: &str, prefix: Option<&str>) -> bool {
-    let build = if cfg!(debug_assertions) { "debug" } else { "release" };
+    let build = if cfg!(debug_assertions) {
+        "debug"
+    } else {
+        "release"
+    };
 
     println!("{}", cmd);
 
     Command::new("bash")
-            .arg("-c")
-            .arg(format!(
-                "{prefix}target/{build}/{cmd}",
-                prefix=prefix.unwrap_or(""),
-                cmd=cmd,
-                build=build
-            ))
-            .spawn().unwrap().wait().unwrap().success()
+        .arg("-c")
+        .arg(format!(
+            "{prefix}target/{build}/{cmd}",
+            prefix = prefix.unwrap_or(""),
+            cmd = cmd,
+            build = build
+        ))
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap()
+        .success()
 }
-
 
 fn run_exp(dataset: &str, codebook: &str, params: &str) -> bool {
     run_cmd(
@@ -42,7 +47,6 @@ fn run_exp(dataset: &str, codebook: &str, params: &str) -> bool {
     )
 }
 
-
 #[test]
 fn test_exp_mhd4_cell0() {
     assert!(run_exp("140genesData.1.cell0", "140genesData.1", "--p0 0.01258132102084181 0.013360438064572837 0.019941605919281354 0.016581551788592854 0.22860571489439577 0.22269171721737882 0.2073701214077358 0.02231576033300221 0.017689514891827997 0.02054328192011981 0.02101414200654054 0.03938992313394839 0.023995219270935196 0.03557793748730565 0.17007370565085334 0.03569158826173908 --p1 0.5912118122316706 0.5063863207089024 0.42338772914919315 0.43282699715628403 0.17843503208026912 0.18766044306365068 0.1989449380102563 0.42262699427628003 0.4930707032134955 0.4034046655581933 0.4610572590564446 0.30553305919201673 0.2931349183480258 0.2634814096058736 0.16619112507647252 0.36410395236487053"));
@@ -50,29 +54,34 @@ fn test_exp_mhd4_cell0() {
     //assert!(run_exp("140genesData.1.cell0", "140genesData.1", "--p0 0.1 --p1 0.6"));
 }
 
-
 #[test]
 fn test_exp_mhd4_thbs_bias() {
     assert!(run_exp("140genesData.1.cell24", "140genesData.1", "--p0 0.01258132102084181 0.013360438064572837 0.019941605919281354 0.016581551788592854 0.22860571489439577 0.22269171721737882 0.2073701214077358 0.02231576033300221 0.017689514891827997 0.02054328192011981 0.02101414200654054 0.03938992313394839 0.023995219270935196 0.03557793748730565 0.17007370565085334 0.03569158826173908 --p1 0.5912118122316706 0.5063863207089024 0.42338772914919315 0.43282699715628403 0.17843503208026912 0.18766044306365068 0.1989449380102563 0.42262699427628003 0.4930707032134955 0.4034046655581933 0.4610572590564446 0.30553305919201673 0.2931349183480258 0.2634814096058736 0.16619112507647252 0.36410395236487053"));
 }
-
 
 #[test]
 fn test_exp_mhd2() {
     assert!(run_exp("1001genesData.3.cell0", "1001genesData", ""));
 }
 
-
 /// This is a longrunning test that should be activated only on purpose.
 #[test]
 #[ignore]
 fn test_exp_mhd2_8() {
-    assert!(run_exp("simulated-MHD2-8.25.all", "simulated-MHD2-8", "--p0 0.005 --p1 0.01"));
+    assert!(run_exp(
+        "simulated-MHD2-8.25.all",
+        "simulated-MHD2-8",
+        "--p0 0.005 --p1 0.01"
+    ));
 }
 
 #[test]
 fn test_exp_mhd4_sim() {
-    assert!(run_exp("simulated-MHD4.35.1", "simulated-MHD4", "--p0 0.04 --p1 0.1"));
+    assert!(run_exp(
+        "simulated-MHD4.35.1",
+        "simulated-MHD4",
+        "--p0 0.04 --p1 0.1"
+    ));
 }
 
 #[test]
@@ -82,7 +91,6 @@ fn test_estimate_error_rates_real() {
         Some("grep -P '^3\\t' tests/data/140genesData.readouts.txt | cut -f2,3,4 | ")
     ));
 }
-
 
 #[test]
 fn test_estimate_error_rates_simulated() {

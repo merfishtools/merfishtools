@@ -3,17 +3,15 @@ use std::mem;
 use itertools::Itertools;
 use ndarray::prelude::*;
 
-use bio::stats::{Prob, LogProb};
+use bio::stats::{LogProb, Prob};
 
 use io::codebook::Codeword;
-
 
 /// Basic model for the probability of making i 1-0 and j 0-1 errors.
 pub struct Xi {
     p0: Vec<LogProb>,
-    p1: Vec<LogProb>
+    p1: Vec<LogProb>,
 }
-
 
 impl Xi {
     /// Create a new instance.
@@ -26,7 +24,7 @@ impl Xi {
         let tolog = |&p| LogProb::from(p);
         Xi {
             p0: p0.iter().map(&tolog).collect_vec(),
-            p1: p1.iter().map(&tolog).collect_vec()
+            p1: p1.iter().map(&tolog).collect_vec(),
         }
     }
 
@@ -39,10 +37,10 @@ impl Xi {
         for k in 0..source.len() {
             for d in 1..curr.shape()[0] {
                 let (d_0, d_1, p_0) = match (source.get(k).unwrap(), target.get(k).unwrap()) {
-                    (true, true)   => (d - 1, d, self.p1[k]),
+                    (true, true) => (d - 1, d, self.p1[k]),
                     (false, false) => (d - 1, d, self.p0[k]),
-                    (false, true)  => (d, d - 1, self.p0[k]),
-                    (true, false)  => (d, d - 1, self.p1[k])
+                    (false, true) => (d, d - 1, self.p0[k]),
+                    (true, false) => (d, d - 1, self.p1[k]),
                 };
 
                 let p = (p_0 + prev[d_0]).ln_add_exp(p_0.ln_one_minus_exp() + prev[d_1]);
@@ -55,14 +53,12 @@ impl Xi {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    use bio::stats::{LogProb, Prob};
     use bit_vec::BitVec;
-    use bio::stats::{Prob, LogProb};
-
 
     #[test]
     fn test_xi_exact_or_mismatch() {
@@ -75,9 +71,8 @@ mod tests {
 
         let p = xi.prob(&a, &b);
 
-        let truth = LogProb(*p1.ln_one_minus_exp() * 4.0) +
-                    LogProb(*p0.ln_one_minus_exp() * 2.0) +
-                    p1 + p0;
+        let truth =
+            LogProb(*p1.ln_one_minus_exp() * 4.0) + LogProb(*p0.ln_one_minus_exp() * 2.0) + p1 + p0;
 
         assert_relative_eq!(*p[0], *truth);
 
@@ -89,10 +84,10 @@ mod tests {
             // mismatch in mismatching 1-bits, 1 position
             truth - p1 + p1.ln_one_minus_exp(),
             // mismatch in mismatching 0-bits, 1 position
-            truth - p0 + p0.ln_one_minus_exp()
+            truth - p0 + p0.ln_one_minus_exp(),
         ]);
 
-        assert_relative_eq!(*p[1], *truth_mismatch, epsilon=0.001);
+        assert_relative_eq!(*p[1], *truth_mismatch, epsilon = 0.001);
     }
 
     #[test]
@@ -124,17 +119,20 @@ mod tests {
 
         let p = xi.prob(&noise, &target);
 
-        let truth_exact = LogProb(*p0 * 4.0) +
-                          LogProb(*p0.ln_one_minus_exp() * 12.0);
+        let truth_exact = LogProb(*p0 * 4.0) + LogProb(*p0.ln_one_minus_exp() * 12.0);
 
         let truth_mismatch = LogProb::ln_sum_exp(&[
             // mismatch in matching 0-bits, 12 possible positions
-            LogProb::from(Prob(*Prob::from(truth_exact - p0.ln_one_minus_exp() + p0) * 12.0)),
+            LogProb::from(Prob(
+                *Prob::from(truth_exact - p0.ln_one_minus_exp() + p0) * 12.0,
+            )),
             // mismatch in mismatching 1-bits
-            LogProb::from(Prob(*Prob::from(truth_exact - p0 + p0.ln_one_minus_exp()) * 4.0))
+            LogProb::from(Prob(
+                *Prob::from(truth_exact - p0 + p0.ln_one_minus_exp()) * 4.0,
+            )),
         ]);
 
-        assert_relative_eq!(*p[0], *truth_exact, epsilon=0.0001);
+        assert_relative_eq!(*p[0], *truth_exact, epsilon = 0.0001);
         assert_relative_eq!(*p[1], *truth_mismatch);
     }
 }

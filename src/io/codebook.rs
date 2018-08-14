@@ -3,18 +3,16 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::path::Path;
-use std::collections::{HashMap, hash_map, HashSet};
 use num::CheckedAdd;
+use std::collections::{hash_map, HashMap, HashSet};
+use std::path::Path;
 
+use bit_vec::BitVec;
 use csv;
 use itertools::Itertools;
-use bit_vec::BitVec;
 use petgraph::prelude::*;
 
-
 pub type Codeword = BitVec<u32>;
-
 
 pub fn parse_codeword(codeword: &[u8]) -> Codeword {
     let mut _codeword = BitVec::with_capacity(codeword.len());
@@ -31,7 +29,6 @@ pub fn parse_codeword(codeword: &[u8]) -> Codeword {
     _codeword
 }
 
-
 /// A codebook record.
 #[derive(Clone, Debug)]
 pub struct Record {
@@ -40,13 +37,12 @@ pub struct Record {
     expressed: bool,
 }
 
-
 impl Record {
     pub fn noise(len: usize) -> Self {
         Record {
             name: "noise".to_owned(),
             codeword: BitVec::from_elem(len, false),
-            expressed: true,  // there is always some noise
+            expressed: true, // there is always some noise
         }
     }
 
@@ -75,9 +71,9 @@ impl Record {
     pub fn dist(&self, other: &Record) -> u8 {
         let mut dist = 0;
         for (a, b) in self.codeword.blocks().zip(other.codeword.blocks()) {
-            dist = dist.checked_add(&((a ^ b).count_ones() as u8)).expect(
-                "bug: overflow when calculating hamming distance"
-            );
+            dist = dist
+                .checked_add(&((a ^ b).count_ones() as u8))
+                .expect("bug: overflow when calculating hamming distance");
         }
         dist
     }
@@ -90,15 +86,15 @@ impl Record {
                 s.push(a ^ b);
             }
         }
-        unsafe { diff.set_len(self.codeword.len()); }
+        unsafe {
+            diff.set_len(self.codeword.len());
+        }
 
         diff
     }
 }
 
-
 pub type FeatureID = usize;
-
 
 /// Codebook representation.\
 #[allow(non_snake_case)]
@@ -113,7 +109,6 @@ pub struct Codebook {
     pub m: u8,
     noise_record: Record,
 }
-
 
 impl Codebook {
     /// Read from a given file path.
@@ -146,10 +141,7 @@ impl Codebook {
                 }
 
                 let idx = graph.add_node(rec);
-                index.insert(
-                    feature,
-                    idx.index(),
-                );
+                index.insert(feature, idx.index());
             }
             index
         };
@@ -160,7 +152,12 @@ impl Codebook {
             rec_a.dist(&rec_b)
         };
 
-        let min_dist = index.values().tuple_combinations().map(|(&a, &b)| dist(a, b, &graph)).min().unwrap();
+        let min_dist = index
+            .values()
+            .tuple_combinations()
+            .map(|(&a, &b)| dist(a, b, &graph))
+            .min()
+            .unwrap();
 
         for (&a, &b) in index.values().tuple_combinations() {
             let d = dist(a, b, &graph);
@@ -184,13 +181,14 @@ impl Codebook {
     }
 
     pub fn record(&self, feature: FeatureID) -> &Record {
-        self.graph.node_weight(
-            NodeIndex::new(feature)
-        ).unwrap()
+        self.graph.node_weight(NodeIndex::new(feature)).unwrap()
     }
 
     pub fn get_id(&self, feature: &str) -> FeatureID {
-        *self.index.get(feature).expect("bug: feature not in codebook")
+        *self
+            .index
+            .get(feature)
+            .expect("bug: feature not in codebook")
     }
 
     pub fn features(&self) -> hash_map::Keys<String, FeatureID> {
@@ -199,7 +197,10 @@ impl Codebook {
 
     pub fn records<'a>(&'a self) -> Vec<&'a Record> {
         //self.graph.node_weights_mut()
-        self.graph.node_indices().map(|n| self.graph.node_weight(n).unwrap()).collect_vec()
+        self.graph
+            .node_indices()
+            .map(|n| self.graph.node_weight(n).unwrap())
+            .collect_vec()
     }
 
     pub fn contains(&self, feature: &str) -> bool {
@@ -219,7 +220,10 @@ impl Codebook {
         let feature = NodeIndex::new(feature);
 
         if dist == self.min_dist {
-            self.graph.neighbors(feature).map(|n| n.index()).collect_vec()
+            self.graph
+                .neighbors(feature)
+                .map(|n| n.index())
+                .collect_vec()
         } else if dist == self.min_dist * 2 {
             let mut neighbors = HashSet::new();
             for n in self.graph.neighbors(feature) {
@@ -233,7 +237,8 @@ impl Codebook {
             neighbors.into_iter().collect_vec()
         } else {
             panic!(
-                "unsupported distance {}, only first and second order neighbors supported", dist
+                "unsupported distance {}, only first and second order neighbors supported",
+                dist
             );
         }
     }
@@ -242,5 +247,7 @@ impl Codebook {
         self.index.len()
     }
 
-    pub fn is_empty(&self) -> bool { self.index.is_empty() }
+    pub fn is_empty(&self) -> bool {
+        self.index.is_empty()
+    }
 }

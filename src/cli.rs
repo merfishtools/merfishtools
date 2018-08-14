@@ -10,28 +10,26 @@ use std::collections;
 use std::io::prelude::*;
 
 use csv;
-use itertools::Itertools;
 use cue;
-use regex::Regex;
 use failure::Error;
+use itertools::Itertools;
+use regex::Regex;
 
-use bio::stats::{Prob, LogProb};
+use bio::stats::{LogProb, Prob};
 
+use codebook;
+use error_rates;
 use io;
 use io::merfishdata::MerfishRecord;
 use model;
-use model::foldchange::LogFC;
 use model::cv::CV;
-use codebook;
+use model::foldchange::LogFC;
 use model::readout::Counts;
-use error_rates;
-
 
 pub struct Selection {
     pub expmnt: String,
-    pub cell: String
+    pub cell: String,
 }
-
 
 /*pub fn stats(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &str) {
     let codebook = io::codebook::Reader::from_file(codebook_path, dist).unwrap().codebook();
@@ -53,11 +51,9 @@ pub struct Selection {
     }
 }*/
 
-
 #[derive(Builder)]
 #[builder(pattern = "owned")]
-pub struct Expression
-{
+pub struct Expression {
     p0: Vec<Prob>,
     p1: Vec<Prob>,
     codebook_path: String,
@@ -68,45 +64,48 @@ pub struct Expression
     window_width: u32,
     seed: usize,
     #[builder(setter(skip))]
-    counts: collections::HashMap<String, collections::HashMap<String, Counts>>
+    counts: collections::HashMap<String, collections::HashMap<String, Counts>>,
 }
 
-
-impl Expression
-{
-    pub fn load_counts<'a, R>(&mut self, reader: &'a mut R) -> Result<(), Error> where
-        R: io::merfishdata::Reader<'a>
+impl Expression {
+    pub fn load_counts<'a, R>(&mut self, reader: &'a mut R) -> Result<(), Error>
+    where
+        R: io::merfishdata::Reader<'a>,
     {
         let codebook = io::codebook::Codebook::from_file(&self.codebook_path)?;
 
         let mut counts = collections::HashMap::new();
         for record in reader.records().filter_map(|res| {
-                let rec = res.unwrap();
-                // consider record if it is contained in the codebook and has a valid cell id
-                if self.cells.is_match(&rec.cell_name()) && codebook.contains(&rec.feature_name()) {
-                    Some(rec)
-                }
-                else {
-                    None
-                }
+            let rec = res.unwrap();
+            // consider record if it is contained in the codebook and has a valid cell id
+            if self.cells.is_match(&rec.cell_name()) && codebook.contains(&rec.feature_name()) {
+                Some(rec)
+            } else {
+                None
             }
-        ) {
-            let cell_counts = counts.entry(record.cell_name()).or_insert_with(collections::HashMap::new);
-            let feature_counts = cell_counts.entry(record.feature_name()).or_insert(Counts{ exact: 0, mismatch: 0});
+        }) {
+            let cell_counts = counts
+                .entry(record.cell_name())
+                .or_insert_with(collections::HashMap::new);
+            let feature_counts = cell_counts.entry(record.feature_name()).or_insert(Counts {
+                exact: 0,
+                mismatch: 0,
+            });
             if record.hamming_dist() == 0 {
                 feature_counts.exact += 1;
-            }
-            else if record.hamming_dist() == 1 {
+            } else if record.hamming_dist() == 1 {
                 feature_counts.mismatch += 1;
-            }
-            else {
+            } else {
                 panic!("Hamming distance of greater than 1 is unsupported at the moment.")
             }
         }
         // add missing features from codebook
         for cell_counts in counts.values_mut() {
             for feature in codebook.features() {
-                cell_counts.entry(feature.clone()).or_insert(Counts{ exact: 0, mismatch: 0});
+                cell_counts.entry(feature.clone()).or_insert(Counts {
+                    exact: 0,
+                    mismatch: 0,
+                });
             }
         }
 
@@ -117,9 +116,17 @@ impl Expression
     pub fn infer(&mut self) -> Result<(), Error> {
         let codebook = io::codebook::Codebook::from_file(&self.codebook_path).unwrap();
         let mut cdf_writer = io::cdf::expression::Writer::from_writer(std::io::stdout());
-        let mut est_writer = self.estimate_path.as_ref().map(io::estimation::expression::Writer::from_file);
+        let mut est_writer = self
+            .estimate_path
+            .as_ref()
+            .map(io::estimation::expression::Writer::from_file);
 
-        let mut stats_writer = self.stats_path.as_ref().map(|path| csv::WriterBuilder::new().delimiter(b'\t').from_path(path).unwrap());
+        let mut stats_writer = self.stats_path.as_ref().map(|path| {
+            csv::WriterBuilder::new()
+                .delimiter(b'\t')
+                .from_path(path)
+                .unwrap()
+        });
         if let Some(ref mut writer) = stats_writer {
             writer.serialize(["cell", "noise-rate"]).unwrap();
         }
@@ -131,21 +138,30 @@ impl Expression
             |(cell, counts)| {
                 // Generate joint model.
                 let mut model = model::readout::JointModel::new(
-                    counts.iter(), &self.p0, &self.p1, &codebook, self.window_width, self.seed
+                    counts.iter(),
+                    &self.p0,
+                    &self.p1,
+                    &codebook,
+                    self.window_width,
+                    self.seed,
                 );
                 model.expectation_maximization(&cell);
 
                 // Calculate CDF for all features.
-                let cdfs = counts.into_iter().filter_map(|(feature, _)| {
-                    let feature_id = codebook.get_id(&feature);
-                    if codebook.record(feature_id).expressed() {
-                        let (cdf, map_estimate) = model::expression::cdf(
-                            feature_id, &mut model
-                        );
+                let cdfs = counts
+                    .into_iter()
+                    .filter_map(|(feature, _)| {
+                        let feature_id = codebook.get_id(&feature);
+                        if codebook.record(feature_id).expressed() {
+                            let (cdf, map_estimate) =
+                                model::expression::cdf(feature_id, &mut model);
 
-                        Some((feature, cdf, map_estimate))
-                    } else { None }
-                }).collect_vec();
+                            Some((feature, cdf, map_estimate))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect_vec();
                 (cell, cdfs, model.noise_rate())
             },
             |(cell, cdfs, noise_rate)| {
@@ -157,20 +173,21 @@ impl Expression
                             &cell,
                             &feature,
                             map_estimate,
-                            &cdf.credible_interval(0.95).expect("bug: empty CDF")
+                            &cdf.credible_interval(0.95).expect("bug: empty CDF"),
                         );
                     }
                 }
                 if let Some(ref mut stats_writer) = stats_writer {
-                    stats_writer.serialize([&cell, &format!("{:.4}", noise_rate)]).unwrap();
+                    stats_writer
+                        .serialize([&cell, &format!("{:.4}", noise_rate)])
+                        .unwrap();
                 }
-            }
+            },
         );
 
         Ok(())
     }
 }
-
 
 // /// Estimate expressions.
 // pub fn expression<'a, I, R>(
@@ -273,20 +290,34 @@ impl Expression
 //     );
 // }
 
-
 /// Estimate differential expression over two conditions via fold changes.
-pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: Option<&str>, max_fc: LogFC, pseudocounts: f64, threads: usize) -> Result<(), Error> {
-    assert!(pseudocounts > 0.0, "Pseudocounts must be > 0.0 for calculating fold changes.");
+pub fn differential_expression(
+    group1_path: &str,
+    group2_path: &str,
+    pmf_path: Option<&str>,
+    max_fc: LogFC,
+    pseudocounts: f64,
+    threads: usize,
+) -> Result<(), Error> {
+    assert!(
+        pseudocounts > 0.0,
+        "Pseudocounts must be > 0.0 for calculating fold changes."
+    );
 
     let mut reader1 = io::cdf::expression::Reader::from_file(group1_path)?;
     let mut reader2 = io::cdf::expression::Reader::from_file(group2_path)?;
     let mut cdf_writer = pmf_path.map(|path| io::cdf::diffexp::Writer::from_file(path, "log2fc"));
-    let mut est_writer = io::estimation::differential_expression::Writer::from_writer(std::io::stdout(), "log2fc");
+    let mut est_writer =
+        io::estimation::differential_expression::Writer::from_writer(std::io::stdout(), "log2fc");
 
     let group1 = reader1.cdfs();
     let group2 = reader2.cdfs();
 
-    let features = group1.features().filter(|f| group2.contains_feature(f)).cloned().collect_vec();
+    let features = group1
+        .features()
+        .filter(|f| group2.contains_feature(f))
+        .cloned()
+        .collect_vec();
 
     let mut estimates = Vec::new();
 
@@ -300,7 +331,7 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
             let g2 = group2.get(&feature).unwrap();
             let cdf = model::foldchange::cdf(
                 &model::expressionset::cdf(&g1, pseudocounts),
-                &model::expressionset::cdf(&g2, pseudocounts)
+                &model::expressionset::cdf(&g2, pseudocounts),
             );
             (feature, cdf)
         },
@@ -313,15 +344,19 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
                 cdf_writer.write(&feature, &cdf);
             }
             estimates.push((feature, model::diffexp::estimate(&cdf, max_fc)));
-        }
+        },
     );
 
     // calculate FDR and write estimates to STDOUT
     estimates.sort_by(|&(_, ref a), &(_, ref b)| {
-        a.differential_expression_pep.partial_cmp(&b.differential_expression_pep).unwrap()
+        a.differential_expression_pep
+            .partial_cmp(&b.differential_expression_pep)
+            .unwrap()
     });
     let expected_fds = LogProb::ln_cumsum_exp(
-        estimates.iter().map(|&(_, ref a)| a.differential_expression_pep)
+        estimates
+            .iter()
+            .map(|&(_, ref a)| a.differential_expression_pep),
     ).collect_vec();
 
     for (i, ((feature, estimate), fd)) in estimates.into_iter().zip(expected_fds).enumerate() {
@@ -332,23 +367,29 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
             fdr,
             estimate.differential_expression_bf,
             estimate.map,
-            estimate.credible_interval
+            estimate.credible_interval,
         );
     }
 
     Ok(())
 }
 
-
 /// Estimate differential expression over multiple conditions via the coefficient of variation.
-pub fn multi_differential_expression(group_paths: &[&str], pmf_path: Option<&str>, max_cv: CV, pseudocounts: f64, threads: usize) -> Result<(), Error> {
+pub fn multi_differential_expression(
+    group_paths: &[&str],
+    pmf_path: Option<&str>,
+    max_cv: CV,
+    pseudocounts: f64,
+    threads: usize,
+) -> Result<(), Error> {
     let mut groups = Vec::new();
     for path in group_paths {
         let mut reader = io::cdf::expression::Reader::from_file(path)?;
         groups.push(reader.cdfs());
     }
     let mut cdf_writer = pmf_path.map(|path| io::cdf::diffexp::Writer::from_file(path, "cv"));
-    let mut est_writer = io::estimation::differential_expression::Writer::from_writer(std::io::stdout(), "cv");
+    let mut est_writer =
+        io::estimation::differential_expression::Writer::from_writer(std::io::stdout(), "cv");
 
     // TODO take feature intersection or warn if features are not the same
     let mut features = Vec::new();
@@ -370,12 +411,15 @@ pub fn multi_differential_expression(group_paths: &[&str], pmf_path: Option<&str
         features.iter(),
         |feature| {
             info!("Calculating {}.", feature);
-            let cdfs = groups.iter().map(|group| {
-                model::expressionset::cdf(
-                    group.get(&feature).expect("Missing feature."),
-                    pseudocounts
-                )
-            }).collect_vec();
+            let cdfs = groups
+                .iter()
+                .map(|group| {
+                    model::expressionset::cdf(
+                        group.get(&feature).expect("Missing feature."),
+                        pseudocounts,
+                    )
+                })
+                .collect_vec();
             let cdf = model::cv::cdf(&cdfs);
             (feature, cdf)
         },
@@ -388,15 +432,19 @@ pub fn multi_differential_expression(group_paths: &[&str], pmf_path: Option<&str
                 cdf_writer.write(&feature, &cdf);
             }
             estimates.push((feature, model::diffexp::estimate(&cdf, max_cv)));
-        }
+        },
     );
 
     // calculate FDR and write estimates to STDOUT
     estimates.sort_by(|&(_, ref a), &(_, ref b)| {
-        a.differential_expression_pep.partial_cmp(&b.differential_expression_pep).unwrap()
+        a.differential_expression_pep
+            .partial_cmp(&b.differential_expression_pep)
+            .unwrap()
     });
     let expected_fds = LogProb::ln_cumsum_exp(
-        estimates.iter().map(|&(_, ref a)| a.differential_expression_pep)
+        estimates
+            .iter()
+            .map(|&(_, ref a)| a.differential_expression_pep),
     ).collect_vec();
     for (i, ((feature, estimate), fd)) in estimates.into_iter().zip(expected_fds).enumerate() {
         let fdr = LogProb(*fd - (i as f64 + 1.0).ln());
@@ -406,17 +454,16 @@ pub fn multi_differential_expression(group_paths: &[&str], pmf_path: Option<&str
             fdr,
             estimate.differential_expression_bf,
             estimate.map,
-            estimate.credible_interval
+            estimate.credible_interval,
         );
     }
 
     Ok(())
 }
 
-
 pub fn gen_codebook(
     words: &[codebook::Word],
-    not_expressed_pattern: Option<&str>
+    not_expressed_pattern: Option<&str>,
 ) -> Result<(), Error> {
     let not_expressed_re = if not_expressed_pattern.is_some() {
         Some(Regex::new(not_expressed_pattern.unwrap())?)
@@ -426,7 +473,9 @@ pub fn gen_codebook(
 
     let stdin = std::io::stdin();
     let mut reader = stdin.lock().lines();
-    let mut writer = csv::WriterBuilder::new().delimiter(b'\t').from_writer(std::io::stdout());
+    let mut writer = csv::WriterBuilder::new()
+        .delimiter(b'\t')
+        .from_writer(std::io::stdout());
     let mut words = words.iter();
     // TODO add expressed column and handle misidentification probes
     writer.serialize(["feat", "codeword", "expressed"]).unwrap();
@@ -437,47 +486,52 @@ pub fn gen_codebook(
                 let feature = feature?;
                 if feature.is_empty() {
                     // TODO proper error handling
-                    panic!("Empty feature found. All features provided at STDIN have to be non-empty.");
+                    panic!(
+                        "Empty feature found. All features provided at STDIN have to be non-empty."
+                    );
                 }
 
-                let expressed = !not_expressed_re.as_ref().map_or_else(
-                    || false, |re| re.is_match(&feature)
-                );
+                let expressed = !not_expressed_re
+                    .as_ref()
+                    .map_or_else(|| false, |re| re.is_match(&feature));
 
                 writer.serialize([
                     feature,
                     format!("{:?}", w),
-                    if expressed { "1" } else { "0" }.to_string()
+                    if expressed { "1" } else { "0" }.to_string(),
                 ])?;
-            },
+            }
             (None, Some(_)) => break,
             (Some(_), None) => {
-                error!("Not enough code words. Generated codebook for the first {} transcripts.", i);
-                break
-            },
-            (None, None) => break
+                error!(
+                    "Not enough code words. Generated codebook for the first {} transcripts.",
+                    i
+                );
+                break;
+            }
+            (None, None) => break,
         }
     }
     Ok(())
 }
 
-
-pub fn estimate_error_rates(
-    codebook: &str
-) -> Result<(), Error> {
-
+pub fn estimate_error_rates(codebook: &str) -> Result<(), Error> {
     let codebook = io::codebook::Codebook::from_file(codebook).unwrap();
-    let mut readouts = csv::ReaderBuilder::new().delimiter(b'\t').from_reader(std::io::stdin());
+    let mut readouts = csv::ReaderBuilder::new()
+        .delimiter(b'\t')
+        .from_reader(std::io::stdin());
 
     let (p0, p1) = error_rates::estimate(
         &codebook,
         readouts.deserialize().map(|rec| {
             let (_cell, feat, readout): (String, String, String) = rec.unwrap();
             (feat, io::codebook::parse_codeword(readout.as_bytes()))
-        })
+        }),
     );
 
-    let mut writer = csv::WriterBuilder::new().delimiter(b'\t').from_writer(std::io::stdout());
+    let mut writer = csv::WriterBuilder::new()
+        .delimiter(b'\t')
+        .from_writer(std::io::stdout());
     writer.write_record(&["pos", "p0", "p1"])?;
     for (i, (p0, p1)) in p0.into_iter().zip(p1.into_iter()).enumerate() {
         writer.write_record(&[format!("{}", i), format!("{}", *p0), format!("{}", *p1)])?;

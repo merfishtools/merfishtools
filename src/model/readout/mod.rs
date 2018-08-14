@@ -5,25 +5,21 @@ use ndarray::prelude::*;
 
 use io::codebook::FeatureID;
 
-pub mod joint_model;
 pub mod feature_model;
+pub mod joint_model;
 pub mod xi;
 
-pub use model::readout::joint_model::JointModel;
 pub use model::readout::feature_model::{FeatureModel, NoiseModel};
+pub use model::readout::joint_model::JointModel;
 pub use model::readout::xi::Xi;
 
-
 pub type Expressions = Array1<u32>;
-
-
 
 #[derive(Debug, Clone)]
 pub struct Counts {
     pub exact: u32,
-    pub mismatch: u32
+    pub mismatch: u32,
 }
-
 
 impl Counts {
     pub fn total(&self) -> u32 {
@@ -31,15 +27,13 @@ impl Counts {
     }
 }
 
-
 #[derive(Clone)]
 pub struct Miscalls {
     miscalls: Array2<u32>,
     total_to: Vec<u32>,
     max_total_to: Vec<u32>,
-    total: u32
+    total: u32,
 }
-
 
 impl Miscalls {
     /// Create new instance.
@@ -47,15 +41,21 @@ impl Miscalls {
         feature_count: usize,
         feature_models: &HashMap<FeatureID, FeatureModel>,
         noise_model: &NoiseModel,
-        exact: bool
+        exact: bool,
     ) -> Self {
         let mut max_total_to = vec![0; feature_count];
         for m in feature_models.values() {
-            max_total_to[m.feature_id] = if exact { m.counts.exact } else { m.counts.mismatch };
+            max_total_to[m.feature_id] = if exact {
+                m.counts.exact
+            } else {
+                m.counts.mismatch
+            };
         }
-        for (&feature_id, counts) in noise_model.not_expressed_feature_ids.iter().zip(
-            &noise_model.not_expressed_counts
-        ) {
+        for (&feature_id, counts) in noise_model
+            .not_expressed_feature_ids
+            .iter()
+            .zip(&noise_model.not_expressed_counts)
+        {
             max_total_to[feature_id] = if exact { counts.exact } else { counts.mismatch };
         }
 
@@ -63,7 +63,7 @@ impl Miscalls {
             miscalls: Array::from_elem((feature_count, feature_count), 0),
             total_to: vec![0; feature_count],
             max_total_to,
-            total: 0
+            total: 0,
         }
     }
 
@@ -79,7 +79,7 @@ impl Miscalls {
             let entry = self.miscalls.get_mut((i as usize, j as usize)).unwrap();
             let value = cmp::min(
                 cmp::min(value, *capacity),
-                self.max_total_to[j] - (self.total_to[j] - *entry)
+                self.max_total_to[j] - (self.total_to[j] - *entry),
             );
             let change = value as i32 - *entry as i32;
             *capacity -= value;

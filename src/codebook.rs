@@ -3,29 +3,26 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use bit_vec::BitVec;
 use itertools::Itertools;
 use ndarray::prelude::*;
-use bit_vec::BitVec;
-
 
 pub type Word = BitVec;
 
-
 /// Generate MHD4 code with m 1-bits.
 pub fn generate_mhd4(m: u8) -> Vec<Word> {
-    let gen_mat = Array::from_shape_vec((11, 16), vec![
-        1,0,1,0,1,1,0,0,0,0,0,0,0,0,0,0,
-        1,1,1,1,1,0,1,0,0,0,0,0,0,0,0,0,
-        1,1,0,1,0,0,0,1,0,0,0,0,0,0,0,0,
-        0,1,1,0,1,0,0,0,1,0,0,0,0,0,0,0,
-        1,0,0,1,1,0,0,0,0,1,0,0,0,0,0,0,
-        1,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,
-        0,1,1,1,0,0,0,0,0,0,0,1,0,0,0,0,
-        0,0,1,1,1,0,0,0,0,0,0,0,1,0,0,0,
-        1,0,1,1,0,0,0,0,0,0,0,0,0,1,0,0,
-        0,1,0,1,1,0,0,0,0,0,0,0,0,0,1,0,
-        1,1,0,0,1,0,0,0,0,0,0,0,0,0,0,1
-    ]).unwrap();
+    let gen_mat = Array::from_shape_vec(
+        (11, 16),
+        vec![
+            1, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0,
+            0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0,
+            0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1,
+            1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0,
+            1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 1,
+        ],
+    ).unwrap();
 
     let mut words = Vec::new();
     for i in 0..2u32.pow(11) - 1 {
@@ -45,18 +42,19 @@ pub fn generate_mhd4(m: u8) -> Vec<Word> {
     words
 }
 
-
 /// Generate MHD2 code with n bits in total and m 1-bits.
 pub fn generate_mhd2(n: u8, m: u8) -> Vec<Word> {
-    (0..n as usize).combinations(m as usize).map(|bits| {
-        let mut word = BitVec::from_elem(n as usize, false);
-        for i in bits {
-            word.set(i, true);
-        }
-        word
-    }).collect_vec()
+    (0..n as usize)
+        .combinations(m as usize)
+        .map(|bits| {
+            let mut word = BitVec::from_elem(n as usize, false);
+            for i in bits {
+                word.set(i, true);
+            }
+            word
+        })
+        .collect_vec()
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -65,9 +63,14 @@ mod tests {
 
     fn hamming_dist(a: &Word, b: &Word) -> u8 {
         assert_eq!(a.len(), b.len());
-        (0..a.len()).fold(0, |d, i| d + (if a.get(i).unwrap() != b.get(i).unwrap() {1} else {0} ))
+        (0..a.len()).fold(0, |d, i| {
+            d + (if a.get(i).unwrap() != b.get(i).unwrap() {
+                1
+            } else {
+                0
+            })
+        })
     }
-
 
     fn test_words(words: &[Word], dist: u8) {
         let mut is_tight = false;
@@ -85,7 +88,6 @@ mod tests {
         assert!(is_tight);
     }
 
-
     #[test]
     fn test_generate_mhd2() {
         let dist = 2;
@@ -95,7 +97,6 @@ mod tests {
         assert_eq!(words.len(), 1001);
         test_words(&words, dist);
     }
-
 
     #[test]
     fn test_generate_mhd4() {

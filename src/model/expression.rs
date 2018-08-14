@@ -1,45 +1,48 @@
 use itertools::Itertools;
 use ordered_float::NotNaN;
 
-use bio::stats::LogProb;
 use bio::stats::probs;
+use bio::stats::LogProb;
 
-use model;
 use io::codebook::FeatureID;
-
+use model;
 
 pub type CDF = probs::cdf::CDF<u32>;
 pub type NormalizedCDF = probs::cdf::CDF<NotNaN<f64>>;
-
 
 /// Calculate CDF of expression.
 ///
 /// Returns a tuple of CDF and the MAP estimate.
 pub fn cdf(feature: FeatureID, model: &mut model::readout::JointModel) -> (CDF, u32) {
     let (xmin, xmax) = model.window(feature);
-    let likelihoods = (xmin..xmax + 1).map(|x| {
-        model.likelihood(feature, x)
-    }).collect_vec();
+    let likelihoods = (xmin..xmax + 1)
+        .map(|x| model.likelihood(feature, x))
+        .collect_vec();
     // calculate (marginal / flat_prior)
     let marginal = LogProb::ln_sum_exp(&likelihoods);
 
     let cdf = CDF::from_pmf(
-        likelihoods.iter().enumerate().filter_map(|(x, lh)| {
-            let prob = lh - marginal;
-            if prob >= model::MIN_PROB {
-                Some(probs::cdf::Entry {
-                    value: xmin + x as u32,
-                    prob
-                })
-            }
-            else {
-                None
-            }
-        }).collect_vec()
+        likelihoods
+            .iter()
+            .enumerate()
+            .filter_map(|(x, lh)| {
+                let prob = lh - marginal;
+                if prob >= model::MIN_PROB {
+                    Some(probs::cdf::Entry {
+                        value: xmin + x as u32,
+                        prob,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect_vec(),
     );
 
     let map = model.map_estimate(feature);
-    let cdf_map = *cdf.map().expect(&format!("bug: empty CDF, xmin={}, xmax={}", xmin, xmax));
+    let cdf_map = *cdf
+        .map()
+        .expect(&format!("bug: empty CDF, xmin={}, xmax={}", xmin, xmax));
 
     if cdf_map != map {
         debug!("EM-MAP and CDF MAP do not agree: {}!={}", map, cdf_map);
@@ -53,21 +56,19 @@ pub fn cdf(feature: FeatureID, model: &mut model::readout::JointModel) -> (CDF, 
     (cdf, map)
 }
 
-
-
 #[cfg(test)]
 mod tests {
     #![allow(non_upper_case_globals)]
 
-//    use nalgebra::ApproxEq;
-//
-//    use bio::stats::{Prob, LogProb};
-//
-//    use super::*;
-//    use model;
-//    use io;
+    //    use nalgebra::ApproxEq;
+    //
+    //    use bio::stats::{Prob, LogProb};
+    //
+    //    use super::*;
+    //    use model;
+    //    use io;
 
-/*
+    /*
 
     const GENE: &'static str = "COL5A1";
 

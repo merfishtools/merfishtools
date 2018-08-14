@@ -38,8 +38,8 @@ extern crate failure_derive;
 #[macro_use]
 extern crate derive_builder;
 
-pub mod model;
-pub mod io;
+pub mod cli;
 pub mod codebook;
 pub mod error_rates;
-pub mod cli;
+pub mod io;
+pub mod model;
