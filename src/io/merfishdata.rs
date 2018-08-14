@@ -217,6 +217,7 @@ pub mod binary {
         }
 
         fn hamming_dist(&self) -> u8 {
+            assert!(self.is_exact <= 1, "unexpected value in field is_exact: {}", self.is_exact);
             1 - self.is_exact
         }
     }
