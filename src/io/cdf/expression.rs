@@ -11,6 +11,7 @@ use std::collections;
 use ordered_float::NotNaN;
 use itertools::Itertools;
 use csv;
+use failure::{Fail, Error};
 
 use bio::stats::LogProb;
 use bio::stats::probs::cdf;
@@ -60,6 +61,13 @@ pub struct Record {
 }
 
 
+#[derive(Debug, Fail)]
+pub enum ReaderError {
+    #[fail(display = "header does not contain expected columns {:?}", columns)]
+    InvalidHeader { columns: &'static [&'static str] }
+}
+
+
 /// A reader for feature expression CDFs.
 pub struct Reader<R: io::Read> {
     inner: csv::Reader<R>
@@ -68,19 +76,20 @@ pub struct Reader<R: io::Read> {
 
 impl Reader<fs::File> {
     /// Read from a given file path.
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Option<Self> {
-        fs::File::open(path).map(Reader::from_reader).expect("Error opening file.")
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+        let f = fs::File::open(path)?;
+        Ok(Reader::from_reader(f)?)
     }
 }
 
 
 impl<R: io::Read> Reader<R> {
-    pub fn from_reader(rdr: R) -> Option<Self> {
+    pub fn from_reader(rdr: R) -> Result<Self, ReaderError> {
         let mut inner = csv::ReaderBuilder::new().delimiter(b'\t').from_reader(rdr);
         if inner.headers().unwrap().eq(HEADER) {
-            Some(Reader { inner })
+            Ok(Reader { inner })
         } else {
-            None
+            Err(ReaderError::InvalidHeader{ columns: HEADER })
         }
     }
 

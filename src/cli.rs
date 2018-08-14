@@ -276,11 +276,11 @@ impl Expression
 
 
 /// Estimate differential expression over two conditions via fold changes.
-pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: Option<&str>, max_fc: LogFC, pseudocounts: f64, threads: usize) {
+pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: Option<&str>, max_fc: LogFC, pseudocounts: f64, threads: usize) -> Result<(), Error> {
     assert!(pseudocounts > 0.0, "Pseudocounts must be > 0.0 for calculating fold changes.");
 
-    let mut reader1 = io::cdf::expression::Reader::from_file(group1_path).expect("Invalid input for group 1.");
-    let mut reader2 = io::cdf::expression::Reader::from_file(group2_path).expect("Invalid input for group 2.");
+    let mut reader1 = io::cdf::expression::Reader::from_file(group1_path)?;
+    let mut reader2 = io::cdf::expression::Reader::from_file(group2_path)?;
     let mut cdf_writer = pmf_path.map(|path| io::cdf::diffexp::Writer::from_file(path, "log2fc"));
     let mut est_writer = io::estimation::differential_expression::Writer::from_writer(std::io::stdout(), "log2fc");
 
@@ -324,6 +324,7 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
     let expected_fds = LogProb::ln_cumsum_exp(
         estimates.iter().map(|&(_, ref a)| a.differential_expression_pep)
     ).collect_vec();
+
     for (i, ((feature, estimate), fd)) in estimates.into_iter().zip(expected_fds).enumerate() {
         let fdr = LogProb(*fd - (i as f64 + 1.0).ln());
         est_writer.write(
@@ -335,15 +336,18 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
             estimate.credible_interval
         );
     }
+
+    Ok(())
 }
 
 
 /// Estimate differential expression over multiple conditions via the coefficient of variation.
-pub fn multi_differential_expression(group_paths: &[&str], pmf_path: Option<&str>, max_cv: CV, pseudocounts: f64, threads: usize) {
-    let groups = group_paths.iter().enumerate().map(|(i, path)| {
-        io::cdf::expression::Reader::from_file(path).expect(&format!("Invalid input for group {}.", i))
-                                                    .cdfs()
-    }).collect_vec();
+pub fn multi_differential_expression(group_paths: &[&str], pmf_path: Option<&str>, max_cv: CV, pseudocounts: f64, threads: usize) -> Result<(), Error> {
+    let mut groups = Vec::new();
+    for (i, path) in group_paths.iter().enumerate() {
+        let mut reader = io::cdf::expression::Reader::from_file(path)?;
+        groups.push(reader.cdfs());
+    }
     let mut cdf_writer = pmf_path.map(|path| io::cdf::diffexp::Writer::from_file(path, "cv"));
     let mut est_writer = io::estimation::differential_expression::Writer::from_writer(std::io::stdout(), "cv");
 
@@ -406,6 +410,8 @@ pub fn multi_differential_expression(group_paths: &[&str], pmf_path: Option<&str
             estimate.credible_interval
         );
     }
+
+    Ok(())
 }
 
 

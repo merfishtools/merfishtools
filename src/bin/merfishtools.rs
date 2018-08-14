@@ -8,11 +8,11 @@ extern crate bio;
 extern crate clap;
 extern crate fern;
 extern crate itertools;
-#[macro_use]
 extern crate log;
 extern crate merfishtools;
 extern crate ordered_float;
 extern crate failure;
+extern crate regex;
 
 use bio::stats::Prob;
 use clap::App;
@@ -21,9 +21,9 @@ use merfishtools::cli;
 use merfishtools::codebook;
 use merfishtools::io::merfishdata;
 use ordered_float::NotNaN;
-use std::process;
 use std::io;
 use failure::Error;
+use regex::Regex;
 
 
 #[allow(non_snake_case)]
@@ -73,15 +73,15 @@ fn main() -> Result<(), Error> {
             }
         };
 
-        let expression = cli::ExpressionBuilder::default().p0(convert_err_rates(p0))
+        let mut expression = cli::ExpressionBuilder::default().p0(convert_err_rates(p0))
                                                           .p1(convert_err_rates(p1))
-                                                          .codebook_path(codebook_path)
-                                                          .estimate_path(estimate_path)
-                                                          .stats_path(stats_path)
+                                                          .codebook_path(codebook_path.to_owned())
+                                                          .estimate_path(estimate_path.map(|v| v.to_owned()))
+                                                          .stats_path(stats_path.map(|v| v.to_owned()))
                                                           .threads(threads)
-                                                          .cells(Regex::new(cells).unwrap())
+                                                          .cells(Regex::new(cells)?)
                                                           .window_width(window_width)
-                                                          .seed(seed).build()?;
+                                                          .seed(seed).build().unwrap();
         if is_binary_input {
           expression.load_counts(&mut merfishdata::binary::Reader::new(io::stdin())?)?;
         } else {
@@ -97,7 +97,7 @@ fn main() -> Result<(), Error> {
         let pseudocounts = value_t!(matches, "pseudocounts", f64).unwrap_or(1.0);
         let threads = value_t!(matches, "threads", usize).unwrap_or(1);
 
-        cli::differential_expression(&group1_path, &group2_path, cdf_path, max_fc, pseudocounts, threads);
+        cli::differential_expression(&group1_path, &group2_path, cdf_path, max_fc, pseudocounts, threads)
     } else if let Some(matches) = matches.subcommand_matches("multidiffexp") {
         let group_paths = matches.values_of("groups").unwrap();
         let cdf_path = matches.value_of("cdf");
@@ -105,29 +105,22 @@ fn main() -> Result<(), Error> {
         let pseudocounts = value_t!(matches, "pseudocounts", f64).unwrap_or(1.0);
         let threads = value_t!(matches, "threads", usize).unwrap_or(1);
 
-        cli::multi_differential_expression(&group_paths.collect_vec(), cdf_path, max_cv, pseudocounts, threads);
+        cli::multi_differential_expression(&group_paths.collect_vec(), cdf_path, max_cv, pseudocounts, threads)
     } else if let Some(matches) = matches.subcommand_matches("gen-mhd4") {
         let m = value_t!(matches, "onebits", u8).unwrap();
         let not_expressed_pattern = matches.value_of("not-expressed");
         let words = codebook::generate_mhd4(m);
-        if let Err(e) = cli::gen_codebook(&words, not_expressed_pattern) {
-            error!("{}", e);
-            process::exit(1);
-        }
+        cli::gen_codebook(&words, not_expressed_pattern)
     } else if let Some(matches) = matches.subcommand_matches("gen-mhd2") {
         let n = value_t!(matches, "bits", u8).unwrap();
         let m = value_t!(matches, "onebits", u8).unwrap();
         let not_expressed_pattern = matches.value_of("not-expressed");
         let words = codebook::generate_mhd2(n, m);
-        if let Err(e) = cli::gen_codebook(&words, not_expressed_pattern) {
-            error!("{}", e);
-            process::exit(1);
-        }
+        cli::gen_codebook(&words, not_expressed_pattern)
     } else if let Some(matches) = matches.subcommand_matches("est-error-rates") {
         let codebook = matches.value_of("codebook").unwrap();
-        if let Err(e) = cli::estimate_error_rates(codebook) {
-            error!("{}", e);
-            process::exit(1);
-        }
+        cli::estimate_error_rates(codebook)
+    } else {
+        panic!("bug: unexpected subcommand");
     }
 }
