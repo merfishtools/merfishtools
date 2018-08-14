@@ -30,7 +30,7 @@ fn run_cmd(cmd: &str, prefix: Option<&str>) -> bool {
 fn run_exp(dataset: &str, codebook: &str, params: &str) -> bool {
     run_cmd(
         &format!(
-            "merfishtools -v exp --seed 42 -t 1 {codebook} --estimate {est} --stats {stats} {params} < {raw} > {cdf}",
+            "merfishtools -v exp --seed 42 -t 1 {codebook} {raw} --estimate {est} --stats {stats} {params} > {cdf}",
             codebook=format!("tests/codebook/{}.txt", codebook),
             raw=format!("tests/data/{}.txt", dataset),
             cdf=format!("tests/results/{}.txt", dataset),

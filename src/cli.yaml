@@ -20,16 +20,6 @@ subcommands:
       about: Estimate expressions for each feature (e.g. gene or transcript) in each cell.
       after_help: |
         This command estimates expressions for each feature (e.g. gene or transcript) in each cell.
-        MERFISH data has to be provided at STDIN in tab separated columns:
-
-        cell
-        feature
-        hamming_dist
-        cell_position_x
-        cell_position_y
-        rna_position_x
-        rna_position_y
-
         Results are provided as PMF (probability mass function) in columns:
 
         cell
@@ -44,8 +34,24 @@ subcommands:
       args:
         - codebook:
             required: true
-            value_name: TSV-FILE
+            value_name: CODEBOOK-TSV
             help: "Path to codebook definition consisting of tab separated columns: feature, codeword. Misidentification probes (see Chen et al. Science 2015) should not be contained in the codebook."
+        - raw_data:
+            required: true
+            value_name: RAW-DATA
+            help: |
+              Raw data containing molecule assignments to positions.
+              If given as TSV file (ending on .tsv), the following columns are expected:
+
+              cell
+              feature
+              hamming_dist
+              cell_position_x
+              cell_position_y
+              rna_position_x
+              rna_position_y
+
+              Otherwise, the official MERFISH binary format is expected.
         - estimate:
             long: estimate
             short: e

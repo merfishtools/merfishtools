@@ -21,7 +21,6 @@ use merfishtools::cli;
 use merfishtools::codebook;
 use merfishtools::io::merfishdata;
 use ordered_float::NotNaN;
-use std::io;
 use failure::Error;
 use regex::Regex;
 
@@ -61,7 +60,8 @@ fn main() -> Result<(), Error> {
         let window_width = value_t!(matches, "pmf-window-width", u32).unwrap_or_else(|e| e.exit());
         let threads = value_t!(matches, "threads", usize).unwrap_or_else(|e| e.exit());
         let seed = value_t!(matches, "seed", usize).unwrap_or_else(|e| e.exit());
-        let is_binary_input = matches.is_present("is_binary_input");
+        let raw_data = matches.value_of("raw_data").unwrap();
+        let is_binary_input = !(raw_data.ends_with(".tsv") || raw_data.ends_with(".txt"));
 
         let convert_err_rates = |values: Vec<f64>| {
             if values.len() == 1 {
@@ -83,9 +83,9 @@ fn main() -> Result<(), Error> {
                                                           .window_width(window_width)
                                                           .seed(seed).build().unwrap();
         if is_binary_input {
-          expression.load_counts(&mut merfishdata::binary::Reader::new(io::stdin())?)?;
+          expression.load_counts(&mut merfishdata::binary::Reader::from_file(raw_data)?)?;
         } else {
-          expression.load_counts(&mut merfishdata::tsv::Reader::new(io::stdin()))?;
+          expression.load_counts(&mut merfishdata::tsv::Reader::from_file(raw_data)?)?;
         }
 
         expression.infer()
