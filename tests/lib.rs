@@ -1,4 +1,5 @@
 use std::process::Command;
+use std::path::Path;
 
 // fn test_output(result: &str, expected: &str) {
 //     assert!(Command::new("cmp")
@@ -33,11 +34,15 @@ fn run_cmd(cmd: &str, prefix: Option<&str>) -> bool {
 }
 
 fn run_exp(dataset: &str, codebook: &str, params: &str) -> bool {
+    let mut raw_path = format!("tests/data/{}.txt", dataset);
+    if !Path::new(&raw_path).exists() {
+        raw_path = format!("tests/data/{}.bin", dataset);
+    }
     run_cmd(
         &format!(
             "merfishtools -v exp --seed 42 -t 1 {codebook} {raw} --estimate {est} --stats {stats} {params} > {cdf}",
             codebook=format!("tests/codebook/{}.txt", codebook),
-            raw=format!("tests/data/{}.txt", dataset),
+            raw=raw_path,
             cdf=format!("tests/results/{}.txt", dataset),
             est=format!("tests/results/{}.est.txt", dataset),
             stats=format!("tests/results/{}.stats.txt", dataset),
@@ -80,6 +85,15 @@ fn test_exp_mhd4_sim() {
     assert!(run_exp(
         "simulated-MHD4.35.1",
         "simulated-MHD4",
+        "--p0 0.04 --p1 0.1"
+    ));
+}
+
+#[test]
+fn test_exp_mhd4v2_real() {
+    assert!(run_exp(
+        "real-MHD4v2.small-example",
+        "real-MHD4v2",
         "--p0 0.04 --p1 0.1"
     ));
 }
