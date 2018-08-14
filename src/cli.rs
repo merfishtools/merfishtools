@@ -8,13 +8,12 @@
 use std;
 use std::collections;
 use std::io::prelude::*;
-use std::marker::PhantomData;
 
 use csv;
 use itertools::Itertools;
 use cue;
 use regex::Regex;
-use failure::{Fail, Error};
+use failure::Error;
 
 use bio::stats::{Prob, LogProb};
 
@@ -344,7 +343,7 @@ pub fn differential_expression(group1_path: &str, group2_path: &str, pmf_path: O
 /// Estimate differential expression over multiple conditions via the coefficient of variation.
 pub fn multi_differential_expression(group_paths: &[&str], pmf_path: Option<&str>, max_cv: CV, pseudocounts: f64, threads: usize) -> Result<(), Error> {
     let mut groups = Vec::new();
-    for (i, path) in group_paths.iter().enumerate() {
+    for path in group_paths {
         let mut reader = io::cdf::expression::Reader::from_file(path)?;
         groups.push(reader.cdfs());
     }

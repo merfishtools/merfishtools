@@ -1,14 +1,13 @@
 use std::process::Command;
-use std::fs;
 
 
-fn test_output(result: &str, expected: &str) {
-    assert!(Command::new("cmp")
-            .arg(result)
-            .arg(expected)
-            .spawn().unwrap().wait().unwrap().success());
-    fs::remove_file(result).unwrap();
-}
+// fn test_output(result: &str, expected: &str) {
+//     assert!(Command::new("cmp")
+//             .arg(result)
+//             .arg(expected)
+//             .spawn().unwrap().wait().unwrap().success());
+//     fs::remove_file(result).unwrap();
+// }
 
 
 fn run_cmd(cmd: &str, prefix: Option<&str>) -> bool {

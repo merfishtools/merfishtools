@@ -11,7 +11,7 @@ use std::collections;
 use ordered_float::NotNaN;
 use itertools::Itertools;
 use csv;
-use failure::{Fail, Error};
+use failure::Error;
 
 use bio::stats::LogProb;
 use bio::stats::probs::cdf;

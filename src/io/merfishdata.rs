@@ -1,12 +1,9 @@
-// Copyright 2016 Johannes Köster.
+// Copyright 2018 Johannes Köster, Till Hartmann.
 // Licensed under the MIT license (http://opensource.org/licenses/MIT)
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use failure::Error;
-
 use failure::Fail;
-use csv;
 
 pub trait MerfishRecord {
     fn cell_id(&self) -> u32;
