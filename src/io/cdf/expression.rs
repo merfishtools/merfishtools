@@ -11,6 +11,7 @@ use std::collections;
 use ordered_float::NotNaN;
 use itertools::Itertools;
 use csv;
+use failure::Error;
 
 use bio::stats::LogProb;
 use bio::stats::probs::cdf;
@@ -18,7 +19,7 @@ use bio::stats::probs::cdf;
 use model::expression::{CDF, NormalizedCDF};
 
 
-const HEADER: [&'static str; 4] = ["cell", "feat", "expr", "prob"];
+const HEADER: &[&str] = &["cell", "feat", "expr", "prob"];
 
 
 /// A container for feature expression CDFs from multiple cells.
@@ -40,7 +41,7 @@ impl CDFs {
         self.inner.get_mut(feature)
     }
 
-    pub fn features(&self) -> collections::hash_map::Keys<String, Vec<NormalizedCDF>>  {
+    pub fn features(&self) -> collections::hash_map::Keys<String, Vec<NormalizedCDF>> {
         self.inner.keys()
     }
 
@@ -51,12 +52,19 @@ impl CDFs {
 
 
 /// A CDF record.
-#[derive(RustcDecodable, RustcEncodable)]
+#[derive(Serialize, Deserialize)]
 pub struct Record {
     pub cell: String,
     pub feature: String,
     pub expression: f64,
-    pub prob: LogProb
+    pub prob: LogProb,
+}
+
+
+#[derive(Debug, Fail)]
+pub enum ReaderError {
+    #[fail(display = "header does not contain expected columns {:?}", columns)]
+    InvalidHeader { columns: &'static [&'static str] }
 }
 
 
@@ -68,38 +76,36 @@ pub struct Reader<R: io::Read> {
 
 impl Reader<fs::File> {
     /// Read from a given file path.
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Option<Self> {
-        fs::File::open(path).map(|f| Reader::from_reader(f)).ok().expect("Error opening file.")
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+        let f = fs::File::open(path)?;
+        Ok(Reader::from_reader(f)?)
     }
 }
 
 
 impl<R: io::Read> Reader<R> {
-    pub fn from_reader(rdr: R) -> Option<Self> {
-        let mut inner = csv::Reader::from_reader(rdr).delimiter(b'\t');
-        if inner.headers().unwrap() == HEADER {
-            Some(Reader {
-                inner: inner
-            })
-        }
-        else {
-            None
+    pub fn from_reader(rdr: R) -> Result<Self, ReaderError> {
+        let mut inner = csv::ReaderBuilder::new().delimiter(b'\t').from_reader(rdr);
+        if inner.headers().unwrap().eq(HEADER) {
+            Ok(Reader { inner })
+        } else {
+            Err(ReaderError::InvalidHeader{ columns: HEADER })
         }
     }
 
     pub fn cdfs(&mut self) -> CDFs {
         let mut features = collections::HashMap::new();
-        let groups = self.inner.decode().map(|res| res.ok().expect("Error reading record")).group_by(
-            |rec: &Record| (rec.cell.clone(), rec.feature.clone())
-        );
-        for ((_, feature), records) in groups.into_iter() {
+        let groups = self.inner.deserialize()
+            .map(|res| res.expect("Error reading record"))
+            .group_by(|rec: &Record| (rec.cell.clone(), rec.feature.clone()));
+        for ((_, feature), records) in &groups {
             let cdf = NormalizedCDF::from_cdf(records.map(|rec| {
                 cdf::Entry {
-                    value: NotNaN::new(rec.expression.clone()).unwrap(),
-                    prob: rec.prob.clone()
+                    value: NotNaN::new(rec.expression).unwrap(),
+                    prob: rec.prob,
                 }
             }));
-            let mut cdfs = features.entry(feature).or_insert(Vec::new());
+            let mut cdfs = features.entry(feature).or_insert_with(Vec::new);
             cdfs.push(cdf);
         }
         CDFs { inner: features }
@@ -115,7 +121,7 @@ pub struct Writer<W: io::Write> {
 impl Writer<fs::File> {
     /// Write to a given file path.
     pub fn from_file<P: AsRef<Path>>(path: P) -> Self {
-        fs::File::create(path).map(|f| Writer::from_writer(f)).unwrap()
+        fs::File::create(path).map(Writer::from_writer).unwrap()
     }
 }
 
@@ -123,21 +129,21 @@ impl Writer<fs::File> {
 impl<W: io::Write> Writer<W> {
     pub fn from_writer(w: W) -> Self {
         let mut writer = Writer {
-            inner: csv::Writer::from_writer(w).delimiter(b'\t')
+            inner: csv::WriterBuilder::new().delimiter(b'\t').from_writer(w)
         };
-        writer.inner.write(HEADER.iter()).unwrap();
+        writer.inner.write_record(HEADER).unwrap();
 
         writer
     }
 
     pub fn write(&mut self, cell: &str, feature: &str, cdf: &CDF) {
         for x in cdf.iter() {
-            self.inner.write([
+            self.inner.write_record(&[
                 cell,
                 feature,
                 &format!("{:.0}", x.value)[..],
                 &format!("{}", *x.prob)[..]
-            ].iter()).unwrap();
+            ]).unwrap();
         }
     }
 }

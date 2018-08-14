@@ -1,3 +1,4 @@
+cell	feat	dist	cell_x	cell_y	x	y
 1	CREBBP	0	0	0	0	0
 1	CREBBP	0	0	0	0	0
 1	CREBBP	0	0	0	0	0

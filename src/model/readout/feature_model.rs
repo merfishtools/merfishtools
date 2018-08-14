@@ -190,10 +190,10 @@ impl FeatureModel {
 
         FeatureModel {
             feature_id: feature,
-            event_probs: event_probs,
-            neighbors: neighbors,
+            event_probs,
+            neighbors,
             min_dist: codebook.min_dist,
-            counts: counts,
+            counts,
             event_counts: RefCell::new(Vec::new())
         }
     }
@@ -386,13 +386,13 @@ impl NoiseModel {
         ]).ln_one_minus_exp();
 
         NoiseModel {
-            feature_id: feature_id,
-            not_expressed_feature_ids: not_expressed_feature_ids,
-            not_expressed_counts: not_expressed_counts,
+            feature_id,
+            not_expressed_feature_ids,
+            not_expressed_counts,
             probs_miscall_exact: probs_miscall_exact.iter().map(|&p| Prob::from(p)).collect_vec(),
             probs_miscall_mismatch: probs_miscall_mismatch.iter().map(|&p| Prob::from(p)).collect_vec(),
             prob_dropout: Prob::from(prob_dropout),
-            neighbors: neighbors,
+            neighbors,
             min_dist: codebook.min_dist
         }
     }
@@ -424,11 +424,9 @@ impl AbstractFeatureModel for NoiseModel {
             calls_mismatch += counts.mismatch.saturating_sub(miscalls_mismatch.total_to(id));
         }
 
-        let event_count = calls_exact + calls_mismatch +
-                          miscalls_exact.total_from(self.feature_id) +
-                          miscalls_mismatch.total_from(self.feature_id);
-
-        event_count
+        calls_exact + calls_mismatch +
+            miscalls_exact.total_from(self.feature_id) +
+            miscalls_mismatch.total_from(self.feature_id)
     }
 
     fn prob_dropout(&self) -> f64 {

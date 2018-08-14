@@ -12,6 +12,7 @@ use csv;
 
 
 /// A writer for expression estimates.
+#[derive(Debug)]
 pub struct Writer<W: io::Write> {
     inner: csv::Writer<W>
 }
@@ -20,7 +21,7 @@ pub struct Writer<W: io::Write> {
 impl Writer<fs::File> {
     /// Write to a given file path.
     pub fn from_file<P: AsRef<Path>>(path: P) -> Self {
-        fs::File::create(path).map(|f| Writer::from_writer(f)).unwrap()
+        fs::File::create(path).map( Writer::from_writer).unwrap()
     }
 }
 
@@ -28,10 +29,10 @@ impl Writer<fs::File> {
 impl<W: io::Write> Writer<W> {
     pub fn from_writer(w: W) -> Self {
         let mut writer = Writer {
-            inner: csv::Writer::from_writer(w).delimiter(b'\t')
+            inner: csv::WriterBuilder::new().delimiter(b'\t').from_writer(w)
         };
         let fields = vec!["cell", "feat", "expr_map", "expr_ci_lower", "expr_ci_upper"];
-        writer.inner.write(fields.iter()).unwrap();
+        writer.inner.write_record(fields).unwrap();
 
         writer
     }
@@ -41,14 +42,14 @@ impl<W: io::Write> Writer<W> {
         cell: &str,
         feature: &str,
         map: u32,
-        credible_interval: Range<&u32>
+        credible_interval: &Range<&u32>
     ) {
-        self.inner.write([
+        self.inner.write_record(&[
             cell,
             feature,
             &format!("{}", map)[..],
             &format!("{}", credible_interval.start)[..],
             &format!("{}", credible_interval.end)[..]
-        ].iter()).unwrap();
+        ]).unwrap();
     }
 }

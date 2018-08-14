@@ -4,29 +4,42 @@
 // except according to those terms.
 
 #[macro_use]
-extern crate log;
-extern crate fern;
-extern crate bio;
-extern crate csv;
-extern crate itertools;
-extern crate num;
-extern crate rustc_serialize;
-extern crate nalgebra;
-extern crate regex;
-extern crate rgsl;
-#[macro_use]
 extern crate approx;
-extern crate fnv;
+extern crate bincode;
+extern crate bio;
 extern crate bit_set;
-extern crate rand;
+extern crate bit_vec;
+extern crate csv;
+extern crate cue;
+extern crate fern;
+extern crate fnv;
+extern crate itertools;
+#[macro_use]
+extern crate log;
+extern crate nalgebra;
 #[macro_use(s)]
 extern crate ndarray;
-extern crate bit_vec;
-extern crate petgraph;
-extern crate ordered_float;
 extern crate ndarray_rand;
+extern crate num;
+extern crate ordered_float;
+extern crate petgraph;
+extern crate rand;
+extern crate regex;
+extern crate rgsl;
+extern crate rustc_serialize;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+#[macro_use]
+extern crate serde_with;
+extern crate failure;
+#[macro_use]
+extern crate failure_derive;
+#[macro_use]
+extern crate derive_builder;
 
 pub mod model;
 pub mod io;
 pub mod codebook;
 pub mod error_rates;
+pub mod cli;

@@ -33,11 +33,11 @@ pub fn parse_codeword(codeword: &[u8]) -> Codeword {
 
 
 /// A codebook record.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Record {
     name: String,
     codeword: BitVec<u32>,
-    expressed: bool
+    expressed: bool,
 }
 
 
@@ -46,16 +46,16 @@ impl Record {
         Record {
             name: "noise".to_owned(),
             codeword: BitVec::from_elem(len, false),
-            expressed: true  // there is always some noise
+            expressed: true,  // there is always some noise
         }
     }
 
     /// Create new record.
     pub fn new(name: String, codeword: &[u8], expressed: bool) -> Self {
         Record {
-            name: name,
+            name,
             codeword: parse_codeword(codeword),
-            expressed: expressed
+            expressed,
         }
     }
 
@@ -85,7 +85,7 @@ impl Record {
     pub fn diff(&self, other: &Record) -> BitVec {
         let mut diff = BitVec::new();
         {
-            let mut s = unsafe { diff.storage_mut() };
+            let s = unsafe { diff.storage_mut() };
             for (a, b) in self.codeword.blocks().zip(other.codeword.blocks()) {
                 s.push(a ^ b);
             }
@@ -102,6 +102,7 @@ pub type FeatureID = usize;
 
 /// Codebook representation.\
 #[allow(non_snake_case)]
+#[derive(Clone, Debug)]
 pub struct Codebook {
     index: HashMap<String, FeatureID>,
     graph: UnGraph<Record, ()>,
@@ -110,23 +111,22 @@ pub struct Codebook {
     pub N: u8,
     // Number of 1-bits in the codewords.
     pub m: u8,
-    noise_record: Record
+    noise_record: Record,
 }
-
 
 
 impl Codebook {
     /// Read from a given file path.
     #[allow(non_snake_case)]
     pub fn from_file<P: AsRef<Path>>(path: P) -> csv::Result<Self> {
-        let mut rdr = (csv::Reader::from_file(path)?).delimiter(b'\t');
+        let mut rdr = csv::ReaderBuilder::new().delimiter(b'\t').from_path(path)?;
 
         let mut N = None;
         let mut m = None;
         let mut graph = Graph::default();
         let index = {
             let mut index = HashMap::new();
-            for rec in rdr.decode() {
+            for rec in rdr.deserialize() {
                 let (feature, codeword, expressed): (String, String, u8) = rec?;
                 let expressed = expressed == 1;
 
@@ -148,7 +148,7 @@ impl Codebook {
                 let idx = graph.add_node(rec);
                 index.insert(
                     feature,
-                    idx.index()
+                    idx.index(),
                 );
             }
             index
@@ -170,12 +170,12 @@ impl Codebook {
         }
 
         Ok(Codebook {
-            graph: graph,
-            index: index,
-            min_dist: min_dist,
+            graph,
+            index,
+            min_dist,
             N: N.unwrap() as u8,
             m: m.unwrap() as u8,
-            noise_record: Record::noise(N.unwrap())
+            noise_record: Record::noise(N.unwrap()),
         })
     }
 
@@ -241,4 +241,6 @@ impl Codebook {
     pub fn len(&self) -> usize {
         self.index.len()
     }
+
+    pub fn is_empty(&self) -> bool { self.index.is_empty() }
 }

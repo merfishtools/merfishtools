@@ -104,7 +104,7 @@ mod tests {
         let a = BitVec::from_bytes(&[0b10101101]);
 
         let mut probs = Vec::new();
-        for b in 0..256 {
+        for b in 0..=255 {
             let b = BitVec::from_bytes(&[b]);
             probs.push(xi.prob(&a, &b)[0]);
         }
@@ -120,7 +120,7 @@ mod tests {
         let xi = Xi::new(&[Prob::from(p0); 16], &[Prob::from(p1); 16]);
 
         let noise = BitVec::from_elem(16, false);
-        let mut target = BitVec::from_bytes(&[0b10001100, 0b00000010]);
+        let target = BitVec::from_bytes(&[0b10001100, 0b00000010]);
 
         let p = xi.prob(&noise, &target);
 

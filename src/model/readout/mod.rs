@@ -62,7 +62,7 @@ impl Miscalls {
         Miscalls {
             miscalls: Array::from_elem((feature_count, feature_count), 0),
             total_to: vec![0; feature_count],
-            max_total_to: max_total_to,
+            max_total_to,
             total: 0
         }
     }
