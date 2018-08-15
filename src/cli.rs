@@ -75,15 +75,12 @@ impl Expression {
         let codebook = io::codebook::Codebook::from_file(&self.codebook_path)?;
 
         let mut counts = collections::HashMap::new();
-        for record in reader.records().filter_map(|res| {
-            let rec = res.unwrap();
-            // consider record if it is contained in the codebook and has a valid cell id
-            if self.cells.is_match(&rec.cell_name()) && codebook.contains(&rec.feature_name()) {
-                Some(rec)
-            } else {
-                None
+        for res in reader.records() {
+            let record = res?;
+            if !self.cells.is_match(&record.cell_name()) && codebook.contains(&record.feature_name()) {
+                continue;
             }
-        }) {
+
             let cell_counts = counts
                 .entry(record.cell_name())
                 .or_insert_with(collections::HashMap::new);

@@ -217,6 +217,7 @@ pub mod binary {
         }
 
         fn hamming_dist(&self) -> u8 {
+            assert!(self.is_exact <= 1, "unexpected value in field is_exact: {}", self.is_exact);
             1 - self.is_exact
         }
     }
@@ -262,21 +263,14 @@ pub mod binary {
             &self.header
         }
 
-        pub fn read(&mut self) -> Result<Record, io::Error> {
-            match bincode::deserialize_from::<_, Record>(&mut self.reader) {
-                Ok(record) => Ok(record),
-                // TODO: propagate bincode's Error
-                Err(_) => Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("Failed deserializing record {} from reader.", 0),
-                )),
-            }
+        pub fn read(&mut self) -> Result<Record, bincode::Error> {
+            bincode::deserialize_from::<_, Record>(&mut self.reader)
         }
     }
 
     impl<'a, R: io::Read + 'a> super::Reader<'a> for Reader<R> {
         type Record = Record;
-        type Error = io::Error;
+        type Error = bincode::Error;
         type Iterator = RecordIterator<'a, R>;
 
         fn records(&'a mut self) -> RecordIterator<'a, R> {
@@ -299,9 +293,9 @@ pub mod binary {
     }
 
     impl<'a, R: io::Read> Iterator for RecordIterator<'a, R> {
-        type Item = Result<Record, io::Error>;
+        type Item = Result<Record, bincode::Error>;
 
-        fn next(&mut self) -> Option<Result<Record, io::Error>> {
+        fn next(&mut self) -> Option<Result<Record, bincode::Error>> {
             if self.i >= self.reader.header.num_entries {
                 None
             } else {
