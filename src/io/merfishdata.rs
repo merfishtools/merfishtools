@@ -22,10 +22,12 @@ pub enum Format {
 impl Format {
     /// Infer input format from given path.
     pub fn from_path<P: AsRef<Path>>(path: P) -> Format {
-        if !path.as_ref().ends_with(".tsv") || path.as_ref().ends_with(".txt") {
-            Format::Binary
-        } else {
+        if path.as_ref().ends_with(".tsv") || path.as_ref().ends_with(".txt") {
+            println!("TSV!!");
             Format::TSV
+        } else {
+            println!("Binary!!");
+            Format::Binary
         }
     }
 }
