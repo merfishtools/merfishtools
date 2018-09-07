@@ -22,12 +22,9 @@ pub enum Format {
 impl Format {
     /// Infer input format from given path.
     pub fn from_path<P: AsRef<Path>>(path: P) -> Format {
-        if path.as_ref().ends_with(".tsv") || path.as_ref().ends_with(".txt") {
-            println!("TSV!!");
-            Format::TSV
-        } else {
-            println!("Binary!!");
-            Format::Binary
+        match path.as_ref().extension() {
+            Some(e) if e == "tsv" || e == "txt" => Format::TSV,
+            _ => Format::Binary,
         }
     }
 }
@@ -231,7 +228,6 @@ pub mod binary {
         pub fn readout(&self) -> Readout {
             let mut buf = [0; 8];
             NativeEndian::write_u64(&mut buf, self.barcode);
-            // TODO ensure this is read in the right order
             let mut readout = Readout::from_bytes(&buf);
             readout.truncate(16);
             if self.hamming_dist() > 0 {
@@ -260,6 +256,7 @@ pub mod binary {
         }
 
         fn feature_name(&self) -> String {
+            eprintln!("{:?}", self.readout());
             self.barcode_id.to_string()
         }
 
