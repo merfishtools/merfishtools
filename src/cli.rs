@@ -427,7 +427,7 @@ pub fn estimate_error_rates(raw_data: &str, codebook: &str) -> Result<(), Error>
     } else {
         let mut readouts = csv::ReaderBuilder::new()
             .delimiter(b'\t')
-            .from_reader(std::io::stdin());
+            .from_path(raw_data)?;
 
         error_rates::estimate(
             &codebook,

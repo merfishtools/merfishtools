@@ -256,7 +256,6 @@ pub mod binary {
         }
 
         fn feature_name(&self) -> String {
-            eprintln!("{:?}", self.readout());
             self.barcode_id.to_string()
         }
 
