@@ -257,13 +257,7 @@ subcommands:
 
         Example usage:
 
-        merfishtools est-error-rates < readouts.tsv > error-rates.tsv
-
-        The input file should contain the columns
-
-        cell
-        feature (e.g. gene or transcript)
-        readout (binary word as a string of 0 and 1)
+        merfishtools est-error-rates readouts.tsv > error-rates.tsv
 
         The produced output will have the three columns
 
@@ -271,9 +265,24 @@ subcommands:
         p0
         p1
 
+        representing the position in the binary word, the 0-1 error rate and
+        the 1-0 error rate.
+
       settings: ArgRequiredElseHelp
       args:
         - codebook:
             required: true
             value_name: TSV-FILE
             help: Path to codebook file.
+        - raw_data:
+            required: true
+            value_name: RAW-DATA
+            help: |
+              Raw data containing molecule assignments to positions.
+              If given as TSV file (ending on .tsv), the following columns are expected:
+
+              cell
+              feature
+              readout
+
+              Otherwise, the official MERFISH binary format is expected.

@@ -20,7 +20,7 @@ use bio::stats::{LogProb, Prob};
 use codebook;
 use error_rates;
 use io;
-use io::merfishdata::MerfishRecord;
+use io::merfishdata::{MerfishRecord, self, Reader};
 use model;
 use model::cv::CV;
 use model::foldchange::LogFC;
@@ -186,106 +186,6 @@ impl Expression {
     }
 }
 
-// /// Estimate expressions.
-// pub fn expression<'a, I, R>(
-//     p0: &[Prob],
-//     p1: &[Prob],
-//     reader: &'a mut R,
-//     codebook_path: &str,
-//     estimate_path: Option<&str>,
-//     stats_path: Option<&str>,
-//     threads: usize,
-//     cells: &str,
-//     window_width: u32,
-//     seed: usize
-// )
-// where R: io::merfishdata::Reader<'a>
-// {
-//     let codebook = io::codebook::Codebook::from_file(codebook_path).unwrap();
-//     let mut cdf_writer = io::cdf::expression::Writer::from_writer(std::io::stdout());
-//     let mut est_writer = estimate_path.map(io::estimation::expression::Writer::from_file);
-//
-//     let mut stats_writer = stats_path.map(|path| csv::WriterBuilder::new().delimiter(b'\t').from_path(path).unwrap());
-//     if let Some(ref mut writer) = stats_writer {
-//         writer.serialize(["cell", "noise-rate"]).unwrap();
-//     }
-//
-//     let cells = Regex::new(cells).expect("Invalid regular expression for cells.");
-//
-//     let mut counts = collections::HashMap::new();
-//     for record in reader.records().filter_map(|res| {
-//             let rec = res.unwrap();
-//             // consider record if it is contained in the codebook and has a valid cell id
-//             if cells.is_match(&rec.cell_name()) && codebook.contains(&rec.feature_name()) {
-//                 Some(rec)
-//             }
-//             else {
-//                 None
-//             }
-//         }
-//     ) {
-//         let cell_counts = counts.entry(record.cell_name()).or_insert_with(collections::HashMap::new);
-//         let feature_counts = cell_counts.entry(record.feature_name()).or_insert(Counts{ exact: 0, mismatch: 0});
-//         if record.hamming_dist() == 0 {
-//             feature_counts.exact += 1;
-//         }
-//         else if record.hamming_dist() == 1 {
-//             feature_counts.mismatch += 1;
-//         }
-//         else {
-//             panic!("Hamming distance of greater than 1 is unsupported at the moment.")
-//         }
-//     }
-//     // add missing features from codebook
-//     for cell_counts in counts.values_mut() {
-//         for feature in codebook.features() {
-//             cell_counts.entry(feature.clone()).or_insert(Counts{ exact: 0, mismatch: 0});
-//         }
-//     }
-//
-//     cue::pipeline(
-//         "exp",
-//         threads,
-//         counts.into_iter(),
-//         |(cell, counts)| {
-//             // Generate joint model.
-//             let mut model = model::readout::JointModel::new(
-//                 counts.iter(), &p0, &p1, &codebook, window_width, seed
-//             );
-//             model.expectation_maximization(&cell);
-//
-//             // Calculate CDF for all features.
-//             let cdfs = counts.into_iter().filter_map(|(feature, _)| {
-//                 let feature_id = codebook.get_id(&feature);
-//                 if codebook.record(feature_id).expressed() {
-//                     let (cdf, map_estimate) = model::expression::cdf(
-//                         feature_id, &mut model
-//                     );
-//
-//                     Some((feature, cdf, map_estimate))
-//                 } else { None }
-//             }).collect_vec();
-//             (cell, cdfs, model.noise_rate())
-//         },
-//         |(cell, cdfs, noise_rate)| {
-//             for (feature, cdf, map_estimate) in cdfs {
-//                 cdf_writer.write(&cell, &feature, &cdf);
-//
-//                 if let Some(ref mut est_writer) = est_writer {
-//                     est_writer.write(
-//                         &cell,
-//                         &feature,
-//                         map_estimate,
-//                         &cdf.credible_interval(0.95).expect("bug: empty CDF")
-//                     );
-//                 }
-//             }
-//             if let Some(ref mut stats_writer) = stats_writer {
-//                 stats_writer.serialize([&cell, &format!("{:.4}", noise_rate)]).unwrap();
-//             }
-//         }
-//     );
-// }
 
 /// Estimate differential expression over two conditions via fold changes.
 pub fn differential_expression(
@@ -512,19 +412,31 @@ pub fn gen_codebook(
     Ok(())
 }
 
-pub fn estimate_error_rates(codebook: &str) -> Result<(), Error> {
+pub fn estimate_error_rates(raw_data: &str, codebook: &str) -> Result<(), Error> {
     let codebook = io::codebook::Codebook::from_file(codebook).unwrap();
-    let mut readouts = csv::ReaderBuilder::new()
-        .delimiter(b'\t')
-        .from_reader(std::io::stdin());
 
-    let (p0, p1) = error_rates::estimate(
-        &codebook,
-        readouts.deserialize().map(|rec| {
-            let (_cell, feat, readout): (String, String, String) = rec.unwrap();
-            (feat, io::codebook::parse_codeword(readout.as_bytes()))
-        }),
-    );
+    let (p0, p1) = if let merfishdata::Format::Binary = merfishdata::Format::from_path(raw_data) {
+        let mut reader = merfishdata::binary::Reader::from_file(raw_data)?;
+        error_rates::estimate(
+            &codebook,
+            reader.records().map(|rec| {
+                let rec = rec.unwrap();
+                (rec.feature_name(), rec.readout())
+            })
+        )
+    } else {
+        let mut readouts = csv::ReaderBuilder::new()
+            .delimiter(b'\t')
+            .from_path(raw_data)?;
+
+        error_rates::estimate(
+            &codebook,
+            readouts.deserialize().map(|rec| {
+                let (_cell, feat, readout): (String, String, String) = rec.unwrap();
+                (feat, io::codebook::parse_codeword(readout.as_bytes()))
+            }),
+        )
+    };
 
     let mut writer = csv::WriterBuilder::new()
         .delimiter(b'\t')

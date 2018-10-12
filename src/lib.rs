@@ -37,6 +37,7 @@ extern crate failure;
 extern crate failure_derive;
 #[macro_use]
 extern crate derive_builder;
+extern crate byteorder;
 
 pub mod cli;
 pub mod codebook;

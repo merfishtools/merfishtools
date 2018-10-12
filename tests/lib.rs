@@ -100,16 +100,17 @@ fn test_exp_mhd4v2_real() {
 
 #[test]
 fn test_estimate_error_rates_real() {
+
     assert!(run_cmd(
-        "merfishtools -v est-error-rates tests/codebook/140genesData.1.txt > tests/results/140genesData.error-rates.tsv",
-        Some("grep -P '^3\\t' tests/data/140genesData.readouts.txt | cut -f2,3,4 | ")
+        "merfishtools -v est-error-rates tests/codebook/140genesData.1.txt /tmp/merfishtools.140genesData.readouts.simple.txt > tests/results/140genesData.error-rates.tsv",
+        Some("grep -P '^3\\t' tests/data/140genesData.readouts.txt | cut -f2,3,4 > /tmp/merfishtools.140genesData.readouts.simple.txt; ")
     ));
 }
 
 #[test]
 fn test_estimate_error_rates_simulated() {
     assert!(run_cmd(
-        "merfishtools -v est-error-rates tests/codebook/140genesData.1.txt < tests/data/simulated-MHD4.35.readouts.txt > tests/results/simulated-MHD4.35.error-rates.tsv",
+        "merfishtools -v est-error-rates tests/codebook/140genesData.1.txt tests/data/simulated-MHD4.35.readouts.txt > tests/results/simulated-MHD4.35.error-rates.tsv",
         None
     ));
 }

@@ -3,7 +3,32 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use std::path::Path;
+
 use failure::Fail;
+use bit_vec::BitVec;
+
+
+pub type Readout = BitVec;
+
+
+/// Enumeration of all accepted input formats.
+pub enum Format {
+    TSV,
+    Binary
+}
+
+
+impl Format {
+    /// Infer input format from given path.
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Format {
+        match path.as_ref().extension() {
+            Some(e) if e == "tsv" || e == "txt" => Format::TSV,
+            _ => Format::Binary,
+        }
+    }
+}
+
 
 pub trait MerfishRecord {
     fn cell_id(&self) -> u32;
@@ -121,6 +146,10 @@ pub mod binary {
     use std::io;
     use std::io::Read;
     use std::path::Path;
+    use byteorder::{ByteOrder, NativeEndian};
+
+    use super::Readout;
+
 
     /// Header of a binary merfish file.
     #[derive(Serialize, Deserialize, Debug)]
@@ -193,6 +222,20 @@ pub mod binary {
         /// The distance (in microns) from the RNA to the closest boundary of the cell.
         #[serde(rename = "distPeriphery")]
         pub dist_periphery: f64,
+    }
+
+    impl Record {
+        pub fn readout(&self) -> Readout {
+            let mut buf = [0; 8];
+            NativeEndian::write_u64(&mut buf, self.barcode);
+            let mut readout = Readout::from_bytes(&buf);
+            readout.truncate(16);
+            if self.hamming_dist() > 0 {
+                let value = !readout.get(self.error_bit as usize).unwrap();
+                readout.set(self.error_bit as usize, value);
+            }
+            readout
+        }
     }
 
     impl MerfishRecord for Record {
