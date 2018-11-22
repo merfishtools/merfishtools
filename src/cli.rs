@@ -69,8 +69,8 @@ pub struct Expression {
 
 impl Expression {
     pub fn load_counts<'a, R>(&mut self, reader: &'a mut R) -> Result<(), Error>
-    where
-        R: io::merfishdata::Reader<'a>,
+        where
+            R: io::merfishdata::Reader<'a>,
     {
         let codebook = io::codebook::Codebook::from_file(&self.codebook_path)?;
 

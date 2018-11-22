@@ -15,7 +15,7 @@ pub type Readout = BitVec;
 /// Enumeration of all accepted input formats.
 pub enum Format {
     TSV,
-    Binary
+    Binary,
 }
 
 
@@ -42,7 +42,7 @@ pub trait MerfishRecord {
 pub trait Reader<'a> {
     type Record: MerfishRecord;
     type Error: Fail;
-    type Iterator: Iterator<Item = Result<Self::Record, Self::Error>> + 'a;
+    type Iterator: Iterator<Item=Result<Self::Record, Self::Error>> + 'a;
 
     fn records(&'a mut self) -> Self::Iterator;
 }
@@ -275,7 +275,7 @@ pub mod binary {
         #[fail(display = "unsupported version: {}", version)]
         UnsupportedVersion { version: u8 },
         #[fail(
-            display = "header is corrupt, i.e. might not have been written properly (while in append mode)"
+        display = "header is corrupt, i.e. might not have been written properly (while in append mode)"
         )]
         Corrupt,
     }
