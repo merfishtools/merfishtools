@@ -101,6 +101,7 @@ pub type FeatureID = usize;
 #[derive(Clone, Debug)]
 pub struct Codebook {
     index: HashMap<String, FeatureID>,
+    idmap: HashMap<u16, String>,
     graph: UnGraph<Record, ()>,
     pub min_dist: u8,
     // Number of bits in the codewords.
@@ -119,10 +120,12 @@ impl Codebook {
         let mut N = None;
         let mut m = None;
         let mut graph = Graph::default();
+        let mut idmap = HashMap::new();
         let index = {
             let mut index = HashMap::new();
-            for rec in rdr.deserialize() {
+            for (i, rec) in rdr.deserialize().enumerate() {
                 let (feature, codeword, expressed): (String, String, u8) = rec?;
+                idmap.insert((i + 1) as u16, feature.clone());
                 let expressed = expressed == 1;
 
                 let rec = Record::new(feature.clone(), codeword.as_bytes(), expressed);
@@ -165,10 +168,10 @@ impl Codebook {
                 graph.add_edge(NodeIndex::new(a), NodeIndex::new(b), ());
             }
         }
-
         Ok(Codebook {
-            graph,
             index,
+            idmap,
+            graph,
             min_dist,
             N: N.unwrap() as u8,
             m: m.unwrap() as u8,
@@ -182,6 +185,10 @@ impl Codebook {
 
     pub fn record(&self, feature: FeatureID) -> &Record {
         self.graph.node_weight(NodeIndex::new(feature)).unwrap()
+    }
+
+    pub fn get_name(&self, feature_id: &u16) -> Option<String> {
+        self.idmap.get(feature_id).cloned()
     }
 
     pub fn get_id(&self, feature: &str) -> FeatureID {

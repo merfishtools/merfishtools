@@ -149,6 +149,7 @@ pub mod binary {
     use byteorder::{ByteOrder, NativeEndian};
 
     use super::Readout;
+    use bit_vec::BitVec;
 
 
     /// Header of a binary merfish file.
@@ -228,7 +229,8 @@ pub mod binary {
         pub fn readout(&self) -> Readout {
             let mut buf = [0; 8];
             NativeEndian::write_u64(&mut buf, self.barcode);
-            let mut readout = Readout::from_bytes(&buf);
+            let mut readout = BitVec::with_capacity(16);
+            (0..16).for_each(|i| readout.push(((self.barcode >> i) & 1) == 1));
             readout.truncate(16);
             if self.error_bit > 0 {
                 // error_bit == 0 <=> there is no error.
