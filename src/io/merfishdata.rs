@@ -230,9 +230,12 @@ pub mod binary {
             NativeEndian::write_u64(&mut buf, self.barcode);
             let mut readout = Readout::from_bytes(&buf);
             readout.truncate(16);
-            if self.hamming_dist() > 0 {
-                let value = !readout.get(self.error_bit as usize).unwrap();
-                readout.set(self.error_bit as usize, value);
+            if self.error_bit > 0 {
+                // error_bit == 0 <=> there is no error.
+                // i.e. the actually erroneous bit is `error_bit - 1`
+                let bit = self.error_bit as usize - 1;
+                let value = !readout.get(bit).unwrap();
+                readout.set(bit, value);
             }
             readout
         }
