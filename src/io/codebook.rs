@@ -187,8 +187,8 @@ impl Codebook {
         self.graph.node_weight(NodeIndex::new(feature)).unwrap()
     }
 
-    pub fn get_name(&self, feature_id: &u16) -> Option<String> {
-        self.idmap.get(feature_id).cloned()
+    pub fn get_name(&self, feature_id: u16) -> Option<String> {
+        self.idmap.get(&feature_id).cloned()
     }
 
     pub fn get_id(&self, feature: &str) -> FeatureID {
