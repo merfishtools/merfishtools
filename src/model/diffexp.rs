@@ -8,7 +8,7 @@ use ordered_float::NotNaN;
 use bio::stats::probs;
 use bio::stats::LogProb;
 
-use model;
+use crate::model;
 
 pub type DiffexpMeasure = NotNaN<f64>;
 pub type CDF = probs::cdf::CDF<DiffexpMeasure>;

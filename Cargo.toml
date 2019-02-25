@@ -2,6 +2,7 @@
 name = "merfishtools"
 version = "1.5.0"
 authors = ["Johannes Koester <johannes.koester@tu-dortmund.de>"]
+edition = "2018"
 
 [dependencies]
 bio = "0.14"

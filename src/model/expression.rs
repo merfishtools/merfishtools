@@ -4,8 +4,8 @@ use ordered_float::NotNaN;
 use bio::stats::probs;
 use bio::stats::LogProb;
 
-use io::codebook::FeatureID;
-use model;
+use crate::io::codebook::FeatureID;
+use crate::model;
 
 pub type CDF = probs::cdf::CDF<u32>;
 pub type NormalizedCDF = probs::cdf::CDF<NotNaN<f64>>;

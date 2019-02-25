@@ -5,7 +5,7 @@ use ndarray::prelude::*;
 
 use bio::stats::{LogProb, Prob};
 
-use io::codebook::Codeword;
+use crate::io::codebook::Codeword;
 
 /// Basic model for the probability of making i 1-0 and j 0-1 errors.
 pub struct Xi {

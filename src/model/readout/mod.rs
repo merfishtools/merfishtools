@@ -3,15 +3,15 @@ use std::collections::HashMap;
 
 use ndarray::prelude::*;
 
-use io::codebook::FeatureID;
+use crate::io::codebook::FeatureID;
 
 pub mod feature_model;
 pub mod joint_model;
 pub mod xi;
 
-pub use model::readout::feature_model::{FeatureModel, NoiseModel};
-pub use model::readout::joint_model::JointModel;
-pub use model::readout::xi::Xi;
+pub use crate::model::readout::feature_model::{FeatureModel, NoiseModel};
+pub use crate::model::readout::joint_model::JointModel;
+pub use crate::model::readout::xi::Xi;
 
 pub type Expressions = Array1<u32>;
 

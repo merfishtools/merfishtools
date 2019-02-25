@@ -1,12 +1,10 @@
 use std::f64;
 
+use bio::stats::Prob;
 use ndarray::prelude::*;
 
-use bio::stats::Prob;
-
-use io::codebook::Codebook;
-use io::merfishdata::Readout;
-
+use crate::io::codebook::Codebook;
+use crate::io::merfishdata::Readout;
 
 /// Estimate position-wise error rates as presented by Chen et al. 2015.
 pub fn estimate<I: Iterator<Item = (String, Readout)>>(

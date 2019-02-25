@@ -3,27 +3,19 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-extern crate bio;
 #[macro_use]
 extern crate clap;
-extern crate failure;
-extern crate fern;
-extern crate itertools;
-extern crate log;
-extern crate merfishtools;
-extern crate ordered_float;
-extern crate regex;
 
 use bio::stats::Prob;
 use clap::App;
 use failure::Error;
 use itertools::Itertools;
-use merfishtools::cli;
-use merfishtools::codebook;
-use merfishtools::io::merfishdata;
 use ordered_float::NotNaN;
 use regex::Regex;
 
+use merfishtools::cli;
+use merfishtools::codebook;
+use merfishtools::io::merfishdata;
 
 #[allow(non_snake_case)]
 fn main() -> Result<(), Error> {

@@ -5,9 +5,8 @@
 
 use std::path::Path;
 
-use failure::Fail;
 use bit_vec::BitVec;
-
+use failure::Fail;
 
 pub type Readout = BitVec;
 
@@ -53,7 +52,8 @@ pub mod tsv {
     use std::path::Path;
 
     use csv;
-    use io::merfishdata::MerfishRecord;
+
+    use crate::io::merfishdata::MerfishRecord;
 
     /// A 2D position in the microscope.
     #[derive(Serialize, Deserialize, Debug)]
@@ -139,18 +139,19 @@ pub mod tsv {
 }
 
 pub mod binary {
-    use bincode;
-    use failure::Error;
-    use io::merfishdata::MerfishRecord;
     use std::fs;
     use std::io;
     use std::io::Read;
     use std::path::Path;
+
+    use bincode;
+    use bit_vec::BitVec;
     use byteorder::{ByteOrder, NativeEndian};
+    use failure::Error;
+
+    use crate::io::merfishdata::MerfishRecord;
 
     use super::Readout;
-    use bit_vec::BitVec;
-
 
     /// Header of a binary merfish file.
     #[derive(Serialize, Deserialize, Debug)]
@@ -356,8 +357,9 @@ pub mod binary {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::io;
+
+    use super::*;
 
     #[test]
     fn test_tsv_records() {

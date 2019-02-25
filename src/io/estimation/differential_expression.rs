@@ -7,11 +7,10 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
+use bio::stats::LogProb;
 use csv;
 
-use bio::stats::LogProb;
-
-use model;
+use crate::model;
 
 /// A writer for differential expression estimates.
 pub struct Writer<W: io::Write> {

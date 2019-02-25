@@ -7,7 +7,7 @@ use ordered_float::NotNaN;
 
 use bio::stats::probs;
 
-use model;
+use crate::model;
 
 pub type CV = NotNaN<f64>;
 pub type CDF = probs::cdf::CDF<CV>;

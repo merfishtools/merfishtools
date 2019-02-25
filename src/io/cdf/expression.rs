@@ -8,15 +8,14 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
+use bio::stats::LogProb;
+use bio::stats::probs::cdf;
 use csv;
 use failure::Error;
 use itertools::Itertools;
 use ordered_float::NotNaN;
 
-use bio::stats::probs::cdf;
-use bio::stats::LogProb;
-
-use model::expression::{NormalizedCDF, CDF};
+use crate::model::expression::{CDF, NormalizedCDF};
 
 const HEADER: &[&str] = &["cell", "feat", "expr", "prob"];
 
