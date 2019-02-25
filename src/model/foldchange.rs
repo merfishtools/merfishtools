@@ -4,7 +4,7 @@ use ordered_float::NotNaN;
 
 use bio::stats::probs;
 
-use model;
+use crate::model;
 
 pub type LogFC = NotNaN<f64>;
 pub type FC = rational::Ratio<u64>;

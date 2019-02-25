@@ -8,9 +8,9 @@ use rgsl::randist::multinomial::multinomial_pdf;
 
 use bio::stats::{LogProb, Prob};
 
-use io::codebook::{Codebook, FeatureID};
+use crate::io::codebook::{Codebook, FeatureID};
 
-use model::readout::{Counts, Expressions, Miscalls, Xi};
+use crate::model::readout::{Counts, Expressions, Miscalls, Xi};
 
 pub trait AbstractFeatureModel {
     /// FeatureID of this feature.

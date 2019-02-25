@@ -3,13 +3,13 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use num::CheckedAdd;
 use std::collections::{hash_map, HashMap, HashSet};
 use std::path::Path;
 
 use bit_vec::BitVec;
 use csv;
 use itertools::Itertools;
+use num::CheckedAdd;
 use petgraph::prelude::*;
 
 pub type Codeword = BitVec<u32>;

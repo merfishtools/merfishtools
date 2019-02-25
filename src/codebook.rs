@@ -58,8 +58,9 @@ pub fn generate_mhd2(n: u8, m: u8) -> Vec<Word> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use itertools::Itertools;
+
+    use super::*;
 
     fn hamming_dist(a: &Word, b: &Word) -> u8 {
         assert_eq!(a.len(), b.len());

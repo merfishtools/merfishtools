@@ -9,10 +9,10 @@ use rand::{Rng, SeedableRng};
 
 use bio::stats::{LogProb, Prob};
 
-use io::codebook::{Codebook, FeatureID};
+use crate::io::codebook::{Codebook, FeatureID};
 
-use model::readout::feature_model::AbstractFeatureModel;
-use model::readout::{Counts, Expressions, FeatureModel, Miscalls, NoiseModel, Xi};
+use crate::model::readout::feature_model::AbstractFeatureModel;
+use crate::model::readout::{Counts, Expressions, FeatureModel, Miscalls, NoiseModel, Xi};
 
 pub struct JointModel {
     feature_models: HashMap<FeatureID, FeatureModel>,

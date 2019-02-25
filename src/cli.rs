@@ -9,22 +9,21 @@ use std;
 use std::collections;
 use std::io::prelude::*;
 
+use bio::stats::{LogProb, Prob};
 use csv;
 use cue;
 use failure::Error;
 use itertools::Itertools;
 use regex::Regex;
 
-use bio::stats::{LogProb, Prob};
-
-use codebook;
-use error_rates;
-use io;
-use io::merfishdata::{MerfishRecord, self, Reader};
-use model;
-use model::cv::CV;
-use model::foldchange::LogFC;
-use model::readout::Counts;
+use crate::codebook;
+use crate::error_rates;
+use crate::io;
+use crate::io::merfishdata::{self, MerfishRecord, Reader};
+use crate::model;
+use crate::model::cv::CV;
+use crate::model::foldchange::LogFC;
+use crate::model::readout::Counts;
 
 pub struct Selection {
     pub expmnt: String,
