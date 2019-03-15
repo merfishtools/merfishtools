@@ -16,9 +16,105 @@ use regex::Regex;
 use merfishtools::cli;
 use merfishtools::codebook;
 use merfishtools::io::merfishdata;
+use structopt::StructOpt;
+use clap::AppSettings::{ColoredHelp, DeriveDisplayOrder};
+use std::process;
+
+#[derive(StructOpt)]
+#[structopt(name = "merfishtools",
+raw(global_settings = "&[ColoredHelp, DeriveDisplayOrder]"))]
+struct Opt {
+    #[structopt(long, short, name = "verbose", parse(from_occurrences))]
+    /// Level of verbosity. Can be specified multiple times.
+    verbosity: usize,
+    #[structopt(subcommand)]
+    subcommand: Command,
+}
+
+#[derive(StructOpt)]
+enum Command {
+    #[structopt(name = "exp")]
+    Expression {
+        #[structopt(value_name = "CODEBOOK-TSV")]
+        /// Path to codebook definition consisting of tab separated columns: feature, codeword.
+        ///
+        /// Misidentification probes (see Chen et al. Science 2015) should not be contained in the codebook.
+        codebook: String,
+
+        #[structopt(value_name = "READOUTS")]
+        /// Raw readout data containing molecule assignments to positions.
+        ///
+        /// If given as TSV file (ending on .tsv), the following columns are expected:
+        /// cell, feature, hamming_dist, cell_position_x, cell_position_y, rna_position_x, rna_position_y.
+        /// Otherwise, the official MERFISH binary format is expected.
+        raw_data: String,
+
+        #[structopt(value_name = "TSV-FILE")]
+        /// Path to write expected value and standard deviation estimates of expression to.
+        ///
+        //  Output is formatted into columns: cell, feature, expected value, standard deviation
+        estimate: Option<String>,
+
+        #[structopt(long)]
+        /// Path to write global statistics per cell to.
+        ///
+        //  Output is formatted into columns: cell, noise-rate
+        stats: Option<String>,
+
+        #[structopt(long)]
+        /// Seed for shuffling that occurs in EM algorithm.
+        seed: Option<usize>,
+
+        #[structopt(long, default_value = "0.04", raw(use_delimiter = "true"))]
+        /// Prior probability of 0->1 error
+        p0: Vec<f64>,
+
+        #[structopt(long, default_value = "0.10", raw(use_delimiter = "true"))]
+        /// Prior probability of 1->0 error
+        p1: Vec<f64>,
+
+        #[structopt(long, default_value = ".*", value_name = "REGEX")]
+        /// Regular expression to select cells from cell column (see above).
+        cells: String,
+
+        #[structopt(long, default_value = "100")]
+        /// Width of the window to calculate PMF for.
+        pmf_window_width: u32,
+
+        #[structopt(long, short, default_value = "1")]
+        /// Number of threads to use.
+        threads: usize,
+    },
+    #[structopt(name = "diffexp")]
+    DifferentialExpression {},
+    #[structopt(name = "multidiffexp")]
+    MultiDifferentialExpression {},
+    #[structopt(name = "est-error-rates")]
+    EstimateErrors {},
+}
 
 #[allow(non_snake_case)]
 fn main() -> Result<(), Error> {
+    let opt = Opt::from_args();
+    match opt.subcommand {
+        // it is not yet possible to use `exp @ Command::Expression { .. } => { do stuff with exp }`
+        // see https://github.com/rust-lang/rfcs/pull/2593
+        // and https://github.com/varkor/rfcs/blob/enum-variant-types/text/0000-enum-variant-types.md
+        Command::Expression {
+            codebook,
+            raw_data,
+            estimate,
+            stats,
+            seed,
+            p0,
+            p1,
+            cells,
+            pmf_window_width,
+            threads
+        } => unimplemented!(),
+        _ => unimplemented!()
+    }
+    process::exit(0);
     let yaml = load_yaml!("../cli.yaml");
     let matches = App::from_yaml(yaml)
         .version(env!("CARGO_PKG_VERSION"))
