@@ -33,7 +33,22 @@ struct Opt {
 
 #[derive(StructOpt)]
 enum Command {
-    #[structopt(name = "exp")]
+    #[structopt(
+    name = "exp",
+    about = "Estimate expressions for each feature (e.g. gene or transcript) in each cell.",
+    after_help =
+    "This command estimates expressions for each feature (e.g. gene or transcript) in each cell.
+Results are provided as PMF (probability mass function) in columns:
+
+cell
+feature (e.g. gene, rna)
+expression
+posterior probability
+
+Example usage:
+
+merfishtools exp codebook.txt < data.txt > expression.txt
+                ")]
     Expression {
         #[structopt(value_name = "CODEBOOK-TSV")]
         /// Path to codebook definition consisting of tab separated columns: feature, codeword.
@@ -55,21 +70,21 @@ enum Command {
         //  Output is formatted into columns: cell, feature, expected value, standard deviation
         estimate: Option<String>,
 
-        #[structopt(long)]
+        #[structopt(long, value_name = "TSV-FILE")]
         /// Path to write global statistics per cell to.
         ///
         //  Output is formatted into columns: cell, noise-rate
         stats: Option<String>,
 
-        #[structopt(long)]
+        #[structopt(long, value_name = "INT")]
         /// Seed for shuffling that occurs in EM algorithm.
-        seed: Option<usize>,
+        seed: u64,
 
-        #[structopt(long, default_value = "0.04", raw(use_delimiter = "true"))]
+        #[structopt(long, default_value = "0.04", value_name = "FLOAT", raw(use_delimiter = "true"))]
         /// Prior probability of 0->1 error
         p0: Vec<f64>,
 
-        #[structopt(long, default_value = "0.10", raw(use_delimiter = "true"))]
+        #[structopt(long, default_value = "0.10", value_name = "FLOAT", raw(use_delimiter = "true"))]
         /// Prior probability of 1->0 error
         p1: Vec<f64>,
 
@@ -77,16 +92,39 @@ enum Command {
         /// Regular expression to select cells from cell column (see above).
         cells: String,
 
-        #[structopt(long, default_value = "100")]
+        #[structopt(long, default_value = "100", value_name = "INT")]
         /// Width of the window to calculate PMF for.
         pmf_window_width: u32,
 
-        #[structopt(long, short, default_value = "1")]
+        #[structopt(long, short, default_value = "1", value_name = "INT")]
         /// Number of threads to use.
         threads: usize,
     },
-    #[structopt(name = "diffexp")]
-    DifferentialExpression {},
+
+    #[structopt(name = "diffexp", about = "Test for differential expression between two groups of cells.")]
+    DifferentialExpression {
+        /// Path to expression PMFs for group of cells.
+        group1: String,
+
+        /// Path to expression PMFs for group of cells.
+        group2: String,
+
+        #[structopt(long, default_value = "1", value_name = "FLOAT")]
+        /// Maximum absolute log2 fold change considered as no differential expression.
+        max_null_log2fc: f64,
+
+        #[structopt(long, default_value = "1", value_name = "FLOAT")]
+        /// Pseudocounts to add to means before fold change calculation.
+        pseudocounts: f64,
+
+        #[structopt(long, value_name = "FILE")]
+        /// Path to write CDFs of log2 fold changes to.
+        cdf: Option<String>,
+
+        #[structopt(long, short, default_value = "1", value_name = "INT")]
+        /// Number of threads to use.
+        threads: usize,
+    },
     #[structopt(name = "multidiffexp")]
     MultiDifferentialExpression {},
     #[structopt(name = "est-error-rates")]
@@ -95,7 +133,28 @@ enum Command {
 
 #[allow(non_snake_case)]
 fn main() -> Result<(), Error> {
-    let opt = Opt::from_args();
+    let opt = Opt::from_args();  // .version(env!("CARGO_PKG_VERSION"));
+
+    let logger_config = fern::DispatchConfig {
+        format: Box::new(
+            |msg: &str, level: &log::LogLevel, _: &log::LogLocation| match *level {
+                log::LogLevel::Debug => format!("DEBUG: {}", msg),
+                _ => msg.to_owned(),
+            },
+        ),
+        output: vec![fern::OutputConfig::stderr()],
+        level: log::LogLevelFilter::Debug,
+    };
+
+    if let Err(e) = fern::init_global_logger(
+        logger_config,
+        match opt.verbosity {
+            0 => log::LogLevelFilter::Info,
+            _ => log::LogLevelFilter::Debug,
+        },
+    ) {
+        panic!("Failed to initialize logger: {}", e);
+    }
     match opt.subcommand {
         // it is not yet possible to use `exp @ Command::Expression { .. } => { do stuff with exp }`
         // see https://github.com/rust-lang/rfcs/pull/2593
@@ -111,80 +170,62 @@ fn main() -> Result<(), Error> {
             cells,
             pmf_window_width,
             threads
-        } => unimplemented!(),
+        } => {
+            let convert_err_rates = |values: Vec<f64>| {
+                if values.len() == 1 {
+                    vec![Prob::checked(values[0]).unwrap(); 32]
+                } else {
+                    values
+                        .into_iter()
+                        .map(|p| Prob::checked(p).unwrap())
+                        .collect_vec()
+                }
+            };
+
+            let mut expression = cli::ExpressionBuilder::default()
+                .p0(convert_err_rates(p0))
+                .p1(convert_err_rates(p1))
+                .codebook_path(codebook.to_owned())
+                .estimate_path(estimate.map(|v| v.to_owned()))
+                .stats_path(stats.map(|v| v.to_owned()))
+                .threads(threads)
+                .cells(Regex::new(&cells)?)
+                .window_width(pmf_window_width)
+                .seed(seed)
+                .build()
+                .unwrap();
+            if let merfishdata::Format::Binary = merfishdata::Format::from_path(&raw_data) {
+                expression.load_counts(&mut merfishdata::binary::Reader::from_file(&raw_data)?)?;
+            } else {
+                expression.load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?)?;
+            }
+
+            return expression.infer();
+        }
+        Command::DifferentialExpression {
+            group1,
+            group2,
+            max_null_log2fc,
+            pseudocounts,
+            cdf,
+            threads, } => {
+            let max_fc = NotNaN::new(max_null_log2fc)
+                .expect("NaN not allowed for --max-null-log2fc.");
+            let pmf_path: Option<&str> = cdf.as_ref().map(String::as_str);
+            return cli::differential_expression(
+                &group1,
+                &group2,
+                pmf_path,
+                max_fc,
+                pseudocounts,
+                threads,
+            );
+        }
         _ => unimplemented!()
     }
     process::exit(0);
-    let yaml = load_yaml!("../cli.yaml");
-    let matches = App::from_yaml(yaml)
-        .version(env!("CARGO_PKG_VERSION"))
-        .get_matches();
-
-    let logger_config = fern::DispatchConfig {
-        format: Box::new(
-            |msg: &str, level: &log::LogLevel, _: &log::LogLocation| match *level {
-                log::LogLevel::Debug => format!("DEBUG: {}", msg),
-                _ => msg.to_owned(),
-            },
-        ),
-        output: vec![fern::OutputConfig::stderr()],
-        level: log::LogLevelFilter::Debug,
-    };
-
-    if let Err(e) = fern::init_global_logger(
-        logger_config,
-        if matches.is_present("verbose") {
-            log::LogLevelFilter::Debug
-        } else {
-            log::LogLevelFilter::Info
-        },
-    ) {
-        panic!("Failed to initialize logger: {}", e);
-    }
-
-    if let Some(matches) = matches.subcommand_matches("exp") {
-        let p0 = values_t!(matches, "p0", f64).unwrap_or_else(|e| e.exit());
-        let p1 = values_t!(matches, "p1", f64).unwrap_or_else(|e| e.exit());
-        let estimate_path = matches.value_of("estimate");
-        let stats_path = matches.value_of("stats");
-        let codebook_path = matches.value_of("codebook").unwrap();
-        let cells = matches.value_of("cells").unwrap();
-        let window_width = value_t!(matches, "pmf-window-width", u32).unwrap_or_else(|e| e.exit());
-        let threads = value_t!(matches, "threads", usize).unwrap_or_else(|e| e.exit());
-        let seed = value_t!(matches, "seed", u64).unwrap_or_else(|e| e.exit());
-        let raw_data = matches.value_of("raw_data").unwrap();
-
-        let convert_err_rates = |values: Vec<f64>| {
-            if values.len() == 1 {
-                vec![Prob::checked(values[0]).unwrap(); 32]
-            } else {
-                values
-                    .into_iter()
-                    .map(|p| Prob::checked(p).unwrap())
-                    .collect_vec()
-            }
-        };
-
-        let mut expression = cli::ExpressionBuilder::default()
-            .p0(convert_err_rates(p0))
-            .p1(convert_err_rates(p1))
-            .codebook_path(codebook_path.to_owned())
-            .estimate_path(estimate_path.map(|v| v.to_owned()))
-            .stats_path(stats_path.map(|v| v.to_owned()))
-            .threads(threads)
-            .cells(Regex::new(cells)?)
-            .window_width(window_width)
-            .seed(seed)
-            .build()
-            .unwrap();
-        if let merfishdata::Format::Binary = merfishdata::Format::from_path(raw_data) {
-            expression.load_counts(&mut merfishdata::binary::Reader::from_file(raw_data)?)?;
-        } else {
-            expression.load_counts(&mut merfishdata::tsv::Reader::from_file(raw_data)?)?;
-        }
-
-        expression.infer()
-    } else if let Some(matches) = matches.subcommand_matches("diffexp") {
+    let matches = App::from_yaml(load_yaml!("../cli.yaml")).get_matches();
+    if let Some(matches) = matches.subcommand_matches("diffexp") {
         let group1_path = matches.value_of("group1").unwrap();
         let group2_path = matches.value_of("group2").unwrap();
         let cdf_path = matches.value_of("cdf");
