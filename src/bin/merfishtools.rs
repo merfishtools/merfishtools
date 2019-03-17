@@ -3,26 +3,23 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#[macro_use]
-extern crate clap;
-
 use bio::stats::Prob;
-use clap::App;
+use clap::AppSettings::{ColoredHelp, DeriveDisplayOrder};
 use failure::Error;
 use itertools::Itertools;
 use ordered_float::NotNaN;
 use regex::Regex;
+use structopt::StructOpt;
 
 use merfishtools::cli;
 use merfishtools::codebook;
 use merfishtools::io::merfishdata;
-use structopt::StructOpt;
-use clap::AppSettings::{ColoredHelp, DeriveDisplayOrder};
-use std::process;
 
 #[derive(StructOpt)]
-#[structopt(name = "merfishtools",
-raw(global_settings = "&[ColoredHelp, DeriveDisplayOrder]"))]
+#[structopt(
+name = "merfishtools",
+raw(global_settings = "&[ColoredHelp, DeriveDisplayOrder]")
+)]
 struct Opt {
     #[structopt(long, short, name = "verbose", parse(from_occurrences))]
     /// Level of verbosity. Can be specified multiple times.
@@ -36,8 +33,8 @@ enum Command {
     #[structopt(
     name = "exp",
     about = "Estimate expressions for each feature (e.g. gene or transcript) in each cell.",
-    after_help =
-    "This command estimates expressions for each feature (e.g. gene or transcript) in each cell.
+    after_help = "\
+This command estimates expressions for each feature (e.g. gene or transcript) in each cell.
 Results are provided as PMF (probability mass function) in columns:
 
 cell
@@ -47,8 +44,8 @@ posterior probability
 
 Example usage:
 
-merfishtools exp codebook.txt < data.txt > expression.txt
-                ")]
+merfishtools exp codebook.txt < data.txt > expression.txt"
+    )]
     Expression {
         #[structopt(value_name = "CODEBOOK-TSV")]
         /// Path to codebook definition consisting of tab separated columns: feature, codeword.
@@ -80,11 +77,21 @@ merfishtools exp codebook.txt < data.txt > expression.txt
         /// Seed for shuffling that occurs in EM algorithm.
         seed: usize,
 
-        #[structopt(long, default_value = "0.04", value_name = "FLOAT", raw(use_delimiter = "true"))]
+        #[structopt(
+        long,
+        default_value = "0.04",
+        value_name = "FLOAT",
+        multiple = true,
+        )]
         /// Prior probability of 0->1 error
         p0: Vec<f64>,
 
-        #[structopt(long, default_value = "0.10", value_name = "FLOAT", raw(use_delimiter = "true"))]
+        #[structopt(
+        long,
+        default_value = "0.10",
+        value_name = "FLOAT",
+        multiple = true,
+        )]
         /// Prior probability of 1->0 error
         p1: Vec<f64>,
 
@@ -101,7 +108,25 @@ merfishtools exp codebook.txt < data.txt > expression.txt
         threads: usize,
     },
 
-    #[structopt(name = "diffexp", about = "Test for differential expression between two groups of cells.")]
+    #[structopt(
+    name = "diffexp",
+    about = "Test for differential expression between two groups of cells.",
+    after_help = "\
+This command calculates, for given expression PMFs (generated with merfishtools exp), differentially expressed features (e.g. genes or transcripts) between groups of cells given as separate input data.
+Results are provided as columns:
+
+feature (e.g. gene, rna)
+posterior error probability (PEP) for differential expression
+expected FDR when selecting all features down to the current
+bayes factor (BF) for differential expression
+expected log2 fold change of first vs second group
+standard deviation of log2 fold change
+lower and upper bound of 95% credible interval of log2 fold change
+
+Example usage:
+
+merfishtools diffexp data1.txt data2.txt > diffexp.txt"
+    )]
     DifferentialExpression {
         /// Path to expression PMFs for group of cells.
         group1: String,
@@ -109,7 +134,7 @@ merfishtools exp codebook.txt < data.txt > expression.txt
         /// Path to expression PMFs for group of cells.
         group2: String,
 
-        #[structopt(long, default_value = "1", value_name = "FLOAT")]
+        #[structopt(long = "max-null-log2fc", default_value = "1", value_name = "FLOAT")]
         /// Maximum absolute log2 fold change considered as no differential expression.
         max_null_log2fc: f64,
 
@@ -125,15 +150,141 @@ merfishtools exp codebook.txt < data.txt > expression.txt
         /// Number of threads to use.
         threads: usize,
     },
-    #[structopt(name = "multidiffexp")]
-    MultiDifferentialExpression {},
-    #[structopt(name = "est-error-rates")]
-    EstimateErrors {},
+
+    #[structopt(
+    name = "multidiffexp",
+    about = "Test for differential expression between multiple groups of cells.",
+    after_help = "\
+This command calculates, for given expression PMFs (obtained with merfishtools exp), differentially expressed features (e.g. genes or transcripts) between groups of cells given as separate input data.
+Results are provided as columns:
+
+feature (e.g. gene, rna)
+posterior error probability (PEP) for differential expression
+expected FDR when selecting all features down to the current
+bayes factor (BF) for differential expression
+expected coefficient of variation (CV)
+standard deviation of CV
+lower and upper bound of 95% credible interval of CV
+
+Example usage:
+
+merfishtools multidiffexp data1.txt data2.txt data3.txt > diffexp.txt"
+    )]
+    MultiDifferentialExpression {
+        #[structopt(multiple = true)]
+        /// Paths to expression PMFs for groups of cells.
+        groups: Vec<String>,
+
+        #[structopt(long = "max-null-cv", value_name = "FLOAT", default_value = "0.5")]
+        /// Maximum coefficient of variation (CV) considered as no differential expression
+        max_null_cv: f64,
+
+        #[structopt(long, default_value = "1", value_name = "FLOAT")]
+        /// Pseudocounts to add to means before CV calculation.
+        pseudocounts: f64,
+
+        #[structopt(long, value_name = "FILE")]
+        /// Path to write CDFs of CVs to.
+        cdf: Option<String>,
+
+        #[structopt(long, short, default_value = "1", value_name = "INT")]
+        /// Number of threads to use.
+        threads: usize,
+    },
+    #[structopt(
+    name = "est-error-rates",
+    about = "Estimate 0-1 and 1-0 error rates.",
+    after_help = "\
+This command estimates 0-1 and 1-0 error rates from given MERFISH
+readouts.
+
+Example usage:
+
+merfishtools est-error-rates readouts.tsv > error-rates.tsv
+
+The produced output will have the three columns
+
+pos
+p0
+p1
+
+representing the position in the binary word, the 0-1 error rate and
+the 1-0 error rate."
+    )]
+    EstimateErrors {
+        #[structopt(value_name = "TSV-FILE")]
+        codebook: String,
+
+        #[structopt(value_name = "RAW-DATA")]
+        ///Raw data containing molecule assignments to positions.
+        ///
+        /// If given as TSV file (ending on .tsv), the following columns are expected:
+        /// cell, feature, readout
+        /// Otherwise, the official MERFISH binary format is expected.
+        raw_data: String,
+    },
+    #[structopt(
+    name = "gen-mhd4",
+    about = "Generate MERFISH MHD4 codebook with given parameters.",
+    after_help = "\
+This command generates a codebook with the given parameters.
+Currently, the number of bits (N) is fixed to 16.
+
+Example usage:
+
+merfishtools gen-mhd4 -m 8 < transcript-names.txt > codebook.tsv
+
+The output file codebook.tsv will contain the columns
+
+feature (e.g. gene or transcript)
+codeword"
+    )]
+    GenMhd4 {
+        #[structopt(long, short = "m", value_name = "INT", required = true)]
+        /// Number of 1-bits.
+        onebits: u8,
+
+        #[structopt(long = "not-expressed", value_name = "PATTERN")]
+        /// Regular expression pattern for features that should be marked
+        /// as not expressed. This is useful to correctly model, e.g.,
+        /// misidentification probes.
+        not_expressed: Option<String>,
+    },
+    #[structopt(
+    name = "gen-mhd2",
+    about = "Generate MERFISH MHD2 codebook with given parameters.",
+    after_help = "\
+This command generates a codebook with the given parameters.
+
+Example usage:
+
+merfishtools gen-mhd2 -m 8 -N 16 < transcript-names.txt > codebook.tsv
+
+The output file codebook.tsv will contain the columns
+
+feature (e.g. gene or transcript)
+codeword"
+    )]
+    GenMhd2 {
+        #[structopt(long, short = "N", value_name = "INT")]
+        /// Number of bits.
+        bits: u8,
+
+        #[structopt(long, short = "m", value_name = "INT")]
+        /// Number of 1-bits.
+        onebits: u8,
+
+        #[structopt(long = "not-expressed", value_name = "PATTERN")]
+        /// Regular expression pattern for features that should be marked
+        /// as not expressed. This is useful to correctly model, e.g.,
+        /// misidentification probes.
+        not_expressed: Option<String>,
+    },
 }
 
 #[allow(non_snake_case)]
 fn main() -> Result<(), Error> {
-    let opt = Opt::from_args();  // .version(env!("CARGO_PKG_VERSION"));
+    let opt = Opt::from_args(); // .version(env!("CARGO_PKG_VERSION"));
 
     let logger_config = fern::DispatchConfig {
         format: Box::new(
@@ -169,17 +320,14 @@ fn main() -> Result<(), Error> {
             p1,
             cells,
             pmf_window_width,
-            threads
+            threads,
         } => {
-            let convert_err_rates = |values: Vec<f64>| {
-                if values.len() == 1 {
-                    vec![Prob::checked(values[0]).unwrap(); 32]
-                } else {
-                    values
-                        .into_iter()
-                        .map(|p| Prob::checked(p).unwrap())
-                        .collect_vec()
-                }
+            let convert_err_rates = |values: Vec<f64>| match values.len() {
+                1 => vec![Prob::checked(values[0]).unwrap(); 32],
+                _ => values
+                    .into_iter()
+                    .map(|p| Prob::checked(p).unwrap())
+                    .collect_vec(),
             };
 
             let mut expression = cli::ExpressionBuilder::default()
@@ -200,80 +348,57 @@ fn main() -> Result<(), Error> {
                 expression.load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?)?;
             }
 
-            return expression.infer();
+            expression.infer()
         }
+
         Command::DifferentialExpression {
             group1,
             group2,
             max_null_log2fc,
             pseudocounts,
             cdf,
-            threads, } => {
-            let max_fc = NotNaN::new(max_null_log2fc)
-                .expect("NaN not allowed for --max-null-log2fc.");
-            let pmf_path: Option<&str> = cdf.as_ref().map(String::as_str);
-            return cli::differential_expression(
-                &group1,
-                &group2,
-                pmf_path,
-                max_fc,
-                pseudocounts,
-                threads,
-            );
+            threads,
+        } => {
+            let max_fc =
+                NotNaN::new(max_null_log2fc).expect("NaN not allowed for --max-null-log2fc.");
+            let pmf_path = cdf.as_ref().map(String::as_str);
+            cli::differential_expression(&group1, &group2, pmf_path, max_fc, pseudocounts, threads)
         }
-        _ => unimplemented!()
-    }
-    process::exit(0);
-    let matches = App::from_yaml(load_yaml!("../cli.yaml")).get_matches();
-    if let Some(matches) = matches.subcommand_matches("diffexp") {
-        let group1_path = matches.value_of("group1").unwrap();
-        let group2_path = matches.value_of("group2").unwrap();
-        let cdf_path = matches.value_of("cdf");
-        let max_fc = NotNaN::new(value_t!(matches, "max-null-log2fc", f64).unwrap_or(1.0))
-            .expect("NaN not allowed for --max-null-log2fc.");
-        let pseudocounts = value_t!(matches, "pseudocounts", f64).unwrap_or(1.0);
-        let threads = value_t!(matches, "threads", usize).unwrap_or(1);
 
-        cli::differential_expression(
-            &group1_path,
-            &group2_path,
-            cdf_path,
-            max_fc,
+        Command::MultiDifferentialExpression {
+            groups,
+            max_null_cv,
             pseudocounts,
+            cdf,
             threads,
-        )
-    } else if let Some(matches) = matches.subcommand_matches("multidiffexp") {
-        let group_paths = matches.values_of("groups").unwrap();
-        let cdf_path = matches.value_of("cdf");
-        let max_cv = NotNaN::new(value_t!(matches, "max-null-cv", f64).unwrap_or(0.5))
-            .expect("NaN not allowed for --max-null-cv.");
-        let pseudocounts = value_t!(matches, "pseudocounts", f64).unwrap_or(1.0);
-        let threads = value_t!(matches, "threads", usize).unwrap_or(1);
+        } => {
+            let max_cv = NotNaN::new(max_null_cv).expect("NaN not allowed for --max-null-cv.");
+            let group_paths = &groups.iter().map(String::as_ref).collect_vec();
+            let cdf_path = cdf.as_ref().map(String::as_str);
+            cli::multi_differential_expression(group_paths, cdf_path, max_cv, pseudocounts, threads)
+        }
 
-        cli::multi_differential_expression(
-            &group_paths.collect_vec(),
-            cdf_path,
-            max_cv,
-            pseudocounts,
-            threads,
-        )
-    } else if let Some(matches) = matches.subcommand_matches("gen-mhd4") {
-        let m = value_t!(matches, "onebits", u8).unwrap();
-        let not_expressed_pattern = matches.value_of("not-expressed");
-        let words = codebook::generate_mhd4(m);
-        cli::gen_codebook(&words, not_expressed_pattern)
-    } else if let Some(matches) = matches.subcommand_matches("gen-mhd2") {
-        let n = value_t!(matches, "bits", u8).unwrap();
-        let m = value_t!(matches, "onebits", u8).unwrap();
-        let not_expressed_pattern = matches.value_of("not-expressed");
-        let words = codebook::generate_mhd2(n, m);
-        cli::gen_codebook(&words, not_expressed_pattern)
-    } else if let Some(matches) = matches.subcommand_matches("est-error-rates") {
-        let codebook = matches.value_of("codebook").unwrap();
-        let raw_data = matches.value_of("raw_data").unwrap();
+        Command::EstimateErrors { codebook, raw_data } => {
+            cli::estimate_error_rates(&raw_data, &codebook)
+        }
 
-        cli::estimate_error_rates(raw_data, codebook)
-    } else {
-        panic!("bug: unexpected subcommand");
+        Command::GenMhd2 {
+            bits,
+            onebits,
+            not_expressed,
+        } => {
+            let words = codebook::generate_mhd2(bits, onebits);
+            let not_expressed_pattern = not_expressed.as_ref().map(String::as_ref);
+            cli::gen_codebook(&words, not_expressed_pattern)
+        }
+
+        Command::GenMhd4 {
+            onebits,
+            not_expressed,
+        } => {
+            let words = codebook::generate_mhd4(onebits);
+            let not_expressed_pattern = not_expressed.as_ref().map(String::as_ref);
+            cli::gen_codebook(&words, not_expressed_pattern)
+        }
     }
 }
