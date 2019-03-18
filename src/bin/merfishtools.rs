@@ -14,6 +14,7 @@ use structopt::StructOpt;
 use merfishtools::cli;
 use merfishtools::codebook;
 use merfishtools::io::merfishdata;
+use merfishtools::cli::Expression;
 
 #[derive(StructOpt)]
 #[structopt(
@@ -330,7 +331,7 @@ fn main() -> Result<(), Error> {
                     .collect_vec(),
             };
 
-            let mut expression = cli::ExpressionBuilder::default()
+            let mut expression = cli::ExpressionJBuilder::default()
                 .p0(convert_err_rates(p0))
                 .p1(convert_err_rates(p1))
                 .codebook_path(codebook.to_owned())

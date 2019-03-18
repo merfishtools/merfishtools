@@ -9,7 +9,7 @@ use bio::stats::{LogProb, Prob};
 
 use crate::io::codebook::{Codebook, FeatureID};
 
-use crate::model::readout::{Counts, Expressions, Miscalls, Xi};
+use crate::model::bayes::readout::{Counts, Expressions, Miscalls, Xi};
 
 pub trait AbstractFeatureModel {
     /// FeatureID of this feature.

@@ -10,7 +10,7 @@ use std::path::Path;
 use bio::stats::LogProb;
 use csv;
 
-use crate::model;
+use crate::model::bayes;
 
 /// A writer for differential expression estimates.
 pub struct Writer<W: io::Write> {
@@ -52,11 +52,11 @@ impl<W: io::Write> Writer<W> {
         feature: &str,
         differential_expression_pep: LogProb,
         fdr: LogProb,
-        differential_expression_bf: model::BayesFactor,
-        map: model::diffexp::DiffexpMeasure,
+        differential_expression_bf: bayes::BayesFactor,
+        map: bayes::diffexp::DiffexpMeasure,
         credible_interval: (
-            model::diffexp::DiffexpMeasure,
-            model::diffexp::DiffexpMeasure,
+            bayes::diffexp::DiffexpMeasure,
+            bayes::diffexp::DiffexpMeasure,
         ),
     ) {
         self.inner

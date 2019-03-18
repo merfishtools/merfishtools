@@ -9,8 +9,8 @@ use bio::stats::{LogProb, Prob};
 
 use crate::io::codebook::{Codebook, FeatureID};
 
-use crate::model::readout::feature_model::AbstractFeatureModel;
-use crate::model::readout::{Counts, Expressions, FeatureModel, Miscalls, NoiseModel, Xi};
+use crate::model::bayes::readout::feature_model::AbstractFeatureModel;
+use crate::model::bayes::readout::{Counts, Expressions, FeatureModel, Miscalls, NoiseModel, Xi};
 
 pub struct JointModel {
     feature_models: HashMap<FeatureID, FeatureModel>,

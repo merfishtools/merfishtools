@@ -9,7 +9,7 @@ use std::path::Path;
 
 use csv;
 
-use crate::model::diffexp::CDF;
+use crate::model::bayes::diffexp::CDF;
 
 /// A writer for differential expression CDFs.
 pub struct Writer<W: io::Write> {

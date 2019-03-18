@@ -7,7 +7,7 @@ use crate::model;
 pub type MeanExpression = NotNaN<f64>;
 pub type CDF = probs::cdf::CDF<MeanExpression>;
 
-pub fn cdf(expression_cdfs: &[model::expression::NormalizedCDF], pseudocounts: f64) -> CDF {
+pub fn cdf(expression_cdfs: &[model::bayes::expression::NormalizedCDF], pseudocounts: f64) -> CDF {
     let pseudocounts = NotNaN::new(pseudocounts).unwrap();
 
     if expression_cdfs.len() == 1 {
@@ -18,7 +18,7 @@ pub fn cdf(expression_cdfs: &[model::expression::NormalizedCDF], pseudocounts: f
         return cdf;
     }
 
-    let cdf = model::meanvar::cdf(expression_cdfs, |mean, _| mean + pseudocounts);
+    let cdf = model::bayes::meanvar::cdf(expression_cdfs, |mean, _| mean + pseudocounts);
     assert_relative_eq!(cdf.total_prob().exp(), 1.0, epsilon = 0.001);
     cdf.reduce().sample(1000)
 }

@@ -15,7 +15,7 @@ use failure::Error;
 use itertools::Itertools;
 use ordered_float::NotNaN;
 
-use crate::model::expression::{CDF, NormalizedCDF};
+use crate::model::bayes::expression::{CDF, NormalizedCDF};
 
 const HEADER: &[&str] = &["cell", "feat", "expr", "prob"];
 
