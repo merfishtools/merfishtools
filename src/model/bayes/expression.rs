@@ -13,7 +13,7 @@ pub type NormalizedCDF = probs::cdf::CDF<NotNaN<f64>>;
 /// Calculate CDF of expression.
 ///
 /// Returns a tuple of CDF and the MAP estimate.
-pub fn cdf(feature: FeatureID, model: &mut model::readout::JointModel) -> (CDF, u32) {
+pub fn cdf(feature: FeatureID, model: &mut model::bayes::readout::JointModel) -> (CDF, u32) {
     let (xmin, xmax) = model.window(feature);
     let likelihoods = (xmin..xmax + 1)
         .map(|x| model.likelihood(feature, x))
@@ -27,7 +27,7 @@ pub fn cdf(feature: FeatureID, model: &mut model::readout::JointModel) -> (CDF, 
             .enumerate()
             .filter_map(|(x, lh)| {
                 let prob = lh - marginal;
-                if prob >= model::MIN_PROB {
+                if prob >= model::bayes::MIN_PROB {
                     Some(probs::cdf::Entry {
                         value: xmin + x as u32,
                         prob,

@@ -20,10 +20,10 @@ use crate::codebook;
 use crate::error_rates;
 use crate::io;
 use crate::io::merfishdata::{self, MerfishRecord, Reader};
-use crate::model;
-use crate::model::cv::CV;
-use crate::model::foldchange::LogFC;
-use crate::model::readout::Counts;
+use crate::model::bayes;
+use crate::model::bayes::cv::CV;
+use crate::model::bayes::foldchange::LogFC;
+use crate::model::bayes::readout::Counts;
 
 pub struct Selection {
     pub expmnt: String,
@@ -32,7 +32,7 @@ pub struct Selection {
 
 /*pub fn stats(N: u8, m: u8, p0: Prob, p1: Prob, dist: u8, codebook_path: &str) {
     let codebook = io::codebook::Reader::from_file(codebook_path, dist).unwrap().codebook();
-    let model = model::readout::new_model(N, m, p0, p1, dist, codebook);
+    let model = bayes::readout::new_model(N, m, p0, p1, dist, codebook);
     let mut reader = io::merfishdata::Reader::from_reader(std::io::stdin());
 
     let mut total_counts = collections::HashMap::new();
@@ -52,7 +52,7 @@ pub struct Selection {
 
 #[derive(Builder)]
 #[builder(pattern = "owned")]
-pub struct Expression {
+pub struct ExpressionJ {
     p0: Vec<Prob>,
     p1: Vec<Prob>,
     codebook_path: String,
@@ -66,17 +66,19 @@ pub struct Expression {
     counts: collections::HashMap<String, collections::HashMap<String, Counts>>,
 }
 
-impl Expression {
-    pub fn load_counts<'a, R>(&mut self, reader: &'a mut R) -> Result<(), Error>
+pub trait Expression {
+    fn codebook_path(&self) -> &str;
+    fn cells(&self) -> &Regex;
+    fn load_counts<'a, R>(&mut self, reader: &'a mut R) -> Result<(), Error>
         where
             R: io::merfishdata::Reader<'a>,
     {
-        let codebook = io::codebook::Codebook::from_file(&self.codebook_path)?;
+        let codebook = io::codebook::Codebook::from_file(&self.codebook_path())?;
 
         let mut counts = collections::HashMap::new();
         for res in reader.records() {
             let record = res?;
-            if !self.cells.is_match(&record.cell_name()) && codebook.contains(&record.feature_name()) {
+            if !self.cells().is_match(&record.cell_name()) && codebook.contains(&record.feature_name()) {
                 continue;
             }
 
@@ -107,10 +109,21 @@ impl Expression {
 
         Ok(())
     }
+    fn infer(&mut self) -> Result<(), Error>;
+}
+
+impl Expression for ExpressionJ {
+    fn codebook_path(&self) -> &str {
+        &self.codebook_path
+    }
+
+    fn cells(&self) -> &Regex {
+        &self.cells
+    }
 
     /// Estimate expressions.
-    pub fn infer(&mut self) -> Result<(), Error> {
-        let codebook = io::codebook::Codebook::from_file(&self.codebook_path).unwrap();
+    fn infer(&mut self) -> Result<(), Error> {
+        let codebook = io::codebook::Codebook::from_file(&self.codebook_path()).unwrap();
         let mut cdf_writer = io::cdf::expression::Writer::from_writer(std::io::stdout());
         let mut est_writer = self
             .estimate_path
@@ -133,7 +146,7 @@ impl Expression {
             self.counts.iter(),
             |(cell, counts)| {
                 // Generate joint model.
-                let mut model = model::readout::JointModel::new(
+                let mut model = bayes::readout::JointModel::new(
                     counts.iter(),
                     &self.p0,
                     &self.p1,
@@ -150,7 +163,7 @@ impl Expression {
                         let feature_id = codebook.get_id(&feature);
                         if codebook.record(feature_id).expressed() {
                             let (cdf, map_estimate) =
-                                model::expression::cdf(feature_id, &mut model);
+                                bayes::expression::cdf(feature_id, &mut model);
 
                             Some((feature, cdf, map_estimate))
                         } else {
@@ -225,9 +238,9 @@ pub fn differential_expression(
             info!("Calculating {}.", feature);
             let g1 = group1.get(&feature).unwrap();
             let g2 = group2.get(&feature).unwrap();
-            let cdf = model::foldchange::cdf(
-                &model::expressionset::cdf(&g1, pseudocounts),
-                &model::expressionset::cdf(&g2, pseudocounts),
+            let cdf = bayes::foldchange::cdf(
+                &bayes::expressionset::cdf(&g1, pseudocounts),
+                &bayes::expressionset::cdf(&g2, pseudocounts),
             );
             (feature, cdf)
         },
@@ -239,7 +252,7 @@ pub fn differential_expression(
             if let Some(ref mut cdf_writer) = cdf_writer {
                 cdf_writer.write(&feature, &cdf);
             }
-            estimates.push((feature, model::diffexp::estimate(&cdf, max_fc)));
+            estimates.push((feature, bayes::diffexp::estimate(&cdf, max_fc)));
         },
     );
 
@@ -310,13 +323,13 @@ pub fn multi_differential_expression(
             let cdfs = groups
                 .iter()
                 .map(|group| {
-                    model::expressionset::cdf(
+                    bayes::expressionset::cdf(
                         group.get(&feature).expect("Missing feature."),
                         pseudocounts,
                     )
                 })
                 .collect_vec();
-            let cdf = model::cv::cdf(&cdfs);
+            let cdf = bayes::cv::cdf(&cdfs);
             (feature, cdf)
         },
         |(feature, cdf)| {
@@ -327,7 +340,7 @@ pub fn multi_differential_expression(
             if let Some(ref mut cdf_writer) = cdf_writer {
                 cdf_writer.write(&feature, &cdf);
             }
-            estimates.push((feature, model::diffexp::estimate(&cdf, max_cv)));
+            estimates.push((feature, bayes::diffexp::estimate(&cdf, max_cv)));
         },
     );
 

@@ -28,7 +28,7 @@ pub fn pep(cdf: &CDF, max_null_value: DiffexpMeasure) -> LogProb {
 }
 
 /// Bayes factor for differential expression.
-pub fn bayes_factor(cdf: &CDF, max_null_value: DiffexpMeasure) -> model::BayesFactor {
+pub fn bayes_factor(cdf: &CDF, max_null_value: DiffexpMeasure) -> model::bayes::BayesFactor {
     let m0 = cdf.get(&max_null_value).unwrap();
     let m1 = m0.ln_one_minus_exp();
 

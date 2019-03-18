@@ -13,8 +13,8 @@ pub type CV = NotNaN<f64>;
 pub type CDF = probs::cdf::CDF<CV>;
 
 /// Calculate CDF for differential expression.
-pub fn cdf(cdfs: &[model::expressionset::CDF]) -> CDF {
-    model::meanvar::cdf(cdfs, |mean, var| NotNaN::new(var.sqrt()).unwrap() / mean)
+pub fn cdf(cdfs: &[model::bayes::expressionset::CDF]) -> CDF {
+    model::bayes::meanvar::cdf(cdfs, |mean, var| NotNaN::new(var.sqrt()).unwrap() / mean)
         .reduce()
         .sample(100)
 }

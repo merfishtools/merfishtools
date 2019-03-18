@@ -12,7 +12,7 @@ pub type FC = rational::Ratio<u64>;
 pub type CDF = probs::cdf::CDF<LogFC>;
 
 /// PMF of log2 fold change of a vs b. Specifically, we calculate log2((mean(a) + c) / (mean(b) + c))
-pub fn cdf(a: &model::expressionset::CDF, b: &model::expressionset::CDF) -> CDF {
+pub fn cdf(a: &model::bayes::expressionset::CDF, b: &model::bayes::expressionset::CDF) -> CDF {
     let mut pmf = Vec::new();
     let a_pmf = a.iter_pmf().collect_vec();
     let b_pmf = b.iter_pmf().collect_vec();
