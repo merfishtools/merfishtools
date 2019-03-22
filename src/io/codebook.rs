@@ -202,7 +202,7 @@ impl Codebook {
         self.index.keys()
     }
 
-    pub fn records<'a>(&'a self) -> Vec<&'a Record> {
+    pub fn records(&self) -> Vec<&Record> {
         //self.graph.node_weights_mut()
         self.graph
             .node_indices()
