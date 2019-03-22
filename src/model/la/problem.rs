@@ -1,4 +1,4 @@
-use crate::model::la::common::{Errors, NUM_BITS, NUM_CODES};
+use crate::model::la::common::{Errors, NUM_BITS, NUM_CODES, ExprV};
 use crate::model::la::hamming::hamming_distance16;
 use rayon::prelude::*;
 
@@ -32,8 +32,8 @@ fn dprob_inf(i: usize, j: usize, e: &Errors, pos: usize, kind: usize) -> f32 {
 }
 
 pub fn objective(
-    x: &[f32],
-    y: &[f32],
+    x: ExprV,
+    y: ExprV,
     e: &Errors,
     max_hamming_distance: usize,
     x_ind: &[usize],
@@ -54,8 +54,8 @@ pub fn objective(
 }
 
 pub fn partial_objective(
-    x: &[f32],
-    y: &[f32],
+    x: ExprV,
+    y: ExprV,
     e: &Errors,
     pos: usize,
     kind: usize,

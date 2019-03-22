@@ -1,9 +1,13 @@
-use crate::model::la::common::{Errors, NUM_BITS, NUM_CODES};
+use crate::model::la::common::{Errors, NUM_BITS, NUM_CODES, Expr, ExprV, ExprVMut};
 use crate::model::la::hamming::hamming_distance16;
 use crate::model::la::problem::prob;
-use ndarray::Array1;
+use ndarray::{Array1, Axis, ArrayView1};
+use ndarray::prelude::*;
+use ndarray_parallel::*;
 use rayon::prelude::*;
 use std::ops::Mul;
+use rand::distributions::{Normal, Sample};
+use rand::SeedableRng;
 
 // NNZ = {i: num_entries(i) for i in range(2, 16 + 1)}
 // Pre-calculate the number of nonzero entries for CSR representation
@@ -90,6 +94,47 @@ impl Mul<&[f32]> for &CSR {
     }
 }
 
+
+impl<'a> Mul<ArrayView1<'a, f32>> for &CSR {
+    type Output = Array1<f32>;
+
+    fn mul(self, rhs: ArrayView1<'a, f32>) -> Self::Output {
+        let mut result = Array1::<f32>::zeros((rhs.len(), ));
+        result
+            .axis_iter_mut(Axis(0))
+            .into_par_iter()
+            .enumerate()
+            .for_each(|(i, mut v)| {
+                let x = (self.indptr[i]..self.indptr[i + 1]).into_par_iter()
+                    .map(|k| self.data[k] * rhs[self.columns[k]])
+                    .sum::<f32>();
+                // v is actually a single value
+                v.mapv_inplace(|s| x);
+            });
+        result
+    }
+}
+
+impl<'a> Mul<ArrayView1<'a, f32>> for CSR {
+    type Output = Array1<f32>;
+
+    fn mul(self, rhs: ArrayView1<'a, f32>) -> Self::Output {
+        let mut result = Array1::<f32>::zeros((rhs.len(), ));
+        result
+            .axis_iter_mut(Axis(0))
+            .into_par_iter()
+            .enumerate()
+            .for_each(|(i, mut v)| {
+                let x = (self.indptr[i]..self.indptr[i + 1]).into_par_iter()
+                    .map(|k| self.data[k] * rhs[self.columns[k]])
+                    .sum::<f32>();
+                // v is actually a single value
+                v.mapv_inplace(|s| x);
+            });
+        result
+    }
+}
+
 pub fn csr_error_matrix(e: &Errors, max_hamming_distance: usize) -> CSR {
     // Build a sparse representation of the transition matrix in CSR format. Since no element is actually nonzero,
     // a threshold at which to consider an entry small enough to be negligible needs to be specified. This is achieved
@@ -116,35 +161,42 @@ pub fn csr_error_matrix(e: &Errors, max_hamming_distance: usize) -> CSR {
     CSR::from(data, indices, indptr)
 }
 
-pub fn error_dot(e: &Errors, y: &[f32], max_hamming_distance: usize) -> Vec<f32> {
-    let mut data = vec![0.; NUM_CODES];
-    data.par_iter_mut()
+pub fn error_dot(e: &Errors, y: ArrayView1<f32>, max_hamming_distance: usize) -> Array1<f32> {
+    let mut data = Array1::zeros((y.len(), ));
+    data.axis_iter_mut(Axis(0))
+        .into_par_iter()
         .enumerate()
-        .for_each(|(i, v)| {
+        .for_each(|(i, mut v)| {
             (0..NUM_CODES).filter(|j| hamming_distance16(i, *j) <= max_hamming_distance)
-                .for_each(|j| *v += prob(j, i, e) * y[j]);
+                .for_each(|j| {
+                    v.mapv_inplace(|_| prob(j, i, e) * y[j]);
+                });
         });
     data
 }
 
-pub fn rmse(a: &[f32], b: &[f32]) -> f32 {
+pub fn rmse(a: ArrayView1<f32>, b: ArrayView1<f32>) -> f32 {
     assert_eq!(a.len(), b.len());
-    let sqsum: f32 = a.iter()
-        .zip(b.iter())
-        .map(|(&x, &y)| (x - y).powi(2)).sum();
+    let sqsum = (&a - &b).map(|v| v.powi(2)).scalar_sum();
     (sqsum / (a.len() as f32)).sqrt()
 }
 
-pub fn csr_successive_over_relaxation(a: &CSR,
-                                      x: &mut [f32],
-                                      y: &[f32],
-                                      w: f32,
-                                      eps: f32,
-                                      max_iter: usize) -> Result<(Vec<f32>, usize, f32), (usize, f32)> {
+pub fn csr_successive_overrelaxation(a: &CSR,
+                                     y: ExprV,
+                                     w: f32,
+                                     eps: f32,
+                                     max_iter: usize) -> Result<(Expr, usize, f32), (usize, f32)> {
     assert!(w > 0.);
     assert!(w < 2.);
-    assert_eq!(x.len(), y.len());
-    let mut error = rmse(&(a * x), y);
+//    assert_eq!(x.len(), y.len());
+    let mut x = y.to_owned();
+    let mut rng = rand::StdRng::from_seed(&[42]);
+    let std_dev = y.std_axis(Axis(0), 1.);
+    let b = std_dev.iter().cloned().take(1).collect::<Vec<f32>>()[0];
+    let mut normal = Normal::new(0., (b as f64) / 4.);
+    x.mapv_inplace(|v| (v + normal.sample(&mut rng) as f32).abs());
+
+    let mut error = rmse((a * x.view()).view(), y);
     let nrows = y.len();
     for it in 0..max_iter {
         for row in 0..nrows {
@@ -163,9 +215,10 @@ pub fn csr_successive_over_relaxation(a: &CSR,
             }
             x[row] = ((1. - w) * x[row] + (w / diag) * (y[row] - sigma));
         }
-        error = rmse(&(a * x), y);
+        error = rmse((a * x.view()).view(), y);
+        println!("{:?}, {:?}", it, &error);
         if error < eps {
-            return Ok((x.to_vec(), it, error));
+            return Ok((x, it, error));
         }
     }
     Err((max_iter, error))
@@ -173,16 +226,15 @@ pub fn csr_successive_over_relaxation(a: &CSR,
 
 pub fn error_successive_overrelaxation(e: &Errors,
                                        max_hamming_distance: usize,
-                                       y: &[f32],
+                                       y: ExprV,
                                        w: f32,
                                        eps: f32,
-                                       max_iter: usize) -> Result<(Vec<f32>, usize, f32), (usize, f32)> {
+                                       max_iter: usize) -> Result<(Array1<f32>, usize, f32), (usize, f32)> {
     assert!(w > 0.);
     assert!(w < 2.);
     assert_eq!(y.len(), NUM_CODES);
-    let mut x = &mut [0.; NUM_CODES];
-    x.copy_from_slice(y);
-    let mut error = rmse(&error_dot(e, x, max_hamming_distance), y);
+    let mut x = y.to_owned();
+    let mut error = rmse(error_dot(e, x.view(), max_hamming_distance).view(), y.view());
     let nrows = y.len();
     for it in 0..max_iter {
         for row in 0..nrows {
@@ -193,9 +245,9 @@ pub fn error_successive_overrelaxation(e: &Errors,
             let diag = prob(row, row, e);
             x[row] = ((1. - w) * x[row] + (w / diag) * (y[row] - sigma));
         }
-        error = rmse(&error_dot(e, x, max_hamming_distance), y);
+        error = rmse(error_dot(e, x.view(), max_hamming_distance).view(), y.view());
         if error < eps {
-            return Ok((x.to_vec(), it, error));
+            return Ok((x, it, error));
         }
     }
     Err((max_iter, error))

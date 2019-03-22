@@ -24,6 +24,7 @@ use crate::model::bayes;
 use crate::model::bayes::cv::CV;
 use crate::model::bayes::foldchange::LogFC;
 use crate::model::bayes::readout::Counts;
+use std::collections::HashMap;
 
 pub struct Selection {
     pub expmnt: String,
@@ -69,46 +70,6 @@ pub struct ExpressionJ {
 pub trait Expression {
     fn codebook_path(&self) -> &str;
     fn cells(&self) -> &Regex;
-    fn load_counts<'a, R>(&mut self, reader: &'a mut R) -> Result<(), Error>
-        where
-            R: io::merfishdata::Reader<'a>,
-    {
-        let codebook = io::codebook::Codebook::from_file(&self.codebook_path())?;
-
-        let mut counts = collections::HashMap::new();
-        for res in reader.records() {
-            let record = res?;
-            if !self.cells().is_match(&record.cell_name()) && codebook.contains(&record.feature_name()) {
-                continue;
-            }
-
-            let cell_counts = counts
-                .entry(record.cell_name())
-                .or_insert_with(collections::HashMap::new);
-            let feature_counts = cell_counts.entry(record.feature_name()).or_insert(Counts {
-                exact: 0,
-                mismatch: 0,
-            });
-            if record.hamming_dist() == 0 {
-                feature_counts.exact += 1;
-            } else if record.hamming_dist() == 1 {
-                feature_counts.mismatch += 1;
-            } else {
-                panic!("Hamming distance of greater than 1 is unsupported at the moment.")
-            }
-        }
-        // add missing features from codebook
-        for cell_counts in counts.values_mut() {
-            for feature in codebook.features() {
-                cell_counts.entry(feature.clone()).or_insert(Counts {
-                    exact: 0,
-                    mismatch: 0,
-                });
-            }
-        }
-
-        Ok(())
-    }
     fn infer(&mut self) -> Result<(), Error>;
 }
 
@@ -194,6 +155,49 @@ impl Expression for ExpressionJ {
             },
         );
 
+        Ok(())
+    }
+}
+
+impl ExpressionJ {
+    pub fn load_counts<'a, R>(&mut self, reader: &'a mut R) -> Result<(), Error>
+        where
+            R: io::merfishdata::Reader<'a>,
+    {
+        let codebook = io::codebook::Codebook::from_file(&self.codebook_path())?;
+
+        let mut counts = collections::HashMap::new();
+        for res in reader.records() {
+            let record = res?;
+            if !self.cells().is_match(&record.cell_name()) && codebook.contains(&record.feature_name()) {
+                continue;
+            }
+
+            let cell_counts = counts
+                .entry(record.cell_name())
+                .or_insert_with(collections::HashMap::new);
+            let feature_counts = cell_counts.entry(record.feature_name()).or_insert(Counts {
+                exact: 0,
+                mismatch: 0,
+            });
+            if record.hamming_dist() == 0 {
+                feature_counts.exact += 1;
+            } else if record.hamming_dist() == 1 {
+                feature_counts.mismatch += 1;
+            } else {
+                panic!("Hamming distance of greater than 1 is unsupported at the moment.")
+            }
+        }
+        // add missing features from codebook
+        for cell_counts in counts.values_mut() {
+            for feature in codebook.features() {
+                cell_counts.entry(feature.clone()).or_insert(Counts {
+                    exact: 0,
+                    mismatch: 0,
+                });
+            }
+        }
+        self.counts = counts;
         Ok(())
     }
 }

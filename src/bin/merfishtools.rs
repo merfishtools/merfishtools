@@ -5,6 +5,8 @@
 
 use bio::stats::Prob;
 use clap::AppSettings::{ColoredHelp, DeriveDisplayOrder};
+use clap::arg_enum;
+use clap::_clap_count_exprs;
 use failure::Error;
 use itertools::Itertools;
 use ordered_float::NotNaN;
@@ -30,6 +32,7 @@ struct Opt {
 }
 
 #[derive(StructOpt)]
+#[structopt(rename_all = "kebab-case")]
 enum Command {
     #[structopt(
     name = "exp",
@@ -48,64 +51,67 @@ Example usage:
 merfishtools exp codebook.txt < data.txt > expression.txt"
     )]
     Expression {
-        #[structopt(value_name = "CODEBOOK-TSV")]
         /// Path to codebook definition consisting of tab separated columns: feature, codeword.
         ///
         /// Misidentification probes (see Chen et al. Science 2015) should not be contained in the codebook.
+        #[structopt(value_name = "CODEBOOK-TSV")]
         codebook: String,
 
-        #[structopt(value_name = "READOUTS")]
         /// Raw readout data containing molecule assignments to positions.
         ///
         /// If given as TSV file (ending on .tsv), the following columns are expected:
         /// cell, feature, hamming_dist, cell_position_x, cell_position_y, rna_position_x, rna_position_y.
         /// Otherwise, the official MERFISH binary format is expected.
+        #[structopt(value_name = "READOUTS")]
         raw_data: String,
 
-        #[structopt(value_name = "TSV-FILE")]
         /// Path to write expected value and standard deviation estimates of expression to.
         ///
         //  Output is formatted into columns: cell, feature, expected value, standard deviation
+        #[structopt(value_name = "TSV-FILE")]
         estimate: Option<String>,
 
-        #[structopt(long, value_name = "TSV-FILE")]
         /// Path to write global statistics per cell to.
         ///
         //  Output is formatted into columns: cell, noise-rate
+        #[structopt(long, value_name = "TSV-FILE")]
         stats: Option<String>,
 
-        #[structopt(long, value_name = "INT")]
         /// Seed for shuffling that occurs in EM algorithm.
+        #[structopt(long, value_name = "INT")]
         seed: usize,
 
+        /// Prior probability of 0->1 error
         #[structopt(
         long,
         default_value = "0.04",
         value_name = "FLOAT",
         multiple = true,
         )]
-        /// Prior probability of 0->1 error
         p0: Vec<f64>,
 
+        /// Prior probability of 1->0 error
         #[structopt(
         long,
         default_value = "0.10",
         value_name = "FLOAT",
         multiple = true,
         )]
-        /// Prior probability of 1->0 error
         p1: Vec<f64>,
 
-        #[structopt(long, default_value = ".*", value_name = "REGEX")]
         /// Regular expression to select cells from cell column (see above).
+        #[structopt(long, default_value = ".*", value_name = "REGEX")]
         cells: String,
 
-        #[structopt(long, default_value = "100", value_name = "INT")]
         /// Width of the window to calculate PMF for.
+        #[structopt(long, default_value = "100", value_name = "INT")]
         pmf_window_width: u32,
 
-        #[structopt(long, short, default_value = "1", value_name = "INT")]
+        #[structopt(long, default_value = "Bayes", value_name = "MODE", case_insensitive = true, raw(possible_values = "&Mode::variants()"))]
+        mode: Mode,
+
         /// Number of threads to use.
+        #[structopt(long, short, default_value = "1", value_name = "INT")]
         threads: usize,
     },
 
@@ -135,7 +141,7 @@ merfishtools diffexp data1.txt data2.txt > diffexp.txt"
         /// Path to expression PMFs for group of cells.
         group2: String,
 
-        #[structopt(long = "max-null-log2fc", default_value = "1", value_name = "FLOAT")]
+        #[structopt(long, default_value = "1", value_name = "FLOAT")]
         /// Maximum absolute log2 fold change considered as no differential expression.
         max_null_log2fc: f64,
 
@@ -176,7 +182,7 @@ merfishtools multidiffexp data1.txt data2.txt data3.txt > diffexp.txt"
         /// Paths to expression PMFs for groups of cells.
         groups: Vec<String>,
 
-        #[structopt(long = "max-null-cv", value_name = "FLOAT", default_value = "0.5")]
+        #[structopt(long, value_name = "FLOAT", default_value = "0.5")]
         /// Maximum coefficient of variation (CV) considered as no differential expression
         max_null_cv: f64,
 
@@ -245,7 +251,7 @@ codeword"
         /// Number of 1-bits.
         onebits: u8,
 
-        #[structopt(long = "not-expressed", value_name = "PATTERN")]
+        #[structopt(long, value_name = "PATTERN")]
         /// Regular expression pattern for features that should be marked
         /// as not expressed. This is useful to correctly model, e.g.,
         /// misidentification probes.
@@ -275,12 +281,20 @@ codeword"
         /// Number of 1-bits.
         onebits: u8,
 
-        #[structopt(long = "not-expressed", value_name = "PATTERN")]
+        #[structopt(long, value_name = "PATTERN")]
         /// Regular expression pattern for features that should be marked
         /// as not expressed. This is useful to correctly model, e.g.,
         /// misidentification probes.
         not_expressed: Option<String>,
     },
+}
+
+arg_enum! {
+    #[derive(Debug)]
+    enum Mode {
+        Bayes,
+        LA,
+    }
 }
 
 #[allow(non_snake_case)]
@@ -321,6 +335,7 @@ fn main() -> Result<(), Error> {
             p1,
             cells,
             pmf_window_width,
+            mode,
             threads,
         } => {
             let convert_err_rates = |values: Vec<f64>| match values.len() {
@@ -330,26 +345,51 @@ fn main() -> Result<(), Error> {
                     .map(|p| Prob::checked(p).unwrap())
                     .collect_vec(),
             };
+            match mode {
+                Mode::Bayes => {
+                    let mut expression = cli::ExpressionJBuilder::default()
+                        .p0(convert_err_rates(p0))
+                        .p1(convert_err_rates(p1))
+                        .codebook_path(codebook.to_owned())
+                        .estimate_path(estimate.map(|v| v.to_owned()))
+                        .stats_path(stats.map(|v| v.to_owned()))
+                        .threads(threads)
+                        .cells(Regex::new(&cells)?)
+                        .window_width(pmf_window_width)
+                        .seed(seed)
+                        .build()
+                        .unwrap();
+                    if let merfishdata::Format::Binary = merfishdata::Format::from_path(&raw_data) {
+                        expression.load_counts(&mut merfishdata::binary::Reader::from_file(&raw_data)?)?;
+                    } else {
+                        expression.load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?)?;
+                    }
+                    expression.infer()
+                }
+                Mode::LA => {
+                    let mut expression = merfishtools::model::la::expression::ExpressionTBuilder::default()
+                        .p0(convert_err_rates(p0))
+                        .p1(convert_err_rates(p1))
+                        .codebook_path(codebook.to_owned())
+                        .estimate_path(estimate.map(|v| v.to_owned()))
+                        .stats_path(stats.map(|v| v.to_owned()))
+                        .threads(threads)
+                        .cells(Regex::new(&cells)?)
+                        .max_hamming_distance(4 as usize) // TODO introduce mhd option
+                        .bits(16)
+                        .mode(merfishtools::model::la::expression::Mode::ErrorsThenExpression)
+                        .seed(seed)
+                        .build()
+                        .unwrap();
+                    if let merfishdata::Format::Binary = merfishdata::Format::from_path(&raw_data) {
+                        expression.load_counts(&mut merfishdata::binary::Reader::from_file(&raw_data)?)?;
+                    } else {
+                        expression.load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?)?;
+                    }
 
-            let mut expression = cli::ExpressionJBuilder::default()
-                .p0(convert_err_rates(p0))
-                .p1(convert_err_rates(p1))
-                .codebook_path(codebook.to_owned())
-                .estimate_path(estimate.map(|v| v.to_owned()))
-                .stats_path(stats.map(|v| v.to_owned()))
-                .threads(threads)
-                .cells(Regex::new(&cells)?)
-                .window_width(pmf_window_width)
-                .seed(seed)
-                .build()
-                .unwrap();
-            if let merfishdata::Format::Binary = merfishdata::Format::from_path(&raw_data) {
-                expression.load_counts(&mut merfishdata::binary::Reader::from_file(&raw_data)?)?;
-            } else {
-                expression.load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?)?;
+                    expression.infer()
+                }
             }
-
-            expression.infer()
         }
 
         Command::DifferentialExpression {

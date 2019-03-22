@@ -7,6 +7,7 @@ use std::path::Path;
 
 use bit_vec::BitVec;
 use failure::Fail;
+use crate::io::codebook::Codebook;
 
 pub type Readout = BitVec;
 
@@ -36,6 +37,8 @@ pub trait MerfishRecord {
     fn feature_id(&self) -> u16;
     fn feature_name(&self) -> String;
     fn hamming_dist(&self) -> u8;
+    fn error_bit(&self) -> Option<u8>;
+    fn barcode(&self, codebook: Option<&Codebook>) -> u16;
 }
 
 pub trait Reader<'a> {
@@ -54,6 +57,7 @@ pub mod tsv {
     use csv;
 
     use crate::io::merfishdata::MerfishRecord;
+    use crate::io::codebook::Codebook;
 
     /// A 2D position in the microscope.
     #[derive(Serialize, Deserialize, Debug)]
@@ -105,6 +109,20 @@ pub mod tsv {
         fn hamming_dist(&self) -> u8 {
             self.hamming_dist
         }
+
+        fn error_bit(&self) -> Option<u8> { None }
+
+        fn barcode(&self, codebook: Option<&Codebook>) -> u16 {
+            assert!(!codebook.is_none());
+            match codebook {
+                Some(cb) => {
+                    let feature_id = cb.get_id(&self.feature_name());
+                    let cw = cb.record(feature_id).codeword();
+                    cw.iter().rev().enumerate().map(|(i, bit)| (bit as u16) << i).sum()
+                }
+                None => panic!("Codebook must not be None")
+            }
+        }
     }
 
     /// A reader for MERFISH raw data.
@@ -152,6 +170,7 @@ pub mod binary {
     use crate::io::merfishdata::MerfishRecord;
 
     use super::Readout;
+    use crate::io::codebook::Codebook;
 
     /// Header of a binary merfish file.
     #[derive(Serialize, Deserialize, Debug)]
@@ -269,6 +288,14 @@ pub mod binary {
             assert!(self.is_exact <= 1, "unexpected value in field is_exact: {}", self.is_exact);
             1 - self.is_exact
         }
+
+        fn error_bit(&self) -> Option<u8> {
+            if self.error_bit > 0 {
+                Some(self.error_bit - 1)
+            } else { None }
+        }
+
+        fn barcode(&self, codebook: Option<&Codebook>) -> u16 { self.barcode as u16 }
     }
 
     #[derive(Debug, Fail)]
