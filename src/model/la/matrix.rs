@@ -58,82 +58,62 @@ impl CSR {
     }
 }
 
-impl Mul<&[f32]> for CSR {
-    type Output = Vec<f32>;
+macro_rules! impl_mul_vec {
+   ($base_type: ty, $in_type: ty, $out_type_inner: ty) => {
+        impl<'a> Mul<$in_type> for $base_type {
+            type Output = Vec<$out_type_inner>;
 
-    fn mul(self, rhs: &[f32]) -> Self::Output {
-        let mut result: Vec<f32> = vec![0.; rhs.len()];
-        result
-            .par_iter_mut()
-            .enumerate()
-            .for_each(|(i, v)| {
-                let x = (self.indptr[i]..self.indptr[i + 1]).into_par_iter()
-                    .map(|k| self.data[k] * rhs[self.columns[k]])
-                    .sum::<f32>();
-                *v += x;
-            });
-        result
+            fn mul(self, rhs: $in_type) -> Self::Output {
+                let mut result: Vec<$out_type_inner> = vec![0.; rhs.len()];
+                result
+                    .par_iter_mut()
+                    .enumerate()
+                    .for_each(|(i, v)| {
+                        let x = (self.indptr[i]..self.indptr[i + 1]).into_par_iter()
+                            .map(|k| self.data[k] * rhs[self.columns[k]])
+                            .sum::<$out_type_inner>();
+                        *v += x;
+                    });
+                result
+            }
+        }
     }
 }
 
-impl Mul<&[f32]> for &CSR {
-    type Output = Vec<f32>;
+macro_rules! impl_mul_arr {
+    ($base_type: ty, $in_type: ty, $out_type_inner: ty) => {
+        impl<'a> Mul<$in_type> for $base_type {
+            type Output = Array1<$out_type_inner>;
 
-    fn mul(self, rhs: &[f32]) -> Self::Output {
-        let mut result: Vec<f32> = vec![0.; rhs.len()];
-        result
-            .par_iter_mut()
-            .enumerate()
-            .for_each(|(i, v)| {
-                let x = (self.indptr[i]..self.indptr[i + 1]).into_par_iter()
-                    .map(|k| self.data[k] * rhs[self.columns[k]])
-                    .sum::<f32>();
-                *v += x;
-            });
-        result
+            fn mul(self, rhs: $in_type) -> Self::Output {
+                let mut result: Array1<$out_type_inner> = Array1::<$out_type_inner>::zeros((rhs.len(),));
+                result
+                    .axis_iter_mut(Axis(0))
+                    .into_par_iter()
+                    .enumerate()
+                    .for_each(|(i, mut v)| {
+                        let x = (self.indptr[i]..self.indptr[i + 1]).into_par_iter()
+                            .map(|k| self.data[k] * rhs[self.columns[k]])
+                            .sum::<f32>();
+                        // v is actually a single value
+                        v.mapv_inplace(|s| x);
+                });
+                result
+            }
+        }
     }
 }
 
-
-impl<'a> Mul<ArrayView1<'a, f32>> for &CSR {
-    type Output = Array1<f32>;
-
-    fn mul(self, rhs: ArrayView1<'a, f32>) -> Self::Output {
-        let mut result = Array1::<f32>::zeros((rhs.len(), ));
-        result
-            .axis_iter_mut(Axis(0))
-            .into_par_iter()
-            .enumerate()
-            .for_each(|(i, mut v)| {
-                let x = (self.indptr[i]..self.indptr[i + 1]).into_par_iter()
-                    .map(|k| self.data[k] * rhs[self.columns[k]])
-                    .sum::<f32>();
-                // v is actually a single value
-                v.mapv_inplace(|s| x);
-            });
-        result
-    }
-}
-
-impl<'a> Mul<ArrayView1<'a, f32>> for CSR {
-    type Output = Array1<f32>;
-
-    fn mul(self, rhs: ArrayView1<'a, f32>) -> Self::Output {
-        let mut result = Array1::<f32>::zeros((rhs.len(), ));
-        result
-            .axis_iter_mut(Axis(0))
-            .into_par_iter()
-            .enumerate()
-            .for_each(|(i, mut v)| {
-                let x = (self.indptr[i]..self.indptr[i + 1]).into_par_iter()
-                    .map(|k| self.data[k] * rhs[self.columns[k]])
-                    .sum::<f32>();
-                // v is actually a single value
-                v.mapv_inplace(|s| x);
-            });
-        result
-    }
-}
+impl_mul_vec!(CSR, &[f32], f32);
+impl_mul_vec!(&CSR, &[f32], f32);
+impl_mul_arr!(CSR, ArrayView1<'a, f32>, f32);
+impl_mul_arr!(&CSR, ArrayView1<'a, f32>, f32);
+impl_mul_arr!(CSR, ArrayViewMut1<'a, f32>, f32);
+impl_mul_arr!(&CSR, ArrayViewMut1<'a, f32>, f32);
+impl_mul_arr!(CSR, &ArrayView1<'a, f32>, f32);
+impl_mul_arr!(&CSR, &ArrayView1<'a, f32>, f32);
+impl_mul_arr!(CSR, &mut ArrayViewMut1<'a, f32>, f32);
+impl_mul_arr!(&CSR, &mut ArrayViewMut1<'a, f32>, f32);
 
 pub fn csr_error_matrix(e: &Errors, max_hamming_distance: usize) -> CSR {
     // Build a sparse representation of the transition matrix in CSR format. Since no element is actually nonzero,
@@ -183,43 +163,65 @@ pub fn rmse(a: ArrayView1<f32>, b: ArrayView1<f32>) -> f32 {
 
 pub fn csr_successive_overrelaxation(a: &CSR,
                                      y: ExprV,
+                                     x_est: ExprV,
                                      w: f32,
                                      eps: f32,
-                                     max_iter: usize) -> Result<(Expr, usize, f32), (usize, f32)> {
+                                     max_iter: usize,
+                                     keep_zeros: bool) -> Result<(Expr, usize, f32), (usize, f32)> {
     assert!(w > 0.);
     assert!(w < 2.);
-//    assert_eq!(x.len(), y.len());
-    let mut x = y.to_owned();
-    let mut rng = rand::StdRng::from_seed(&[42]);
-    let std_dev = y.std_axis(Axis(0), 1.);
-    let b = std_dev.iter().cloned().take(1).collect::<Vec<f32>>()[0];
-    let mut normal = Normal::new(0., (b as f64) / 4.);
-    x.mapv_inplace(|v| (v + normal.sample(&mut rng) as f32).abs());
+
+    let mut x = x_est.to_owned();
+//    let mut rng = rand::StdRng::from_seed(&[42]);
+//    let std_dev = y.std_axis(Axis(0), 1.);
+//    let b = std_dev.iter().cloned().take(1).collect::<Vec<f32>>()[0];
+//    let mut normal = Normal::new(0., (b as f64) / 16.);
+//    x.mapv_inplace(|v| (v + normal.sample(&mut rng) as f32).abs());
+
+    dbg!(x.slice(s![0..10; 1]));
+    dbg!(y.slice(s![0..10; 1]));
 
     let mut error = rmse((a * x.view()).view(), y);
-    let nrows = y.len();
+    let mut last_error = std::f32::INFINITY;
+    dbg!((a * x.view()).view().slice(s![0..10; 1]));
+    dbg!(y.slice(s![0..10; 1]));
+    let nonzero: Vec<usize> = if keep_zeros {
+        y.iter().enumerate().filter(|(_, &v)| v != 0.).map(|(i, _)| i).collect()
+    } else {
+        (0..y.len()).collect()
+    };
+//    let num_rows = NUM_CODES;
     for it in 0..max_iter {
-        for row in 0..nrows {
+        for &row in &nonzero {
             let mut sigma = 0.;
             for k in a.indptr[row]..a.indptr[row + 1] {
                 let col = a.columns[k];
                 if row != col {
-                    sigma += a.data[k] * x[col];
+                    sigma += a.data[k] * &x[col];
                 }
             }
             let mut diag = 1.;
             for k in a.indptr[row]..a.indptr[row + 1] {
                 if row == a.columns[k] {
-                    diag = a.data[k]
+                    diag = a.data[k];
+                    break;
                 }
             }
-            x[row] = ((1. - w) * x[row] + (w / diag) * (y[row] - sigma));
+            let value = (1. - w) * &x[row] + (w / diag) * (y[row] - sigma);
+            if value >= 0. {
+                x[row] = value;
+            }
         }
         error = rmse((a * x.view()).view(), y);
         println!("{:?}, {:?}", it, &error);
-        if error < eps {
-            return Ok((x, it, error));
+        if error.is_infinite() || error.is_nan() {
+            return Err((it, error));
         }
+        if error < eps || (last_error - error).abs() <= 1e-5 {
+            println!("{:?}, {:?}", x.slice(s![0..10; 1]), y.slice(s![0..10; 1]));
+            return Ok((x.to_owned(), it, error));
+        }
+        last_error = error;
     }
     Err((max_iter, error))
 }

@@ -9,7 +9,7 @@ use rand::SeedableRng;
 use rand::StdRng;
 use rayon::prelude::*;
 use regex::Regex;
-use rand::distributions::{Weighted, WeightedChoice, IndependentSample};
+use rand::distributions::{Weighted, WeightedChoice, IndependentSample, Normal, Sample};
 
 use crate::cli::Expression;
 use crate::io::codebook::{Codebook, FeatureID};
@@ -17,7 +17,7 @@ use crate::io::merfishdata::MerfishRecord;
 use crate::model::bayes::readout::Counts;
 use crate::model::la::common::{Errors, Expr, ExprV, NUM_BITS, NUM_CODES};
 use crate::model::la::expression::Mode::ExpressionThenErrors;
-use crate::model::la::matrix::{csr_error_matrix, error_dot, error_successive_overrelaxation, csr_successive_overrelaxation};
+use crate::model::la::matrix::{csr_error_matrix, error_dot, error_successive_overrelaxation, csr_successive_overrelaxation, CSR};
 use crate::model::la::problem::{objective, partial_objective};
 
 #[derive(Builder)]
@@ -86,29 +86,38 @@ impl Expression for ExpressionT {
 
         match mode {
             Mode::ErrorsThenExpression => {
-                for hamming_dist in 1..=max_hamming_distance {
+                for hamming_dist in 2..=2 {
                     println!("\n=== {:?} ===", hamming_dist);
                     e = estimate_errors(x.view(), yv, &e, hamming_dist).expect("Failed estimating errors");
-                    x = estimate_expression(&e, yv, hamming_dist).expect("Failed estimating expression");
-                    x.iter_mut().filter(|&&mut v| v <= 1.).for_each(|v| *v = 0.);
+                    let mat = csr_error_matrix(&e, hamming_dist.max(2));
+                    x = estimate_expression(&mat, x.view(),yv, hamming_dist, true).expect("Failed estimating expression");
+//                    x.iter_mut().filter(|&&mut v| v <= 1.).for_each(|v| *v = 0.);
                 }
             }
             Mode::ExpressionThenErrors => {
-                for hamming_dist in 1..=max_hamming_distance {
-                    x = estimate_expression(&e, yv, hamming_dist).expect("Failed estimating expression");
-                    x.iter_mut().filter(|&&mut v| v <= 1.).for_each(|v| *v = 0.);
+                for hamming_dist in 3..=3 {
+                    let mat = csr_error_matrix(&e, hamming_dist.max(2));
+                    x = estimate_expression(&mat, x.view(), yv, hamming_dist, true).expect("Failed estimating expression");
+//                    x.iter_mut().filter(|&&mut v| v <= 1.).for_each(|v| *v = 0.);
                     e = estimate_errors(x.view(), yv, &e, hamming_dist).expect("Failed estimating errors");
                 }
             }
         };
-        self.raw_counts.iter().for_each(|(cell, countmap)| {
+        let mat = csr_error_matrix(&e, 4);
+        self.raw_counts.iter().for_each(|(cell, raw_countmap)| {
+            let corrected_countmap = self.corrected_counts.get(cell).unwrap();
             let mut y = ndarray::Array1::<f32>::zeros((NUM_CODES, ));
-            countmap.iter().for_each(|(&barcode, &count)| {
+            raw_countmap.iter().for_each(|(&barcode, &count)| {
                 y[barcode as usize] += count as f32;
             });
-            x = estimate_expression(&e, y.view(), max_hamming_distance).expect("Failed estimating expression");
+            let mut x = ndarray::Array1::<f32>::zeros((NUM_CODES, ));
+            corrected_countmap.iter().for_each(|(&barcode, &count)| {
+                x[barcode as usize] += count as f32;
+            });
+            x = estimate_expression(&mat, x.view(), y.view(), max_hamming_distance, true).expect("Failed estimating expression");
             x.iter_mut().filter(|&&mut v| v <= 1.).for_each(|v| *v = 0.);
-            println!("{:?}", &x);
+            x.iter_mut().enumerate().filter(|(i, v)| corrected_countmap.contains_key(&(*i as u16))).for_each(|(_, v)| *v = 0.);
+            println!("{:?}", &x.slice(s![0..10; 1]));
         });
         unimplemented!()
     }
@@ -190,14 +199,14 @@ fn _gradient_descent_hardcoded(e: &mut Errors,
     let mult: f32 = 0.5;
     let c1: f32 = 1e-4;
     for i in 0..max_iter {
-        println!("Calculating gradient...");
+//        println!("Calculating gradient...");
         (0..2).for_each(|kind| {
             (0..NUM_BITS).for_each(|pos| {
                 let grad_value = partial_objective(x, y, &e0, pos, kind, max_hamming_distance, x_ind);
                 gradient[kind][pos] = grad_value;
             });
         });
-        println!("Estimating stepsize...");
+//        println!("Estimating stepsize...");
         let o2 = objective(x, y, &e0, max_hamming_distance, x_ind);
         let gradv = gradient.iter().flatten().map(|g: &f32| g.powi(2)).sum::<f32>();
         let mut alpha = alpha0;
@@ -231,9 +240,9 @@ fn _gradient_descent_hardcoded(e: &mut Errors,
                 }
             }
         }
-        println!("{:?}", &e0);
+//        println!("{:?}", &e0);
         let err = (gradient.iter().flatten().map(|g: &f32| g.powi(2)).sum::<f32>() / (gradient.len() as f32)).sqrt();
-        println!("{:?}", err);
+//        println!("{:?}", err);
         if i >= min_iter {
             if err < target_error {
                 return (*e0, err, i);
@@ -256,12 +265,9 @@ fn estimate_errors(x: ExprV, y: ExprV, e: &Errors, max_hamming_distance: usize) 
     }
 }
 
-fn estimate_expression(e: &Errors, y: ExprV, max_hamming_distance: usize) -> Result<Expr, ()> {
-    println!("Building CSR matrix explicitly");
-    let E = csr_error_matrix(e, max_hamming_distance);
-    //if let Ok((x, _it, _err)) = error_successive_overrelaxation(e, max_hamming_distance, y, 0.75, 1e-7, 4096) {
+fn estimate_expression(mat: &CSR, x_est: ExprV, y: ExprV, max_hamming_distance: usize, keep_zeros: bool) -> Result<Expr, ()> {
     println!("SOR...");
-    if let Ok((x, _it, _err)) = csr_successive_overrelaxation(&E, y, 0.75, 1e-7, 4096) {
+    if let Ok((x, _it, _err)) = csr_successive_overrelaxation(mat, y, x_est, 1.25, 5e-2, 256, keep_zeros) {
         Ok(x)
     } else {
         Err(())

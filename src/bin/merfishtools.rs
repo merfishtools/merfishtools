@@ -375,7 +375,7 @@ fn main() -> Result<(), Error> {
                         .stats_path(stats.map(|v| v.to_owned()))
                         .threads(threads)
                         .cells(Regex::new(&cells)?)
-                        .max_hamming_distance(4 as usize) // TODO introduce mhd option
+                        .max_hamming_distance(3 as usize) // TODO introduce mhd option
                         .bits(16)
                         .mode(merfishtools::model::la::expression::Mode::ErrorsThenExpression)
                         .seed(seed)
