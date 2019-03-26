@@ -4,12 +4,10 @@ use bio::stats::Prob;
 use failure::Error;
 use ndarray::prelude::*;
 use rand;
-use rand::Rng;
-use rand::SeedableRng;
-use rand::StdRng;
+use rand::distributions::WeightedIndex;
+use rand::prelude::*;
 use rayon::prelude::*;
 use regex::Regex;
-use rand::distributions::{Weighted, WeightedChoice, IndependentSample, Normal, Sample};
 
 use crate::cli::Expression;
 use crate::io::codebook::{Codebook, FeatureID};
@@ -17,7 +15,7 @@ use crate::io::merfishdata::MerfishRecord;
 use crate::model::bayes::readout::Counts;
 use crate::model::la::common::{Errors, Expr, ExprV, NUM_BITS, NUM_CODES};
 use crate::model::la::expression::Mode::ExpressionThenErrors;
-use crate::model::la::matrix::{csr_error_matrix, error_dot, error_successive_overrelaxation, csr_successive_overrelaxation, CSR};
+use crate::model::la::matrix::{CSR, csr_error_matrix, csr_successive_overrelaxation, error_dot, error_successive_overrelaxation};
 use crate::model::la::problem::{objective, partial_objective};
 
 #[derive(Builder)]
@@ -33,7 +31,7 @@ pub struct ExpressionT {
     bits: usize,
     max_hamming_distance: usize,
     mode: Mode,
-    seed: usize,
+    seed: u64,
     #[builder(setter(skip))]
     corrected_counts: HashMap<String, HashMap<u16, usize>>,
     #[builder(setter(skip))]
@@ -134,8 +132,7 @@ impl ExpressionT {
         let mut corrected_counts: HashMap<String, HashMap<u16, usize>> = HashMap::new();
         let mut raw_counts: HashMap<String, HashMap<u16, usize>> = HashMap::new();
 
-        let mut rng = rand::StdRng::from_seed(&[self.seed]);
-        let weight = |(i, p): (usize, &Prob)| Weighted { weight: (p.0 * 1e6).round() as u32, item: i as u8 };
+        let mut rng = StdRng::seed_from_u64(self.seed);
 
         for rec in reader.records() {
             let record = rec?;
@@ -155,7 +152,7 @@ impl ExpressionT {
                     // the tsv merfish format only states if a readout was bit-corrected or not
                     // we will hence un-correct the barcode at random (according to p0/p1 probabilities)
                     None => {
-                        let mut weights: Vec<_> = (0..NUM_BITS)
+                        let weights: Vec<_> = (0..NUM_BITS)
                             .map(|i| {
                                 let bit = (barcode >> i) & 1;
                                 let p = match bit {
@@ -163,10 +160,10 @@ impl ExpressionT {
                                     1 => &self.p1[i],
                                     _ => panic!("bug: bit can only be 0 or 1")
                                 };
-                                weight((i, p))
+                                p.0
                             }).collect();
-                        let wc = WeightedChoice::new(&mut weights);
-                        wc.ind_sample(&mut rng)
+                        let wc = WeightedIndex::new(&weights).unwrap();
+                        rng.sample(&wc) as u8
                     }
                 };
                 uncorrected_barcode ^= 1 << error_bit;

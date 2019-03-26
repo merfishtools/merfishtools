@@ -6,8 +6,7 @@ use ndarray::prelude::*;
 use ndarray_parallel::*;
 use rayon::prelude::*;
 use std::ops::Mul;
-use rand::distributions::{Normal, Sample};
-use rand::SeedableRng;
+use rand::prelude::*;
 
 // NNZ = {i: num_entries(i) for i in range(2, 16 + 1)}
 // Pre-calculate the number of nonzero entries for CSR representation
