@@ -2,8 +2,7 @@ use std::cell::RefCell;
 use std::cmp;
 
 use itertools::Itertools;
-use rand;
-use rand::Rng;
+use rand::prelude::*;
 use rgsl::randist::multinomial::multinomial_pdf;
 
 use bio::stats::{LogProb, Prob};
@@ -46,7 +45,7 @@ pub trait AbstractFeatureModel {
         expressions: &Expressions,
         miscalls_exact: &mut Miscalls,
         miscalls_mismatch: &mut Miscalls,
-        rng: &mut rand::StdRng,
+        rng: &mut StdRng,
     ) {
         let x = expressions[self.feature_id()];
 
@@ -54,12 +53,13 @@ pub trait AbstractFeatureModel {
         // Hence, we iterate randomly over the neighbors such that we can simply stop once that
         // happens without causing a bias.
         let mut idx = (0..self.neighbors().len()).collect_vec();
-        rng.shuffle(&mut idx);
+        idx.shuffle(rng);
 
         // by stochastic rounding, we ensure that on average \sum x*p_i = x
         // numeric rounding would not work if many of the probabilities are small enough to yield
         // expectations less than 1
-        let mut stochastic_round = |v: f64| v.floor() as u32 + (rng.next_f64() <= v % 1.0) as u32;
+        let uniform = rand::distributions::Uniform::new(0., 1.);
+        let mut stochastic_round = |v: f64| v.floor() as u32 + (rng.sample(uniform) <= v % 1.0) as u32;
 
         let mut rest = x;
         for i in idx {
