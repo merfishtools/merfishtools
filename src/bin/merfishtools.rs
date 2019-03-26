@@ -55,7 +55,7 @@ fn main() -> Result<(), Error> {
         let cells = matches.value_of("cells").unwrap();
         let window_width = value_t!(matches, "pmf-window-width", u32).unwrap_or_else(|e| e.exit());
         let threads = value_t!(matches, "threads", usize).unwrap_or_else(|e| e.exit());
-        let seed = value_t!(matches, "seed", usize).unwrap_or_else(|e| e.exit());
+        let seed = value_t!(matches, "seed", u64).unwrap_or_else(|e| e.exit());
         let raw_data = matches.value_of("raw_data").unwrap();
 
         let convert_err_rates = |values: Vec<f64>| {

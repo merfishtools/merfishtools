@@ -3,9 +3,7 @@ use std::collections::HashMap;
 use itertools::Itertools;
 use ndarray::prelude::*;
 use ordered_float::NotNaN;
-use rand;
-use rand::distributions::IndependentSample;
-use rand::{Rng, SeedableRng};
+use rand::prelude::*;
 
 use bio::stats::{LogProb, Prob};
 
@@ -22,7 +20,7 @@ pub struct JointModel {
     miscalls_mismatch: Miscalls,
     margin: u32,
     em_run: bool,
-    rng: rand::StdRng,
+    rng: StdRng,
 }
 
 impl JointModel {
@@ -32,10 +30,10 @@ impl JointModel {
         p1: &[Prob],
         codebook: &Codebook,
         window_width: u32,
-        seed: usize,
+        seed: u64,
     ) -> Self {
         let xi = Xi::new(p0, p1);
-        let mut rng = rand::StdRng::from_seed(&[seed]);
+        let mut rng = StdRng::seed_from_u64(seed);
 
         // Generate feature models and info about not expressed features.
         let mut feature_models = HashMap::new();
@@ -58,9 +56,9 @@ impl JointModel {
         let feature_count = codebook.len() + 1;
 
         // calculate start values (we take random numbers as start expression)
-        let start_range = rand::distributions::Range::new(1, 10000);
+        let start_range = rand::distributions::Uniform::new(1, 10000);
         let mut expressions =
-            Array1::from_iter((0..feature_count).map(|_| start_range.ind_sample(&mut rng)));
+            Array1::from_iter(rng.sample_iter(&start_range).take(feature_count));
         for &feat_id in &not_expressed_feature_ids {
             expressions[feat_id] = 0;
         }
@@ -121,7 +119,7 @@ impl JointModel {
             // Shuffle models, such that miscalls can be drawn unbiased
             // this is necessary because there is a maximum miscall count for each feature.
             // If we would not shuffle, it would be easier for the first model to provide miscalls.
-            self.rng.shuffle(&mut feature_models);
+            feature_models.shuffle(&mut self.rng);
             for m in &feature_models {
                 m.mle_miscalls(
                     &self.expressions,

@@ -61,7 +61,7 @@ pub struct Expression {
     threads: usize,
     cells: Regex,
     window_width: u32,
-    seed: usize,
+    seed: u64,
     #[builder(setter(skip))]
     counts: collections::HashMap<String, collections::HashMap<String, Counts>>,
 }

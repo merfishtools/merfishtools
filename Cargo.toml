@@ -22,7 +22,7 @@ ordered-float = "0.5"
 approx = "0.1"
 fnv = "1.0"
 clap = {version = "2.26", features = ["yaml", "color", "suggestions"]}
-rand = "0.3"
+rand = "0.6"
 ndarray = "0.10"
 ndarray-rand = "0.6"
 bit-vec = "0.4"
