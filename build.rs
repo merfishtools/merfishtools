@@ -15,10 +15,10 @@ fn main() -> std::io::Result<()> {
     let nbits: Vec<usize> = (0..2 << (16 - 1)).map(|i| bit_count(i)).collect();
     let mut f = fs::File::create("src/model/la/hamming.rs")?;
     f.write_all(b"const _NBITS16: [usize; 65536] = [")?;
-    f.write(b"\t")?;
+    f.write(b"    ")?;
     for (i, n) in nbits.iter().enumerate() {
         if i % 16 == 0 {
-            f.write(b"\n\t")?;
+            f.write(b"\n    ")?;
         }
         f.write_fmt(format_args!("{}, ", n))?;
     }
