@@ -86,16 +86,17 @@ impl Expression for ExpressionT {
 
         match mode {
             Mode::ErrorsThenExpression => {
-                for hamming_dist in 2..=2 {
+                for hamming_dist in 1..=max_hamming_distance {
                     println!("\n=== {:?} ===", hamming_dist);
                     e = estimate_errors(x.view(), yv, &e, hamming_dist).expect("Failed estimating errors");
+                    dbg!(&e);
                     let mat = csr_error_matrix(&e, hamming_dist.max(2));
-                    x = estimate_expression(&mat, x.view(),yv, hamming_dist, true).expect("Failed estimating expression");
+                    x = estimate_expression(&mat, x.view(), yv, hamming_dist, true).expect("Failed estimating expression");
 //                    x.iter_mut().filter(|&&mut v| v <= 1.).for_each(|v| *v = 0.);
                 }
             }
             Mode::ExpressionThenErrors => {
-                for hamming_dist in 3..=3 {
+                for hamming_dist in 1..=max_hamming_distance {
                     let mat = csr_error_matrix(&e, hamming_dist.max(2));
                     x = estimate_expression(&mat, x.view(), yv, hamming_dist, true).expect("Failed estimating expression");
 //                    x.iter_mut().filter(|&&mut v| v <= 1.).for_each(|v| *v = 0.);
@@ -104,21 +105,23 @@ impl Expression for ExpressionT {
             }
         };
         let mat = csr_error_matrix(&e, 4);
-        self.raw_counts.iter().for_each(|(cell, raw_countmap)| {
-            let corrected_countmap = self.corrected_counts.get(cell).unwrap();
-            let mut y = ndarray::Array1::<f32>::zeros((NUM_CODES, ));
-            raw_countmap.iter().for_each(|(&barcode, &count)| {
-                y[barcode as usize] += count as f32;
+        self.raw_counts
+            .par_iter()
+            .for_each(|(cell, raw_countmap)| {
+                let corrected_countmap = self.corrected_counts.get(cell).unwrap();
+                let mut y: Expr = Expr::zeros((NUM_CODES, ));
+                raw_countmap.iter().for_each(|(&barcode, &count)| {
+                    y[barcode as usize] += count as f32;
+                });
+                let mut x: Expr = Expr::zeros((NUM_CODES, ));
+                corrected_countmap.iter().for_each(|(&barcode, &count)| {
+                    x[barcode as usize] += count as f32;
+                });
+                x = estimate_expression(&mat, x.view(), y.view(), max_hamming_distance, true).expect("Failed estimating expression");
+                x.iter_mut().filter(|&&mut v| v <= 1.).for_each(|v| *v = 0.);
+                x.iter_mut().enumerate().filter(|(i, v)| corrected_countmap.contains_key(&(*i as u16))).for_each(|(_, v)| *v = 0.);
+                println!("{:?}", &x.slice(s![0..10; 1]));
             });
-            let mut x = ndarray::Array1::<f32>::zeros((NUM_CODES, ));
-            corrected_countmap.iter().for_each(|(&barcode, &count)| {
-                x[barcode as usize] += count as f32;
-            });
-            x = estimate_expression(&mat, x.view(), y.view(), max_hamming_distance, true).expect("Failed estimating expression");
-            x.iter_mut().filter(|&&mut v| v <= 1.).for_each(|v| *v = 0.);
-            x.iter_mut().enumerate().filter(|(i, v)| corrected_countmap.contains_key(&(*i as u16))).for_each(|(_, v)| *v = 0.);
-            println!("{:?}", &x.slice(s![0..10; 1]));
-        });
         unimplemented!()
     }
 }
