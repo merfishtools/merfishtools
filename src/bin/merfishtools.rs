@@ -61,7 +61,7 @@ merfishtools exp codebook.txt < data.txt > expression.txt"
         /// Otherwise, the official MERFISH binary format is expected.
         raw_data: String,
 
-        #[structopt(value_name = "TSV-FILE")]
+        #[structopt(long, value_name = "TSV-FILE")]
         /// Path to write expected value and standard deviation estimates of expression to.
         ///
         //  Output is formatted into columns: cell, feature, expected value, standard deviation
