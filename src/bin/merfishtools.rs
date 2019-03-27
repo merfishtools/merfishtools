@@ -68,7 +68,7 @@ merfishtools exp codebook.txt < data.txt > expression.txt"
         /// Path to write expected value and standard deviation estimates of expression to.
         ///
         //  Output is formatted into columns: cell, feature, expected value, standard deviation
-        #[structopt(value_name = "TSV-FILE")]
+        #[structopt(long, value_name = "TSV-FILE")]
         estimate: Option<String>,
 
         /// Path to write global statistics per cell to.
