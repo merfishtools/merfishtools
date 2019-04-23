@@ -306,6 +306,9 @@ codeword"
         #[structopt(long, short = "b", value_name = "INT")]
         num_barcodes: Option<usize>,
 
+        #[structopt(long, value_name = "INT")]
+        seed: Option<u64>,
+
         /// Prior probability of 0->1 error
         #[structopt(
         long,
@@ -493,6 +496,7 @@ fn main() -> Result<(), Error> {
             set_bits,
             num_cells,
             num_barcodes,
+            seed,
             p0,
             p1,
             lambda,
@@ -512,6 +516,7 @@ fn main() -> Result<(), Error> {
                 .min_hamming_distance(min_hamming_distance)
                 .num_cells(num_cells)
                 .num_barcodes(num_barcodes)
+                .seed(seed)
                 .p0(convert_err_rates(p0))
                 .p1(convert_err_rates(p1))
                 .lambda(lambda)

@@ -7,8 +7,8 @@ use failure::Error;
 use itertools::Itertools;
 use maplit::hashmap;
 use ndarray::Array;
-use rand::{Rng, SeedableRng};
 use rand::prelude::*;
+use rand::{Rng, SeedableRng};
 use serde::Serialize;
 
 use crate::model::la::hamming::_NBITS16;
@@ -49,14 +49,13 @@ pub fn generate_barcodes(bits: usize, hamming_distance: usize) -> Vec<Barcode> {
 pub fn generate_raw_counts(
     barcodes: &[Barcode],
     lambda: f64,
-    seed: u64,
+    rng: &mut StdRng,
 ) -> HashMap<Barcode, usize> {
     let num_codes = barcodes.len();
-    let mut rng = StdRng::seed_from_u64(seed);
     let poisson = rand::distributions::Poisson::new(lambda);
 
     poisson
-        .sample_iter(&mut rng)
+        .sample_iter(rng)
         .enumerate()
         .take(num_codes)
         .map(|(i, v)| (barcodes[i], v as usize))
@@ -122,6 +121,7 @@ pub struct SimulationParams {
     min_hamming_distance: u8,
     num_cells: Option<usize>,
     num_barcodes: Option<usize>,
+    seed: Option<u64>,
     p0: Vec<Prob>,
     p1: Vec<Prob>,
     lambda: f64,
@@ -130,8 +130,8 @@ pub struct SimulationParams {
 }
 
 mod binary {
-    use serde::{Deserializer, Serializer};
     use serde::de::Deserialize;
+    use serde::{Deserializer, Serializer};
 
     use crate::simulation::Barcode;
 
@@ -174,8 +174,14 @@ pub fn main(params: SimulationParams) -> Result<(), Error> {
     let p0: Vec<f32> = params.p0.iter().map(|v| v.0 as f32).collect();
     let p1: Vec<f32> = params.p1.iter().map(|v| v.0 as f32).collect();
     let lambda = params.lambda;
+    let mut rng = if let Some(seed) = params.seed {
+        StdRng::seed_from_u64(seed)
+    } else {
+        StdRng::from_entropy()
+    };
 
-    let mut barcodes: Vec<Barcode> = generate_barcodes(num_bits, params.min_hamming_distance as usize);
+    let mut barcodes: Vec<Barcode> =
+        generate_barcodes(num_bits, params.min_hamming_distance as usize);
     barcodes = if let Some(s) = set_bits {
         // TODO can be replaced with `drain_filter` in future rust releases
         barcodes
@@ -189,20 +195,22 @@ pub fn main(params: SimulationParams) -> Result<(), Error> {
     if let Some(num_barcodes) = params.num_barcodes {
         if num_barcodes > barcodes.len() {
             // TODO use failure and abort instead?
-            warn!("Desired number of barcodes ({}) > number of available barcodes ({}).", num_barcodes, barcodes.len());
+            warn!(
+                "Desired number of barcodes ({}) > number of available barcodes ({}).",
+                num_barcodes,
+                barcodes.len()
+            );
         }
-        let mut rng = StdRng::from_entropy();
         barcodes.shuffle(&mut rng);
         barcodes.truncate(num_barcodes);
     }
-
 
     let mut writer = csv::WriterBuilder::new()
         .delimiter(b'\t')
         .has_headers(true)
         .from_writer(std::io::stdout());
     for cell in 0..num_cells {
-        let raw_counts = generate_raw_counts(&barcodes, lambda, cell as u64);
+        let raw_counts = generate_raw_counts(&barcodes, lambda, &mut rng);
         let derived_counts =
             generate_erroneous_counts(&raw_counts, cell as u64, &p0, &p1, num_bits);
         for (barcode, errcount) in derived_counts.into_iter().sorted_by_key(|v| v.0) {
