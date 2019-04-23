@@ -23,3 +23,4 @@ pub mod codebook;
 pub mod error_rates;
 pub mod io;
 pub mod model;
+pub mod simulation;

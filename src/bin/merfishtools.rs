@@ -68,7 +68,7 @@ merfishtools exp codebook.txt < data.txt > expression.txt"
         /// Path to write expected value and standard deviation estimates of expression to.
         ///
         //  Output is formatted into columns: cell, feature, expected value, standard deviation
-        #[structopt(value_name = "TSV-FILE")]
+        #[structopt(long, value_name = "TSV-FILE")]
         estimate: Option<String>,
 
         /// Path to write global statistics per cell to.
@@ -287,6 +287,49 @@ codeword"
         /// misidentification probes.
         not_expressed: Option<String>,
     },
+    #[structopt(
+    name = "simulate",
+    about = "Generate raw merfish data")]
+    Simulation {
+        #[structopt(value_name = "NUM BITS")]
+        bits: u8,
+
+        #[structopt(value_name = "HAMMING DISTANCE")]
+        min_hamming_distance: u8,
+
+        #[structopt(long, short = "s", value_name = "SET BITS")]
+        set_bits: Option<u8>,
+
+        #[structopt(long, short = "c", value_name = "INT")]
+        num_cells: Option<usize>,
+
+        #[structopt(long, short = "b", value_name = "INT")]
+        num_barcodes: Option<usize>,
+
+        /// Prior probability of 0->1 error
+        #[structopt(
+        long,
+        default_value = "0.04",
+        value_name = "FLOAT",
+        multiple = true,
+        )]
+        p0: Vec<f64>,
+
+        /// Prior probability of 1->0 error
+        #[structopt(
+        long,
+        default_value = "0.10",
+        value_name = "FLOAT",
+        multiple = true,
+        )]
+        p1: Vec<f64>,
+
+        #[structopt(long, short = "r", value_name = "FILE")]
+        raw_expression_path: Option<String>,
+
+        #[structopt(long, short = "e", value_name = "FILE")]
+        ecc_expression_path: Option<String>,
+    },
 }
 
 arg_enum! {
@@ -440,6 +483,38 @@ fn main() -> Result<(), Error> {
             let words = codebook::generate_mhd4(onebits);
             let not_expressed_pattern = not_expressed.as_ref().map(String::as_ref);
             cli::gen_codebook(&words, not_expressed_pattern)
+        }
+        Command::Simulation {
+            bits,
+            min_hamming_distance,
+            set_bits,
+            num_cells,
+            num_barcodes,
+            p0,
+            p1,
+            raw_expression_path,
+            ecc_expression_path,
+        } => {
+            let convert_err_rates = |values: Vec<f64>| match values.len() {
+                1 => vec![Prob::checked(values[0]).unwrap(); bits as usize],
+                _ => values
+                    .into_iter()
+                    .map(|p| Prob::checked(p).unwrap())
+                    .collect_vec(),
+            };
+            let simulation_params = merfishtools::simulation::SimulationParamsBuilder::default()
+                .bits(bits)
+                .set_bits(set_bits)
+                .min_hamming_distance(min_hamming_distance)
+                .num_cells(num_cells)
+                .num_barcodes(num_barcodes)
+                .p0(convert_err_rates(p0))
+                .p1(convert_err_rates(p1))
+                .raw_expression_path(raw_expression_path)
+                .ecc_expression_path(ecc_expression_path)
+                .build()
+                .unwrap();
+            merfishtools::simulation::main(simulation_params)
         }
     }
 }
