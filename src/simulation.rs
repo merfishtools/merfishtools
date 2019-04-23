@@ -30,7 +30,7 @@ pub fn generate_barcodes(bits: usize, hamming_distance: usize) -> Vec<Barcode> {
                 0, 0, 0, 0, 0, 0, 0, 1,
             ],
         )
-        .unwrap();
+            .unwrap();
 
         let barcodes: Vec<Barcode> = (0..2u32.pow(11) - 1)
             .map(|i| {
@@ -136,16 +136,16 @@ mod binary {
     use crate::simulation::Barcode;
 
     pub(crate) fn serialize<S>(barcode: &Barcode, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
+        where
+            S: Serializer,
     {
         let repr = format!("{:016b}", barcode);
         serializer.serialize_str(&repr)
     }
 
     pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<Barcode, D::Error>
-    where
-        D: Deserializer<'de>,
+        where
+            D: Deserializer<'de>,
     {
         let repr = String::deserialize(deserializer)?;
         let barcode = repr.chars().enumerate().fold(0u16, |acc, (i, c)| {
@@ -171,13 +171,13 @@ pub fn main(params: SimulationParams) -> Result<(), Error> {
     let num_bits = params.bits as usize;
     let set_bits = params.set_bits;
     let num_cells = params.num_cells.unwrap_or(std::usize::MAX);
-    let num_barcodes = params.num_barcodes.unwrap_or(std::usize::MAX);
     let p0: Vec<f32> = params.p0.iter().map(|v| v.0 as f32).collect();
     let p1: Vec<f32> = params.p1.iter().map(|v| v.0 as f32).collect();
     let lambda = params.lambda;
 
-    let barcodes = generate_barcodes(num_bits, params.min_hamming_distance as usize);
-    let barcodes: Vec<Barcode> = if let Some(s) = set_bits {
+    let mut barcodes: Vec<Barcode> = generate_barcodes(num_bits, params.min_hamming_distance as usize);
+    barcodes = if let Some(s) = set_bits {
+        // TODO can be replaced with `drain_filter` in future rust releases
         barcodes
             .iter()
             .cloned()
@@ -186,6 +186,16 @@ pub fn main(params: SimulationParams) -> Result<(), Error> {
     } else {
         barcodes
     };
+    if let Some(num_barcodes) = params.num_barcodes {
+        if num_barcodes > barcodes.len() {
+            // TODO use failure and abort instead?
+            warn!("Desired number of barcodes ({}) > number of available barcodes ({}).", num_barcodes, barcodes.len());
+        }
+        let mut rng = StdRng::from_entropy();
+        barcodes.shuffle(&mut rng);
+        barcodes.truncate(num_barcodes);
+    }
+
 
     let mut writer = csv::WriterBuilder::new()
         .delimiter(b'\t')
