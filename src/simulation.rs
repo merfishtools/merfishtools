@@ -124,6 +124,7 @@ pub struct SimulationParams {
     num_barcodes: Option<usize>,
     p0: Vec<Prob>,
     p1: Vec<Prob>,
+    lambda: f64,
     raw_expression_path: Option<String>,
     ecc_expression_path: Option<String>,
 }
@@ -173,7 +174,7 @@ pub fn main(params: SimulationParams) -> Result<(), Error> {
     let num_barcodes = params.num_barcodes.unwrap_or(std::usize::MAX);
     let p0: Vec<f32> = params.p0.iter().map(|v| v.0 as f32).collect();
     let p1: Vec<f32> = params.p1.iter().map(|v| v.0 as f32).collect();
-    dbg!(&p0);
+    let lambda = params.lambda;
 
     let barcodes = generate_barcodes(num_bits, params.min_hamming_distance as usize);
     let barcodes: Vec<Barcode> = if let Some(s) = set_bits {
@@ -191,7 +192,7 @@ pub fn main(params: SimulationParams) -> Result<(), Error> {
         .has_headers(true)
         .from_writer(std::io::stdout());
     for cell in 0..num_cells {
-        let raw_counts = generate_raw_counts(&barcodes, 100., cell as u64);
+        let raw_counts = generate_raw_counts(&barcodes, lambda, cell as u64);
         let derived_counts =
             generate_erroneous_counts(&raw_counts, cell as u64, &p0, &p1, num_bits);
         for (barcode, errcount) in derived_counts.into_iter().sorted_by_key(|v| v.0) {

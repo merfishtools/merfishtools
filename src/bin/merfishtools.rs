@@ -324,6 +324,9 @@ codeword"
         )]
         p1: Vec<f64>,
 
+        #[structopt(long, short = "l", value_name = "FLOAT", default_value="50.")]
+        lambda: f64,
+
         #[structopt(long, short = "r", value_name = "FILE")]
         raw_expression_path: Option<String>,
 
@@ -492,6 +495,7 @@ fn main() -> Result<(), Error> {
             num_barcodes,
             p0,
             p1,
+            lambda,
             raw_expression_path,
             ecc_expression_path,
         } => {
@@ -510,6 +514,7 @@ fn main() -> Result<(), Error> {
                 .num_barcodes(num_barcodes)
                 .p0(convert_err_rates(p0))
                 .p1(convert_err_rates(p1))
+                .lambda(lambda)
                 .raw_expression_path(raw_expression_path)
                 .ecc_expression_path(ecc_expression_path)
                 .build()
