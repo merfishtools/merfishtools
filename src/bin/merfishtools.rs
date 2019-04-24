@@ -297,6 +297,12 @@ codeword"
         #[structopt(value_name = "HAMMING DISTANCE")]
         min_hamming_distance: u8,
 
+        #[structopt(value_name = "FILE")]
+        raw_expression_path: String,
+
+        #[structopt(value_name = "FILE")]
+        ecc_expression_path: String,
+
         #[structopt(long, short = "s", value_name = "SET BITS")]
         set_bits: Option<u8>,
 
@@ -329,12 +335,6 @@ codeword"
 
         #[structopt(long, short = "l", value_name = "FLOAT", default_value="50.")]
         lambda: f64,
-
-        #[structopt(long, short = "r", value_name = "FILE")]
-        raw_expression_path: Option<String>,
-
-        #[structopt(long, short = "e", value_name = "FILE")]
-        ecc_expression_path: Option<String>,
     },
 }
 

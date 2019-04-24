@@ -30,7 +30,7 @@ pub fn generate_barcodes(bits: usize, hamming_distance: usize) -> Vec<Barcode> {
                 0, 0, 0, 0, 0, 0, 0, 1,
             ],
         )
-            .unwrap();
+        .unwrap();
 
         let barcodes: Vec<Barcode> = (0..2u32.pow(11) - 1)
             .map(|i| {
@@ -124,8 +124,8 @@ pub struct SimulationParams {
     p0: Vec<Prob>,
     p1: Vec<Prob>,
     lambda: f64,
-    raw_expression_path: Option<String>,
-    ecc_expression_path: Option<String>,
+    raw_expression_path: String,
+    ecc_expression_path: String,
 }
 
 mod binary {
@@ -135,16 +135,16 @@ mod binary {
     use crate::simulation::Barcode;
 
     pub(crate) fn serialize<S>(barcode: &Barcode, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         let repr = format!("{:016b}", barcode);
         serializer.serialize_str(&repr)
     }
 
     pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<Barcode, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         let repr = String::deserialize(deserializer)?;
         let barcode = repr.chars().enumerate().fold(0u16, |acc, (i, c)| {
@@ -155,15 +155,22 @@ mod binary {
 }
 
 #[derive(Serialize, Deserialize, new)]
-struct Record {
+struct RecordRaw {
     cell: usize,
     #[serde(with = "binary")]
-    observed_barcode: Barcode,
+    barcode: Barcode,
+    count: usize,
+}
+
+#[derive(Serialize, Deserialize, new)]
+struct RecordObserved {
+    cell: usize,
     #[serde(with = "binary")]
-    true_barcode: Barcode,
-    observed_count: usize,
-    true_count: usize,
-    num_errors: usize,
+    readout: Barcode,
+    count: usize,
+    #[serde(with = "binary")]
+    barcode: Barcode,
+    errors: usize,
 }
 
 pub fn main(params: SimulationParams) -> Result<(), Error> {
@@ -204,29 +211,37 @@ pub fn main(params: SimulationParams) -> Result<(), Error> {
         barcodes.truncate(num_barcodes);
     }
 
-    let mut writer = csv::WriterBuilder::new()
+    let raw_file = std::fs::File::create(params.raw_expression_path)?;
+    let ecc_file = std::fs::File::create(params.ecc_expression_path)?;
+    let mut raw_writer = csv::WriterBuilder::new()
         .delimiter(b'\t')
         .has_headers(true)
-        .from_writer(std::io::stdout());
+        .from_writer(raw_file);
+
+    let mut ecc_writer = csv::WriterBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(true)
+        .from_writer(ecc_file);
+
     for cell in 0..num_cells {
         let raw_counts = generate_raw_counts(&barcodes, lambda, &mut rng);
-        let derived_counts =
-            generate_erroneous_counts(&raw_counts, &mut rng, &p0, &p1, num_bits);
+        for (&barcode, &count) in &raw_counts {
+            let record = RecordRaw::new(cell, barcode, count);
+            raw_writer.serialize(record)?;
+        }
+        raw_writer.flush()?;
+
+        let derived_counts = generate_erroneous_counts(&raw_counts, &mut rng, &p0, &p1, num_bits);
         for (barcode, errcount) in derived_counts.into_iter().sorted_by_key(|v| v.0) {
             for (flip, count) in errcount {
                 let original_barcode = barcode ^ flip;
-                let record = Record::new(
-                    cell,
-                    barcode,
-                    original_barcode,
-                    count,
-                    *raw_counts.get(&original_barcode).unwrap(),
-                    _NBITS16[(original_barcode ^ barcode) as usize],
-                );
-                writer.serialize(record)?;
+                let errs = _NBITS16[flip as usize];
+                let record = RecordObserved::new(cell, barcode, count, original_barcode, errs);
+                ecc_writer.serialize(record)?;
             }
         }
+        ecc_writer.flush()?;
     }
-    writer.flush()?;
+    ecc_writer.flush()?;
     Ok(())
 }
