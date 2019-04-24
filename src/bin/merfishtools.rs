@@ -5,8 +5,8 @@
 
 use bio::stats::Prob;
 use clap::AppSettings::{ColoredHelp, DeriveDisplayOrder};
-use clap::arg_enum;
 use clap::_clap_count_exprs;
+use clap::arg_enum;
 use failure::Error;
 use itertools::Itertools;
 use ordered_float::NotNaN;
@@ -14,9 +14,9 @@ use regex::Regex;
 use structopt::StructOpt;
 
 use merfishtools::cli;
+use merfishtools::cli::Expression;
 use merfishtools::codebook;
 use merfishtools::io::merfishdata;
-use merfishtools::cli::Expression;
 
 #[derive(StructOpt)]
 #[structopt(
@@ -82,21 +82,11 @@ merfishtools exp codebook.txt < data.txt > expression.txt"
         seed: u64,
 
         /// Prior probability of 0->1 error
-        #[structopt(
-        long,
-        default_value = "0.04",
-        value_name = "FLOAT",
-        multiple = true,
-        )]
+        #[structopt(long, default_value = "0.04", value_name = "FLOAT", multiple = true)]
         p0: Vec<f64>,
 
         /// Prior probability of 1->0 error
-        #[structopt(
-        long,
-        default_value = "0.10",
-        value_name = "FLOAT",
-        multiple = true,
-        )]
+        #[structopt(long, default_value = "0.10", value_name = "FLOAT", multiple = true)]
         p1: Vec<f64>,
 
         /// Regular expression to select cells from cell column (see above).
@@ -107,7 +97,13 @@ merfishtools exp codebook.txt < data.txt > expression.txt"
         #[structopt(long, default_value = "100", value_name = "INT")]
         pmf_window_width: u32,
 
-        #[structopt(long, default_value = "Bayes", value_name = "MODE", case_insensitive = true, raw(possible_values = "&Mode::variants()"))]
+        #[structopt(
+        long,
+        default_value = "Bayes",
+        value_name = "MODE",
+        case_insensitive = true,
+        raw(possible_values = "&Mode::variants()")
+        )]
         mode: Mode,
 
         /// Number of threads to use.
@@ -287,21 +283,28 @@ codeword"
         /// misidentification probes.
         not_expressed: Option<String>,
     },
-    #[structopt(
-    name = "simulate",
-    about = "Generate raw merfish data")]
+    #[structopt(name = "simulate", about = "Generate raw merfish data")]
     Simulation {
+        #[structopt(long, value_name = "INT")]
+        seed: Option<u64>,
+
+        #[structopt(subcommand)]
+        mode: SimulationMode,
+    },
+}
+
+#[derive(StructOpt)]
+enum SimulationMode {
+    #[structopt(name = "raw")]
+    Raw {
         #[structopt(value_name = "NUM BITS")]
         bits: u8,
 
         #[structopt(value_name = "HAMMING DISTANCE")]
         min_hamming_distance: u8,
 
-        #[structopt(value_name = "FILE")]
-        raw_expression_path: String,
-
-        #[structopt(value_name = "FILE")]
-        ecc_expression_path: String,
+        #[structopt(long, short = "-o", value_name = "FILE")]
+        raw_expression_path: Option<String>,
 
         #[structopt(long, short = "s", value_name = "SET BITS")]
         set_bits: Option<u8>,
@@ -312,29 +315,24 @@ codeword"
         #[structopt(long, short = "b", value_name = "INT")]
         num_barcodes: Option<usize>,
 
-        #[structopt(long, value_name = "INT")]
-        seed: Option<u64>,
+        #[structopt(long, short = "l", value_name = "FLOAT", default_value = "50.")]
+        lambda: f64,
+    },
+    #[structopt(name = "observed")]
+    Observed {
+        #[structopt(value_name = "FILE")]
+        raw_expression_path: String,
+
+        #[structopt(value_name = "FILE")]
+        ecc_expression_path: String,
 
         /// Prior probability of 0->1 error
-        #[structopt(
-        long,
-        default_value = "0.04",
-        value_name = "FLOAT",
-        multiple = true,
-        )]
+        #[structopt(long, default_value = "0.04", value_name = "FLOAT", multiple = true)]
         p0: Vec<f64>,
 
         /// Prior probability of 1->0 error
-        #[structopt(
-        long,
-        default_value = "0.10",
-        value_name = "FLOAT",
-        multiple = true,
-        )]
+        #[structopt(long, default_value = "0.10", value_name = "FLOAT", multiple = true)]
         p1: Vec<f64>,
-
-        #[structopt(long, short = "l", value_name = "FLOAT", default_value="50.")]
-        lambda: f64,
     },
 }
 
@@ -409,31 +407,36 @@ fn main() -> Result<(), Error> {
                         .build()
                         .unwrap();
                     if let merfishdata::Format::Binary = merfishdata::Format::from_path(&raw_data) {
-                        expression.load_counts(&mut merfishdata::binary::Reader::from_file(&raw_data)?)?;
+                        expression
+                            .load_counts(&mut merfishdata::binary::Reader::from_file(&raw_data)?)?;
                     } else {
-                        expression.load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?)?;
+                        expression
+                            .load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?)?;
                     }
                     expression.infer()
                 }
                 Mode::LA => {
-                    let mut expression = merfishtools::model::la::expression::ExpressionTBuilder::default()
-                        .p0(convert_err_rates(p0))
-                        .p1(convert_err_rates(p1))
-                        .codebook_path(codebook.to_owned())
-                        .estimate_path(estimate.map(|v| v.to_owned()))
-                        .stats_path(stats.map(|v| v.to_owned()))
-                        .threads(threads)
-                        .cells(Regex::new(&cells)?)
-                        .max_hamming_distance(3 as usize) // TODO introduce mhd option
-                        .bits(16)
-                        .mode(merfishtools::model::la::expression::Mode::ErrorsThenExpression)
-                        .seed(seed)
-                        .build()
-                        .unwrap();
+                    let mut expression =
+                        merfishtools::model::la::expression::ExpressionTBuilder::default()
+                            .p0(convert_err_rates(p0))
+                            .p1(convert_err_rates(p1))
+                            .codebook_path(codebook.to_owned())
+                            .estimate_path(estimate.map(|v| v.to_owned()))
+                            .stats_path(stats.map(|v| v.to_owned()))
+                            .threads(threads)
+                            .cells(Regex::new(&cells)?)
+                            .max_hamming_distance(3 as usize) // TODO introduce mhd option
+                            .bits(16)
+                            .mode(merfishtools::model::la::expression::Mode::ErrorsThenExpression)
+                            .seed(seed)
+                            .build()
+                            .unwrap();
                     if let merfishdata::Format::Binary = merfishdata::Format::from_path(&raw_data) {
-                        expression.load_counts(&mut merfishdata::binary::Reader::from_file(&raw_data)?)?;
+                        expression
+                            .load_counts(&mut merfishdata::binary::Reader::from_file(&raw_data)?)?;
                     } else {
-                        expression.load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?)?;
+                        expression
+                            .load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?)?;
                     }
 
                     expression.infer()
@@ -490,41 +493,46 @@ fn main() -> Result<(), Error> {
             let not_expressed_pattern = not_expressed.as_ref().map(String::as_ref);
             cli::gen_codebook(&words, not_expressed_pattern)
         }
-        Command::Simulation {
-            bits,
-            min_hamming_distance,
-            set_bits,
-            num_cells,
-            num_barcodes,
-            seed,
-            p0,
-            p1,
-            lambda,
-            raw_expression_path,
-            ecc_expression_path,
-        } => {
-            let convert_err_rates = |values: Vec<f64>| match values.len() {
-                1 => vec![Prob::checked(values[0]).unwrap(); bits as usize],
-                _ => values
-                    .into_iter()
-                    .map(|p| Prob::checked(p).unwrap())
-                    .collect_vec(),
-            };
-            let simulation_params = merfishtools::simulation::SimulationParamsBuilder::default()
-                .bits(bits)
-                .set_bits(set_bits)
-                .min_hamming_distance(min_hamming_distance)
-                .num_cells(num_cells)
-                .num_barcodes(num_barcodes)
-                .seed(seed)
-                .p0(convert_err_rates(p0))
-                .p1(convert_err_rates(p1))
-                .lambda(lambda)
-                .raw_expression_path(raw_expression_path)
-                .ecc_expression_path(ecc_expression_path)
-                .build()
-                .unwrap();
-            merfishtools::simulation::main(simulation_params)
-        }
+        Command::Simulation { seed, mode } => match mode {
+            SimulationMode::Raw {
+                bits,
+                min_hamming_distance,
+                raw_expression_path,
+                set_bits,
+                num_cells,
+                num_barcodes,
+                lambda,
+            } => merfishtools::simulation::simulate_raw_counts(
+                bits,
+                min_hamming_distance,
+                raw_expression_path,
+                set_bits,
+                num_cells,
+                num_barcodes,
+                lambda,
+                seed,
+            ),
+            SimulationMode::Observed {
+                raw_expression_path,
+                ecc_expression_path,
+                p0,
+                p1,
+            } => {
+                let convert_err_rates = |values: Vec<f64>| match values.len() {
+                    1 => vec![Prob::checked(values[0]).unwrap().0; 16],
+                    _ => values
+                        .into_iter()
+                        .map(|p| Prob::checked(p).unwrap().0)
+                        .collect_vec(),
+                };
+                merfishtools::simulation::simulate_observed_counts(
+                    raw_expression_path,
+                    ecc_expression_path,
+                    convert_err_rates(p0),
+                    convert_err_rates(p1),
+                    seed,
+                )
+            }
+        },
     }
 }

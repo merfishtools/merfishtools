@@ -9,9 +9,10 @@ use maplit::hashmap;
 use ndarray::Array;
 use rand::prelude::*;
 use rand::{Rng, SeedableRng};
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 
 use crate::model::la::hamming::_NBITS16;
+use std::path::Path;
 
 type Barcode = u16;
 
@@ -112,22 +113,6 @@ pub fn generate_erroneous_counts(
     derived_counts
 }
 
-#[derive(Builder)]
-#[builder(pattern = "owned")]
-pub struct SimulationParams {
-    bits: u8,
-    set_bits: Option<u8>,
-    min_hamming_distance: u8,
-    num_cells: Option<usize>,
-    num_barcodes: Option<usize>,
-    seed: Option<u64>,
-    p0: Vec<Prob>,
-    p1: Vec<Prob>,
-    lambda: f64,
-    raw_expression_path: String,
-    ecc_expression_path: String,
-}
-
 mod binary {
     use serde::de::Deserialize;
     use serde::{Deserializer, Serializer};
@@ -146,9 +131,9 @@ mod binary {
     where
         D: Deserializer<'de>,
     {
-        let repr = String::deserialize(deserializer)?;
+        let repr: String = String::deserialize(deserializer)?;
         let barcode = repr.chars().enumerate().fold(0u16, |acc, (i, c)| {
-            acc + (c.to_digit(2).unwrap() as u16) << i
+            acc + ((c.to_digit(2).unwrap() as u16) << i)
         });
         Ok(barcode)
     }
@@ -173,21 +158,73 @@ struct RecordObserved {
     errors: usize,
 }
 
-pub fn main(params: SimulationParams) -> Result<(), Error> {
-    let num_bits = params.bits as usize;
-    let set_bits = params.set_bits;
-    let num_cells = params.num_cells.unwrap_or(std::usize::MAX);
-    let p0: Vec<f32> = params.p0.iter().map(|v| v.0 as f32).collect();
-    let p1: Vec<f32> = params.p1.iter().map(|v| v.0 as f32).collect();
-    let lambda = params.lambda;
-    let mut rng = if let Some(seed) = params.seed {
+fn _read_raw_counts(raw_path: &Path) -> Result<HashMap<usize, HashMap<Barcode, usize>>, Error> {
+    let raw_file = std::fs::File::open(raw_path)?;
+    let mut raw_reader = csv::ReaderBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(true)
+        .from_reader(raw_file);
+    Ok(raw_reader
+        .deserialize::<RecordRaw>()
+        .map(|r| r.unwrap())
+        .group_by(|r| r.cell)
+        .into_iter()
+        .map(|(cell, records)| {
+            (
+                cell,
+                records
+                    .into_iter()
+                    .map(|r| (r.barcode, r.count))
+                    .collect::<HashMap<Barcode, usize>>(),
+            )
+        })
+        .collect())
+}
+
+fn _generate_raw_counts(
+    num_cells: usize,
+    barcodes: &[Barcode],
+    lambda: f64,
+    rng: &mut StdRng,
+) -> HashMap<usize, HashMap<Barcode, usize>> {
+    (0..num_cells)
+        .map(|cell| (cell, generate_raw_counts(&barcodes, lambda, rng)))
+        .collect()
+}
+
+fn _write_raw_counts<S: std::io::Write>(
+    writer: &mut csv::Writer<S>,
+    raw_counts: &HashMap<usize, HashMap<Barcode, usize>>,
+) -> Result<(), Error> {
+    for (cell, counts) in raw_counts {
+        for (&barcode, &count) in counts {
+            let record = RecordRaw::new(*cell, barcode, count);
+            writer.serialize(record)?;
+        }
+        writer.flush()?;
+    }
+    Ok(())
+}
+
+pub fn simulate_raw_counts(
+    bits: u8,
+    min_hamming_distance: u8,
+    raw_expression_path: Option<String>,
+    set_bits: Option<u8>,
+    num_cells: Option<usize>,
+    num_barcodes: Option<usize>,
+    lambda: f64,
+    seed: Option<u64>,
+) -> Result<(), Error> {
+    let num_bits = bits as usize;
+    let num_cells = num_cells.unwrap_or(std::usize::MAX);
+    let mut rng = if let Some(seed) = seed {
         StdRng::seed_from_u64(seed)
     } else {
         StdRng::from_entropy()
     };
 
-    let mut barcodes: Vec<Barcode> =
-        generate_barcodes(num_bits, params.min_hamming_distance as usize);
+    let mut barcodes: Vec<Barcode> = generate_barcodes(num_bits, min_hamming_distance as usize);
     barcodes = if let Some(s) = set_bits {
         // TODO can be replaced with `drain_filter` in future rust releases
         barcodes
@@ -198,7 +235,7 @@ pub fn main(params: SimulationParams) -> Result<(), Error> {
     } else {
         barcodes
     };
-    if let Some(num_barcodes) = params.num_barcodes {
+    if let Some(num_barcodes) = num_barcodes {
         if num_barcodes > barcodes.len() {
             // TODO use failure and abort instead?
             warn!(
@@ -211,27 +248,59 @@ pub fn main(params: SimulationParams) -> Result<(), Error> {
         barcodes.truncate(num_barcodes);
     }
 
-    let raw_file = std::fs::File::create(params.raw_expression_path)?;
-    let ecc_file = std::fs::File::create(params.ecc_expression_path)?;
+    let outlet: Box<std::io::Write> = if raw_expression_path.is_none() {
+        Box::new(std::io::stdout())
+    } else {
+        let raw_expression_path = raw_expression_path.unwrap();
+        let raw_path = Path::new(&raw_expression_path);
+        if raw_path.exists() {
+            warn!("{:?} already exists, exiting.", raw_path);
+            std::process::exit(1);
+        };
+        Box::new(std::fs::File::create(raw_path)?)
+    };
+
+    let raw_counts = _generate_raw_counts(num_cells, &barcodes, lambda, &mut rng);
     let mut raw_writer = csv::WriterBuilder::new()
         .delimiter(b'\t')
         .has_headers(true)
-        .from_writer(raw_file);
+        .from_writer(outlet);
+    _write_raw_counts(&mut raw_writer, &raw_counts)?;
+    Ok(())
+}
 
+pub fn simulate_observed_counts(
+    raw_expression_path: String,
+    ecc_expression_path: String,
+    p0: Vec<f64>,
+    p1: Vec<f64>,
+    seed: Option<u64>,
+) -> Result<(), Error> {
+    let p0: Vec<f32> = p0.iter().map(|&v| v as f32).collect();
+    let p1: Vec<f32> = p1.iter().map(|&v| v as f32).collect();
+
+    let mut rng = if let Some(seed) = seed {
+        StdRng::seed_from_u64(seed)
+    } else {
+        StdRng::from_entropy()
+    };
+
+    let ecc_file = std::fs::File::create(ecc_expression_path)?;
     let mut ecc_writer = csv::WriterBuilder::new()
         .delimiter(b'\t')
         .has_headers(true)
         .from_writer(ecc_file);
 
-    for cell in 0..num_cells {
-        let raw_counts = generate_raw_counts(&barcodes, lambda, &mut rng);
-        for (&barcode, &count) in &raw_counts {
-            let record = RecordRaw::new(cell, barcode, count);
-            raw_writer.serialize(record)?;
-        }
-        raw_writer.flush()?;
-
-        let derived_counts = generate_erroneous_counts(&raw_counts, &mut rng, &p0, &p1, num_bits);
+    let raw_path = Path::new(&raw_expression_path);
+    if !raw_path.exists() {
+        panic!("BLA");
+    }
+    let raw_counts = {
+        let raw_path = Path::new(&raw_path);
+        _read_raw_counts(&raw_path)?
+    };
+    for (&cell, records) in &raw_counts {
+        let derived_counts = generate_erroneous_counts(records, &mut rng, &p0, &p1, p0.len());
         for (barcode, errcount) in derived_counts.into_iter().sorted_by_key(|v| v.0) {
             for (flip, count) in errcount {
                 let original_barcode = barcode ^ flip;
