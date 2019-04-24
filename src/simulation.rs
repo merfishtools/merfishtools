@@ -64,7 +64,7 @@ pub fn generate_raw_counts(
 
 pub fn generate_erroneous_counts(
     raw_counts: &HashMap<Barcode, usize>,
-    seed: u64,
+    rng: &mut StdRng,
     p0: &[f32],
     p1: &[f32],
     max_hamming_distance: usize,
@@ -72,7 +72,6 @@ pub fn generate_erroneous_counts(
     assert!(p0.len() <= 16);
     assert_eq!(p0.len(), p1.len());
     let num_bits = p0.len();
-    let mut rng = StdRng::seed_from_u64(seed);
     let uniform = rand::distributions::Uniform::new(0f32, 1f32);
     let mut derived_counts: HashMap<Barcode, HashMap<Barcode, usize>> = raw_counts
         .to_owned()
@@ -86,7 +85,7 @@ pub fn generate_erroneous_counts(
             let mut flip = 0u16;
             // choose max_hamming_distance different positions to flip
             (0..num_bits)
-                .choose_multiple(&mut rng, max_hamming_distance)
+                .choose_multiple(rng, max_hamming_distance)
                 .iter()
                 .for_each(|&idx| {
                     let bit = (barcode >> idx) & 1;
@@ -212,7 +211,7 @@ pub fn main(params: SimulationParams) -> Result<(), Error> {
     for cell in 0..num_cells {
         let raw_counts = generate_raw_counts(&barcodes, lambda, &mut rng);
         let derived_counts =
-            generate_erroneous_counts(&raw_counts, cell as u64, &p0, &p1, num_bits);
+            generate_erroneous_counts(&raw_counts, &mut rng, &p0, &p1, num_bits);
         for (barcode, errcount) in derived_counts.into_iter().sorted_by_key(|v| v.0) {
             for (flip, count) in errcount {
                 let original_barcode = barcode ^ flip;
