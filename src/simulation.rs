@@ -35,8 +35,7 @@ pub fn generate_barcodes(bits: usize, hamming_distance: usize) -> Vec<Barcode> {
                 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
                 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
             ],
-        )
-        .unwrap();
+        ).unwrap();
 
         let barcodes: Vec<Barcode> = (0..2u32.pow(11) - 1)
             .map(|i| {
