@@ -162,12 +162,13 @@ struct RecordObserved {
     errors: usize,
 }
 
-fn _read_raw_counts(raw_path: &Path) -> Result<HashMap<usize, HashMap<Barcode, usize>>, Error> {
-    let raw_file = std::fs::File::open(raw_path)?;
+fn _read_raw_counts<R: std::io::Read>(
+    reader: R,
+) -> Result<HashMap<usize, HashMap<Barcode, usize>>, Error> {
     let mut raw_reader = csv::ReaderBuilder::new()
         .delimiter(b'\t')
         .has_headers(true)
-        .from_reader(raw_file);
+        .from_reader(reader);
     Ok(raw_reader
         .deserialize::<RecordRaw>()
         .map(|r| r.unwrap())
@@ -252,17 +253,7 @@ pub fn simulate_raw_counts(
         barcodes.truncate(num_barcodes);
     }
 
-    let outlet: Box<std::io::Write> = if raw_expression_path.is_none() {
-        Box::new(std::io::stdout())
-    } else {
-        let raw_expression_path = raw_expression_path.unwrap();
-        let raw_path = Path::new(&raw_expression_path);
-        if raw_path.exists() {
-            warn!("{:?} already exists, exiting.", raw_path);
-            std::process::exit(1);
-        };
-        Box::new(std::fs::File::create(raw_path)?)
-    };
+    let outlet = _writer(raw_expression_path);
 
     let raw_counts = _generate_raw_counts(num_cells, &barcodes, lambda, &mut rng);
     let mut raw_writer = csv::WriterBuilder::new()
@@ -273,9 +264,39 @@ pub fn simulate_raw_counts(
     Ok(())
 }
 
+fn _writer(sink: Option<String>) -> impl std::io::Write {
+    let outlet: Box<std::io::Write> = if sink.is_none() {
+        Box::new(std::io::stdout())
+    } else {
+        let sink_path = sink.unwrap();
+        let sink_path = Path::new(&sink_path);
+        if sink_path.exists() {
+            warn!("{:?} already exists, exiting.", sink_path);
+            std::process::exit(1);
+        };
+        Box::new(std::fs::File::create(sink_path).unwrap())
+    };
+    outlet
+}
+
+fn _reader(source: Option<String>) -> impl std::io::Read {
+    let inlet: Box<std::io::Read> = if source.is_none() {
+        Box::new(std::io::stdin())
+    } else {
+        let source_path = source.unwrap();
+        let source_path = Path::new(&source_path);
+
+        if !source_path.exists() {
+            panic!("File does not exist {:?}", source_path);
+        };
+        Box::new(std::fs::File::open(source_path).unwrap())
+    };
+    inlet
+}
+
 pub fn simulate_observed_counts(
-    raw_expression_path: String,
-    ecc_expression_path: String,
+    raw_expression_path: Option<String>,
+    ecc_expression_path: Option<String>,
     p0: Vec<f64>,
     p1: Vec<f64>,
     seed: Option<u64>,
@@ -289,19 +310,14 @@ pub fn simulate_observed_counts(
         StdRng::from_entropy()
     };
 
-    let ecc_file = std::fs::File::create(ecc_expression_path)?;
+    let ecc_out = _writer(ecc_expression_path);
     let mut ecc_writer = csv::WriterBuilder::new()
         .delimiter(b'\t')
         .has_headers(true)
-        .from_writer(ecc_file);
+        .from_writer(ecc_out);
 
-    let raw_path = Path::new(&raw_expression_path);
-    if !raw_path.exists() {
-        panic!("BLA");
-    }
     let raw_counts = {
-        let raw_path = Path::new(&raw_path);
-        _read_raw_counts(&raw_path)?
+        _read_raw_counts(_reader(raw_expression_path))?
     };
     for (&cell, records) in &raw_counts {
         let derived_counts = generate_erroneous_counts(records, &mut rng, &p0, &p1, p0.len());

@@ -320,11 +320,11 @@ enum SimulationMode {
     },
     #[structopt(name = "observed")]
     Observed {
-        #[structopt(value_name = "FILE")]
-        raw_expression_path: String,
+        #[structopt(long, short = "i", value_name = "FILE")]
+        raw_expression_path: Option<String>,
 
-        #[structopt(value_name = "FILE")]
-        ecc_expression_path: String,
+        #[structopt(long, short = "o", value_name = "FILE")]
+        ecc_expression_path: Option<String>,
 
         /// Prior probability of 0->1 error
         #[structopt(long, default_value = "0.04", value_name = "FLOAT", multiple = true)]
