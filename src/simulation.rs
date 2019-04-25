@@ -265,31 +265,30 @@ pub fn simulate_raw_counts(
 }
 
 fn _writer(sink: Option<String>) -> impl std::io::Write {
-    let outlet: Box<std::io::Write> = if sink.is_none() {
-        Box::new(std::io::stdout())
-    } else {
-        let sink_path = sink.unwrap();
-        let sink_path = Path::new(&sink_path);
-        if sink_path.exists() {
-            warn!("{:?} already exists, exiting.", sink_path);
-            std::process::exit(1);
-        };
-        Box::new(std::fs::File::create(sink_path).unwrap())
+    let outlet: Box<std::io::Write> = match sink {
+        None => Box::new(std::io::stdout()),
+        Some(sink_path) => {
+            let sink_path = Path::new(&sink_path);
+            if sink_path.exists() {
+                warn!("{:?} already exists, exiting.", sink_path);
+                std::process::exit(1);
+            }
+            Box::new(std::fs::File::create(sink_path).unwrap())
+        }
     };
     outlet
 }
 
 fn _reader(source: Option<String>) -> impl std::io::Read {
-    let inlet: Box<std::io::Read> = if source.is_none() {
-        Box::new(std::io::stdin())
-    } else {
-        let source_path = source.unwrap();
-        let source_path = Path::new(&source_path);
-
-        if !source_path.exists() {
-            panic!("File does not exist {:?}", source_path);
-        };
-        Box::new(std::fs::File::open(source_path).unwrap())
+    let inlet: Box<std::io::Read> = match source {
+        None => Box::new(std::io::stdin()),
+        Some(source_path) => {
+            let source_path = Path::new(&source_path);
+            if !source_path.exists() {
+                panic!("File does not exist {:?}", source_path);
+            }
+            Box::new(std::fs::File::open(source_path).unwrap())
+        }
     };
     inlet
 }
@@ -316,9 +315,7 @@ pub fn simulate_observed_counts(
         .has_headers(true)
         .from_writer(ecc_out);
 
-    let raw_counts = {
-        _read_raw_counts(_reader(raw_expression_path))?
-    };
+    let raw_counts = _read_raw_counts(_reader(raw_expression_path))?;
     for (&cell, records) in &raw_counts {
         let derived_counts = generate_erroneous_counts(records, &mut rng, &p0, &p1, p0.len());
         for (barcode, errcount) in derived_counts.into_iter().sorted_by_key(|v| v.0) {
