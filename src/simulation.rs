@@ -136,7 +136,7 @@ mod binary {
         D: Deserializer<'de>,
     {
         let repr: String = String::deserialize(deserializer)?;
-        let barcode = repr.chars().enumerate().fold(0u16, |acc, (i, c)| {
+        let barcode = repr.chars().rev().enumerate().fold(0u16, |acc, (i, c)| {
             acc + ((c.to_digit(2).unwrap() as u16) << i)
         });
         Ok(barcode)
