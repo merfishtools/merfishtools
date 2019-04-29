@@ -177,13 +177,13 @@ pub fn csr_successive_overrelaxation(a: &CSR,
 //    let mut normal = Normal::new(0., (b as f64) / 16.);
 //    x.mapv_inplace(|v| (v + normal.sample(&mut rng) as f32).abs());
 
-    dbg!(x.slice(s![0..10; 1]));
-    dbg!(y.slice(s![0..10; 1]));
+//    dbg!(x.slice(s![0..10; 1]));
+//    dbg!(y.slice(s![0..10; 1]));
 
     let mut error = rmse((a * x.view()).view(), y);
     let mut last_error = std::f32::INFINITY;
-    dbg!((a * x.view()).view().slice(s![0..10; 1]));
-    dbg!(y.slice(s![0..10; 1]));
+//    dbg!((a * x.view()).view().slice(s![0..10; 1]));
+//    dbg!(y.slice(s![0..10; 1]));
     let nonzero: Vec<usize> = if keep_zeros {
         y.iter().enumerate().filter(|(_, &v)| v != 0.).map(|(i, _)| i).collect()
     } else {
@@ -212,12 +212,12 @@ pub fn csr_successive_overrelaxation(a: &CSR,
             }
         }
         error = rmse((a * x.view()).view(), y);
-        println!("{:?}, {:?}", it, &error);
+//        println!("{:?}, {:?}", it, &error);
         if error.is_infinite() || error.is_nan() {
             return Err((it, error));
         }
         if error < eps || (last_error - error).abs() <= 1e-5 {
-            println!("{:?}, {:?}", x.slice(s![0..10; 1]), y.slice(s![0..10; 1]));
+//            println!("{:?}, {:?}", x.slice(s![0..10; 1]), y.slice(s![0..10; 1]));
             return Ok((x.to_owned(), it, error));
         }
         last_error = error;

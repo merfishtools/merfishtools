@@ -252,9 +252,9 @@ fn _gradient_descent_hardcoded(e: &mut Errors,
     return (*e0, std::f32::INFINITY, max_iter);
 }
 
-fn estimate_errors(x: ExprV, y: ExprV, e: &Errors, max_hamming_distance: usize) -> Result<Errors, ()> {
+pub fn estimate_errors(x: ExprV, y: ExprV, e: &Errors, max_hamming_distance: usize) -> Result<Errors, ()> {
     let x_ind: Vec<usize> = x.iter().enumerate().filter(|&(i, &v)| v != 0.).map(|(i, _)| i).collect();
-    let max_iter = 1024;
+    let max_iter = 256;
     let mut e0 = [[0.; NUM_BITS], [0.; NUM_BITS]];
     e0.clone_from_slice(e);
     let (e, _error, num_iters) = _gradient_descent_hardcoded(&mut e0, y, x, 0.9, 0.25, max_hamming_distance, 4, max_iter, &x_ind[..]);
@@ -265,7 +265,7 @@ fn estimate_errors(x: ExprV, y: ExprV, e: &Errors, max_hamming_distance: usize) 
     }
 }
 
-fn estimate_expression(mat: &CSR, x_est: ExprV, y: ExprV, max_hamming_distance: usize, keep_zeros: bool) -> Result<Expr, ()> {
+pub fn estimate_expression(mat: &CSR, x_est: ExprV, y: ExprV, max_hamming_distance: usize, keep_zeros: bool) -> Result<Expr, ()> {
     println!("SOR...");
     if let Ok((x, _it, _err)) = csr_successive_overrelaxation(mat, y, x_est, 1.25, 5e-2, 256, keep_zeros) {
         Ok(x)
