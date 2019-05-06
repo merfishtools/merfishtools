@@ -334,7 +334,7 @@ enum SimulationMode {
         #[structopt(long, default_value = "0.10", value_name = "FLOAT", multiple = true)]
         p1: Vec<f64>,
 
-        #[structopt(long, short = "g", value_name = "BOOL")]
+        #[structopt(long, short = "g")]
         grouped: bool,
     },
 }
