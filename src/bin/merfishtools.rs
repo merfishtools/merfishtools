@@ -333,6 +333,9 @@ enum SimulationMode {
         /// Prior probability of 1->0 error
         #[structopt(long, default_value = "0.10", value_name = "FLOAT", multiple = true)]
         p1: Vec<f64>,
+
+        #[structopt(long, short = "g", value_name = "BOOL")]
+        grouped: bool,
     },
 }
 
@@ -517,6 +520,7 @@ fn main() -> Result<(), Error> {
                 ecc_expression_path,
                 p0,
                 p1,
+                grouped,
             } => {
                 let convert_err_rates = |values: Vec<f64>| match values.len() {
                     1 => vec![Prob::checked(values[0]).unwrap().0; 16],
@@ -530,6 +534,7 @@ fn main() -> Result<(), Error> {
                     ecc_expression_path,
                     convert_err_rates(p0),
                     convert_err_rates(p1),
+                    grouped,
                     seed,
                 )
             }

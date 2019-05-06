@@ -61,9 +61,9 @@ pub fn generate_raw_counts(
 
     poisson
         .sample_iter(rng)
-        .enumerate()
-        .take(num_codes)
-        .map(|(i, v)| (barcodes[i], v as usize))
+        .map(|v| v as usize)
+        .zip(barcodes.iter().cloned())
+        .map(|(a, b)| (b, a))
         .collect()
 }
 
@@ -124,16 +124,16 @@ mod binary {
     use crate::simulation::Barcode;
 
     pub(crate) fn serialize<S>(barcode: &Barcode, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
+        where
+            S: Serializer,
     {
         let repr = format!("{:016b}", barcode);
         serializer.serialize_str(&repr)
     }
 
     pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<Barcode, D::Error>
-    where
-        D: Deserializer<'de>,
+        where
+            D: Deserializer<'de>,
     {
         let repr: String = String::deserialize(deserializer)?;
         let barcode = repr.chars().rev().enumerate().fold(0u16, |acc, (i, c)| {
@@ -186,24 +186,22 @@ fn _read_raw_counts<R: std::io::Read>(
         .collect())
 }
 
-fn _generate_raw_counts(
+fn _generate_raw_counts<'s>(
     num_cells: usize,
-    barcodes: &[Barcode],
+    barcodes: &'s [Barcode],
     lambda: f64,
-    rng: &mut StdRng,
-) -> HashMap<usize, HashMap<Barcode, usize>> {
-    (0..num_cells)
-        .map(|cell| (cell, generate_raw_counts(&barcodes, lambda, rng)))
-        .collect()
+    rng: &'s mut StdRng,
+) -> impl Iterator<Item=(usize, HashMap<Barcode, usize>)> + 's {
+    (0..num_cells).map(move |cell| (cell, generate_raw_counts(&barcodes, lambda, rng)))
 }
 
-fn _write_raw_counts<S: std::io::Write>(
+fn _write_raw_counts<'s, S: std::io::Write>(
     writer: &mut csv::Writer<S>,
-    raw_counts: &HashMap<usize, HashMap<Barcode, usize>>,
+    raw_counts: impl Iterator<Item=(usize, HashMap<Barcode, usize>)> + 's,
 ) -> Result<(), Error> {
     for (cell, counts) in raw_counts {
-        for (&barcode, &count) in counts {
-            let record = RecordRaw::new(*cell, barcode, count);
+        for (barcode, count) in counts {
+            let record = RecordRaw::new(cell, barcode, count);
             writer.serialize(record)?;
         }
         writer.flush()?;
@@ -260,7 +258,7 @@ pub fn simulate_raw_counts(
         .delimiter(b'\t')
         .has_headers(true)
         .from_writer(outlet);
-    _write_raw_counts(&mut raw_writer, &raw_counts)?;
+    _write_raw_counts(&mut raw_writer, raw_counts)?;
     Ok(())
 }
 
@@ -298,6 +296,7 @@ pub fn simulate_observed_counts(
     ecc_expression_path: Option<String>,
     p0: Vec<f64>,
     p1: Vec<f64>,
+    grouped: bool,
     seed: Option<u64>,
 ) -> Result<(), Error> {
     let p0: Vec<f32> = p0.iter().map(|&v| v as f32).collect();
@@ -316,17 +315,23 @@ pub fn simulate_observed_counts(
         .from_writer(ecc_out);
 
     let raw_counts = _read_raw_counts(_reader(raw_expression_path))?;
-    for (&cell, records) in &raw_counts {
-        let derived_counts = generate_erroneous_counts(records, &mut rng, &p0, &p1, p0.len());
-        for (barcode, errcount) in derived_counts.into_iter().sorted_by_key(|v| v.0) {
-            for (flip, count) in errcount {
-                let original_barcode = barcode ^ flip;
-                let errs = _NBITS16[flip as usize];
-                let record = RecordObserved::new(cell, barcode, count, original_barcode, errs);
-                ecc_writer.serialize(record)?;
+    if !grouped {
+        for (&cell, records) in &raw_counts {
+            let derived_counts = generate_erroneous_counts(records, &mut rng, &p0, &p1, p0.len());
+            for (barcode, errcount) in derived_counts.into_iter().sorted_by_key(|v| v.0) {
+                for (flip, count) in errcount {
+                    let original_barcode = barcode ^ flip;
+                    let errs = _NBITS16[flip as usize];
+                    let record = RecordObserved::new(cell, barcode, count, original_barcode, errs);
+                    ecc_writer.serialize(record)?;
+                }
             }
+            ecc_writer.flush()?;
         }
-        ecc_writer.flush()?;
+    } else {
+        for (&cell, records) in &raw_counts {
+            let derived_counts = generate_erroneous_counts(records, &mut rng, &p0, &p1, p0.len());
+        }
     }
     ecc_writer.flush()?;
     Ok(())
