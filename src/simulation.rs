@@ -124,16 +124,16 @@ mod binary {
     use crate::simulation::Barcode;
 
     pub(crate) fn serialize<S>(barcode: &Barcode, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         let repr = format!("{:016b}", barcode);
         serializer.serialize_str(&repr)
     }
 
     pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<Barcode, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         let repr: String = String::deserialize(deserializer)?;
         let barcode = repr.chars().rev().enumerate().fold(0u16, |acc, (i, c)| {
@@ -191,13 +191,13 @@ fn _generate_raw_counts<'s>(
     barcodes: &'s [Barcode],
     lambda: f64,
     rng: &'s mut StdRng,
-) -> impl Iterator<Item=(usize, HashMap<Barcode, usize>)> + 's {
+) -> impl Iterator<Item = (usize, HashMap<Barcode, usize>)> + 's {
     (0..num_cells).map(move |cell| (cell, generate_raw_counts(&barcodes, lambda, rng)))
 }
 
 fn _write_raw_counts<'s, S: std::io::Write>(
     writer: &mut csv::Writer<S>,
-    raw_counts: impl Iterator<Item=(usize, HashMap<Barcode, usize>)> + 's,
+    raw_counts: impl Iterator<Item = (usize, HashMap<Barcode, usize>)> + 's,
 ) -> Result<(), Error> {
     for (cell, counts) in raw_counts {
         for (barcode, count) in counts {
@@ -331,6 +331,13 @@ pub fn simulate_observed_counts(
     } else {
         for (&cell, records) in &raw_counts {
             let derived_counts = generate_erroneous_counts(records, &mut rng, &p0, &p1, p0.len());
+            for (&barcode, count) in derived_counts
+                .iter()
+                .map(|(barcode, errcount)| (barcode, errcount.values().sum()))
+            {
+                let record = RecordRaw::new(cell, barcode, count);
+                ecc_writer.serialize(record)?;
+            }
         }
     }
     ecc_writer.flush()?;
