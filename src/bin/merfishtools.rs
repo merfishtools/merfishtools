@@ -65,18 +65,6 @@ merfishtools exp codebook.txt < data.txt > expression.txt"
         #[structopt(value_name = "READOUTS")]
         raw_data: String,
 
-        /// Path to write expected value and standard deviation estimates of expression to.
-        ///
-        //  Output is formatted into columns: cell, feature, expected value, standard deviation
-        #[structopt(long, value_name = "TSV-FILE")]
-        estimate: Option<String>,
-
-        /// Path to write global statistics per cell to.
-        ///
-        //  Output is formatted into columns: cell, noise-rate
-        #[structopt(long, value_name = "TSV-FILE")]
-        stats: Option<String>,
-
         /// Seed for shuffling that occurs in EM algorithm.
         #[structopt(long, value_name = "INT")]
         seed: u64,
@@ -93,22 +81,12 @@ merfishtools exp codebook.txt < data.txt > expression.txt"
         #[structopt(long, default_value = ".*", value_name = "REGEX")]
         cells: String,
 
-        /// Width of the window to calculate PMF for.
-        #[structopt(long, default_value = "100", value_name = "INT")]
-        pmf_window_width: u32,
-
-        #[structopt(
-        long,
-        default_value = "Bayes",
-        value_name = "MODE",
-        case_insensitive = true,
-        raw(possible_values = "&Mode::variants()")
-        )]
-        mode: Mode,
-
         /// Number of threads to use.
         #[structopt(long, short, default_value = "1", value_name = "INT")]
         threads: usize,
+
+        #[structopt(subcommand)]
+        mode: ExpressionMode,
     },
 
     #[structopt(
@@ -294,6 +272,44 @@ codeword"
 }
 
 #[derive(StructOpt)]
+enum ExpressionMode {
+    Bayes {
+        /// Width of the window to calculate PMF for.
+        #[structopt(long, default_value = "100", value_name = "INT")]
+        pmf_window_width: u32,
+
+        /// Path to write expected value and standard deviation estimates of expression to.
+        ///
+        /// Output is formatted into columns: cell, feature, expected value, standard deviation
+        #[structopt(long, value_name = "TSV-FILE")]
+        estimate: Option<String>,
+
+        /// Path to write global statistics per cell to.
+        ///
+        /// Output is formatted into columns: cell, noise-rate
+        #[structopt(long, value_name = "TSV-FILE")]
+        stats: Option<String>,
+    },
+    LA {
+        /// bla
+        #[structopt(long, short = "d", value_name = "INT", default_value = "3")]
+        max_hamming_distance: usize,
+
+        /// bla
+        #[structopt(long, short = "m", default_value="ExpressionThenErrors",
+            raw(possible_values = "&merfishtools::model::la::expression::Mode::variants()"),
+            case_insensitive = true)]
+        mode: merfishtools::model::la::expression::Mode,
+
+        /// Path to write expected value of expression to.
+        ///
+        /// Output is formatted into columns: cell, feature, expected value
+        #[structopt(long, short = "o", value_name = "TSV-FILE")]
+        estimate: Option<String>,
+    },
+}
+
+#[derive(StructOpt)]
 enum SimulationMode {
     #[structopt(name = "raw")]
     Raw {
@@ -375,13 +391,10 @@ fn main() -> Result<(), Error> {
         Command::Expression {
             codebook,
             raw_data,
-            estimate,
-            stats,
             seed,
             p0,
             p1,
             cells,
-            pmf_window_width,
             mode,
             threads,
         } => {
@@ -393,7 +406,11 @@ fn main() -> Result<(), Error> {
                     .collect_vec(),
             };
             match mode {
-                Mode::Bayes => {
+                ExpressionMode::Bayes {
+                    estimate,
+                    stats,
+                    pmf_window_width
+                } => {
                     let mut expression = cli::ExpressionJBuilder::default()
                         .p0(convert_err_rates(p0))
                         .p1(convert_err_rates(p1))
@@ -406,28 +423,32 @@ fn main() -> Result<(), Error> {
                         .seed(seed)
                         .build()
                         .unwrap();
-                    if let merfishdata::Format::Binary = merfishdata::Format::from_path(&raw_data) {
-                        expression
-                            .load_counts(&mut merfishdata::binary::Reader::from_file(&raw_data)?)?;
-                    } else {
-                        expression
-                            .load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?)?;
+                    match merfishdata::Format::from_path(&raw_data) {
+                        merfishdata::Format::Binary => expression
+                            .load_counts(&mut merfishdata::binary::Reader::from_file(&raw_data)?)?,
+                        merfishdata::Format::TSV => expression
+                            .load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?)?,
+                        merfishdata::Format::Simulation => expression
+                            .load_counts(&mut merfishdata::sim::Reader::from_file(&raw_data)?)?,
                     }
                     expression.infer()
                 }
-                Mode::LA => {
+                ExpressionMode::LA {
+                    max_hamming_distance,
+                    estimate,
+                    mode,
+                } => {
                     let mut expression =
                         merfishtools::model::la::expression::ExpressionTBuilder::default()
                             .p0(convert_err_rates(p0))
                             .p1(convert_err_rates(p1))
                             .codebook_path(codebook.to_owned())
                             .estimate_path(estimate.map(|v| v.to_owned()))
-                            .stats_path(stats.map(|v| v.to_owned()))
                             .threads(threads)
                             .cells(Regex::new(&cells)?)
-                            .max_hamming_distance(3 as usize) // TODO introduce mhd option
+                            .max_hamming_distance(max_hamming_distance) // TODO introduce mhd option
                             .bits(16)
-                            .mode(merfishtools::model::la::expression::Mode::ErrorsThenExpression)
+                            .mode(mode)
                             .seed(seed)
                             .build()
                             .unwrap();

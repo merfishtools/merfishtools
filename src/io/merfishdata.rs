@@ -16,6 +16,7 @@ pub type Readout = BitVec;
 pub enum Format {
     TSV,
     Binary,
+    Simulation,
 }
 
 
@@ -24,6 +25,7 @@ impl Format {
     pub fn from_path<P: AsRef<Path>>(path: P) -> Format {
         match path.as_ref().extension() {
             Some(e) if e == "tsv" || e == "txt" => Format::TSV,
+            Some(e) if e == "sim" || e == "raw" => Format::Simulation,
             _ => Format::Binary,
         }
     }
@@ -47,6 +49,92 @@ pub trait Reader<'a> {
     type Iterator: Iterator<Item=Result<Self::Record, Self::Error>> + 'a;
 
     fn records(&'a mut self) -> Self::Iterator;
+}
+
+
+pub mod sim {
+    use std::io;
+    use std::fs;
+    use std::path::Path;
+    use crate::io::merfishdata::MerfishRecord;
+    use crate::io::codebook::Codebook;
+    use crate::model::la::hamming::_NBITS16;
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct Record {
+        pub cell: usize,
+        pub barcode: u16,
+        pub count: usize,
+    }
+
+    impl MerfishRecord for Record {
+        fn cell_id(&self) -> u32 {
+            self.cell as u32
+        }
+
+        fn cell_name(&self) -> String {
+            format!("{}", self.cell)
+        }
+
+        fn cell_pos(&self) -> (f32, f32) {
+            unimplemented!()
+        }
+
+        fn feature_id(&self) -> u16 {
+            self.barcode
+        }
+
+        fn feature_name(&self) -> String {
+            format!("{}", self.barcode)
+        }
+
+        fn hamming_dist(&self) -> u8 {
+            let d = (_NBITS16[self.barcode as usize] as isize - 4);
+            if d < 0 {
+                (-d) as u8
+            } else {
+                d as u8
+            }
+        }
+
+        fn error_bit(&self) -> Option<u8> {
+            None
+        }
+
+        fn barcode(&self, codebook: Option<&Codebook>) -> u16 {
+            self.barcode
+        }
+    }
+
+    /// A reader for MERFISH raw data.
+    pub struct Reader<R: io::Read> {
+        inner: csv::Reader<R>,
+    }
+
+    impl Reader<fs::File> {
+        /// Read from a given file path.
+        pub fn from_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+            fs::File::open(path).map(Reader::new)
+        }
+    }
+
+    impl<R: io::Read> Reader<R> {
+        pub fn new(rdr: R) -> Self {
+            Reader {
+                inner: csv::ReaderBuilder::new().delimiter(b'\t').from_reader(rdr),
+            }
+        }
+    }
+
+    impl<'a, R: io::Read + 'a> super::Reader<'a> for Reader<R> {
+        type Record = Record;
+        type Error = csv::Error;
+        type Iterator = csv::DeserializeRecordsIter<'a, R, Record>;
+
+        fn records(&'a mut self) -> csv::DeserializeRecordsIter<'a, R, Record> {
+            self.inner.deserialize()
+        }
+    }
 }
 
 pub mod tsv {

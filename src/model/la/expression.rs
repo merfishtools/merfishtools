@@ -8,6 +8,7 @@ use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use rayon::prelude::*;
 use regex::Regex;
+use clap::arg_enum;
 
 use crate::cli::Expression;
 use crate::io::codebook::{Codebook, FeatureID};
@@ -25,7 +26,6 @@ pub struct ExpressionT {
     p1: Vec<Prob>,
     codebook_path: String,
     estimate_path: Option<String>,
-    stats_path: Option<String>,
     threads: usize,
     cells: Regex,
     bits: usize,
@@ -79,6 +79,10 @@ impl Expression for ExpressionT {
                 y[barcode as usize] += count as f32;
             }
         }
+        if true {  // if relative
+            y /= y.sum();
+            x_est /= x_est.sum();
+        }
         let yv = y.view();
         let mut x: Expr = x_est;
 
@@ -95,10 +99,12 @@ impl Expression for ExpressionT {
             }
             Mode::ExpressionThenErrors => {
                 for hamming_dist in 1..=max_hamming_distance {
+                    println!("\n=== {:?} ===", hamming_dist);
                     let mat = csr_error_matrix(&e, hamming_dist.max(2));
                     x = estimate_expression(&mat, x.view(), yv, hamming_dist, true).expect("Failed estimating expression");
 //                    x.iter_mut().filter(|&&mut v| v <= 1.).for_each(|v| *v = 0.);
                     e = estimate_errors(x.view(), yv, &e, hamming_dist).expect("Failed estimating errors");
+                    dbg!(&e);
                 }
             }
         };
@@ -144,7 +150,7 @@ impl ExpressionT {
             let mut uncorrected_barcode = barcode;
 
             // if the readout has been corrected, reconstruct the/an un-corrected barcode
-            if record.hamming_dist() > 0 {
+            if record.hamming_dist() == 1 {
                 let error_bit = match record.error_bit() {
                     // the binary merfish format actually tells us at which position the error occurred
                     Some(bit) => bit,
@@ -274,8 +280,10 @@ pub fn estimate_expression(mat: &CSR, x_est: ExprV, y: ExprV, max_hamming_distan
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum Mode {
-    ErrorsThenExpression,
-    ExpressionThenErrors,
+arg_enum! {
+    #[derive(Debug, Clone)]
+    pub enum Mode {
+        ErrorsThenExpression,
+        ExpressionThenErrors,
+    }
 }
