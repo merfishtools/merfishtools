@@ -51,7 +51,6 @@ pub trait Reader<'a> {
     fn records(&'a mut self) -> Self::Iterator;
 }
 
-
 pub mod sim {
     use std::io;
     use std::fs;
@@ -59,10 +58,12 @@ pub mod sim {
     use crate::io::merfishdata::MerfishRecord;
     use crate::io::codebook::Codebook;
     use crate::model::la::hamming::_NBITS16;
+    use crate::simulation::binary;
 
     #[derive(Serialize, Deserialize, Debug)]
     pub struct Record {
         pub cell: usize,
+        #[serde(with = "binary")]
         pub barcode: u16,
         pub count: usize,
     }

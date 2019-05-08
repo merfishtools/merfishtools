@@ -306,6 +306,10 @@ enum ExpressionMode {
         /// Output is formatted into columns: cell, feature, expected value
         #[structopt(long, short = "o", value_name = "TSV-FILE")]
         estimate: Option<String>,
+
+        /// Whether to use absolute counts or relative frequencies
+        #[structopt(long, short = "a")]
+        absolute: bool
     },
 }
 
@@ -349,6 +353,10 @@ enum SimulationMode {
         /// Prior probability of 1->0 error
         #[structopt(long, default_value = "0.10", value_name = "FLOAT", multiple = true)]
         p1: Vec<f64>,
+
+        /// TODO whether to group or split by readout
+        #[structopt(long, short = "g")]
+        group: bool
     },
 }
 
@@ -437,6 +445,7 @@ fn main() -> Result<(), Error> {
                     max_hamming_distance,
                     estimate,
                     mode,
+                    absolute,
                 } => {
                     let mut expression =
                         merfishtools::model::la::expression::ExpressionTBuilder::default()
@@ -449,15 +458,17 @@ fn main() -> Result<(), Error> {
                             .max_hamming_distance(max_hamming_distance) // TODO introduce mhd option
                             .bits(16)
                             .mode(mode)
+                            .absolute(absolute)
                             .seed(seed)
                             .build()
                             .unwrap();
-                    if let merfishdata::Format::Binary = merfishdata::Format::from_path(&raw_data) {
-                        expression
-                            .load_counts(&mut merfishdata::binary::Reader::from_file(&raw_data)?)?;
-                    } else {
-                        expression
-                            .load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?)?;
+                    match merfishdata::Format::from_path(&raw_data) {
+                        merfishdata::Format::Binary => expression
+                            .load_counts(&mut merfishdata::binary::Reader::from_file(&raw_data)?)?,
+                        merfishdata::Format::TSV => expression
+                            .load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?)?,
+                        merfishdata::Format::Simulation => expression
+                            .load_counts(&mut merfishdata::sim::Reader::from_file(&raw_data)?)?,
                     }
 
                     expression.infer()
@@ -538,6 +549,7 @@ fn main() -> Result<(), Error> {
                 ecc_expression_path,
                 p0,
                 p1,
+                group,
             } => {
                 let convert_err_rates = |values: Vec<f64>| match values.len() {
                     1 => vec![Prob::checked(values[0]).unwrap().0; 16],
@@ -551,6 +563,7 @@ fn main() -> Result<(), Error> {
                     ecc_expression_path,
                     convert_err_rates(p0),
                     convert_err_rates(p1),
+                    true,  // FIXME use group instead.
                     seed,
                 )
             }

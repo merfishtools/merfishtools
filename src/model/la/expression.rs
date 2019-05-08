@@ -31,6 +31,7 @@ pub struct ExpressionT {
     bits: usize,
     max_hamming_distance: usize,
     mode: Mode,
+    absolute: bool,
     seed: u64,
     #[builder(setter(skip))]
     corrected_counts: HashMap<String, HashMap<u16, usize>>,
@@ -79,7 +80,7 @@ impl Expression for ExpressionT {
                 y[barcode as usize] += count as f32;
             }
         }
-        if true {  // if relative
+        if !self.absolute {
             y /= y.sum();
             x_est /= x_est.sum();
         }
@@ -90,9 +91,12 @@ impl Expression for ExpressionT {
             Mode::ErrorsThenExpression => {
                 for hamming_dist in 1..=max_hamming_distance {
                     println!("\n=== {:?} ===", hamming_dist);
+                    println!("Estimating positional error probabilities via GD");
                     e = estimate_errors(x.view(), yv, &e, hamming_dist).expect("Failed estimating errors");
                     dbg!(&e);
+                    println!("Constructing CSR transition matrix");
                     let mat = csr_error_matrix(&e, hamming_dist.max(2));
+                    println!("Estimating true expression via SOR");
                     x = estimate_expression(&mat, x.view(), yv, hamming_dist, true).expect("Failed estimating expression");
 //                    x.iter_mut().filter(|&&mut v| v <= 1.).for_each(|v| *v = 0.);
                 }
@@ -100,9 +104,12 @@ impl Expression for ExpressionT {
             Mode::ExpressionThenErrors => {
                 for hamming_dist in 1..=max_hamming_distance {
                     println!("\n=== {:?} ===", hamming_dist);
+                    println!("Constructing CSR transition matrix");
                     let mat = csr_error_matrix(&e, hamming_dist.max(2));
+                    println!("Estimating true expression via SOR");
                     x = estimate_expression(&mat, x.view(), yv, hamming_dist, true).expect("Failed estimating expression");
 //                    x.iter_mut().filter(|&&mut v| v <= 1.).for_each(|v| *v = 0.);
+                    println!("Estimating positional error probabilities via GD");
                     e = estimate_errors(x.view(), yv, &e, hamming_dist).expect("Failed estimating errors");
                     dbg!(&e);
                 }
@@ -123,10 +130,11 @@ impl Expression for ExpressionT {
                 });
                 x = estimate_expression(&mat, x.view(), y.view(), max_hamming_distance, true).expect("Failed estimating expression");
                 x.iter_mut().filter(|&&mut v| v <= 1.).for_each(|v| *v = 0.);
-                x.iter_mut().enumerate().filter(|(i, v)| corrected_countmap.contains_key(&(*i as u16))).for_each(|(_, v)| *v = 0.);
-                println!("{:?}", &x.slice(s![0..10; 1]));
+//                x.iter_mut().enumerate().filter(|(i, v)| corrected_countmap.contains_key(&(*i as u16))).for_each(|(_, v)| *v = 0.);
+                x.iter().enumerate().filter(|(i, &v)| v > 5.).for_each(|(i, v)| println!("{}\t{:016b}\t{}", cell, i, v));
+                println!();
             });
-        unimplemented!()
+        Ok(())
     }
 }
 
@@ -205,14 +213,14 @@ fn _gradient_descent_hardcoded(e: &mut Errors,
     let mult: f32 = 0.5;
     let c1: f32 = 1e-4;
     for i in 0..max_iter {
-//        println!("Calculating gradient...");
+        println!("Calculating gradient...");
         (0..2).for_each(|kind| {
             (0..NUM_BITS).for_each(|pos| {
                 let grad_value = partial_objective(x, y, &e0, pos, kind, max_hamming_distance, x_ind);
                 gradient[kind][pos] = grad_value;
             });
         });
-//        println!("Estimating stepsize...");
+        println!("Estimating stepsize...");
         let o2 = objective(x, y, &e0, max_hamming_distance, x_ind);
         let gradv = gradient.iter().flatten().map(|g: &f32| g.powi(2)).sum::<f32>();
         let mut alpha = alpha0;
@@ -248,7 +256,7 @@ fn _gradient_descent_hardcoded(e: &mut Errors,
         }
 //        println!("{:?}", &e0);
         let err = (gradient.iter().flatten().map(|g: &f32| g.powi(2)).sum::<f32>() / (gradient.len() as f32)).sqrt();
-//        println!("{:?}", err);
+        println!("{}: {:?}", i, err);
         if i >= min_iter {
             if err < target_error {
                 return (*e0, err, i);
@@ -272,7 +280,6 @@ pub fn estimate_errors(x: ExprV, y: ExprV, e: &Errors, max_hamming_distance: usi
 }
 
 pub fn estimate_expression(mat: &CSR, x_est: ExprV, y: ExprV, max_hamming_distance: usize, keep_zeros: bool) -> Result<Expr, ()> {
-    println!("SOR...");
     if let Ok((x, _it, _err)) = csr_successive_overrelaxation(mat, y, x_est, 1.25, 5e-2, 256, keep_zeros) {
         Ok(x)
     } else {

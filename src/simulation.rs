@@ -117,23 +117,23 @@ pub fn generate_erroneous_counts(
     derived_counts
 }
 
-mod binary {
+pub mod binary {
     use serde::de::Deserialize;
     use serde::{Deserializer, Serializer};
 
     use crate::simulation::Barcode;
 
     pub(crate) fn serialize<S>(barcode: &Barcode, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
+        where
+            S: Serializer,
     {
         let repr = format!("{:016b}", barcode);
         serializer.serialize_str(&repr)
     }
 
     pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<Barcode, D::Error>
-    where
-        D: Deserializer<'de>,
+        where
+            D: Deserializer<'de>,
     {
         let repr: String = String::deserialize(deserializer)?;
         let barcode = repr.chars().rev().enumerate().fold(0u16, |acc, (i, c)| {
@@ -298,6 +298,7 @@ pub fn simulate_observed_counts(
     ecc_expression_path: Option<String>,
     p0: Vec<f64>,
     p1: Vec<f64>,
+    group: bool,
     seed: Option<u64>,
 ) -> Result<(), Error> {
     let p0: Vec<f32> = p0.iter().map(|&v| v as f32).collect();
@@ -316,17 +317,31 @@ pub fn simulate_observed_counts(
         .from_writer(ecc_out);
 
     let raw_counts = _read_raw_counts(_reader(raw_expression_path))?;
-    for (&cell, records) in &raw_counts {
-        let derived_counts = generate_erroneous_counts(records, &mut rng, &p0, &p1, p0.len());
-        for (barcode, errcount) in derived_counts.into_iter().sorted_by_key(|v| v.0) {
-            for (flip, count) in errcount {
-                let original_barcode = barcode ^ flip;
-                let errs = _NBITS16[flip as usize];
-                let record = RecordObserved::new(cell, barcode, count, original_barcode, errs);
-                ecc_writer.serialize(record)?;
+    if !group {
+        for (&cell, records) in &raw_counts {
+            let derived_counts = generate_erroneous_counts(records, &mut rng, &p0, &p1, p0.len());
+            for (barcode, errcount) in derived_counts.into_iter().sorted_by_key(|v| v.0) {
+                for (flip, count) in errcount {
+                    let original_barcode = barcode ^ flip;
+                    let errs = _NBITS16[flip as usize];
+                    let record = RecordObserved::new(cell, barcode, count, original_barcode, errs);
+                    ecc_writer.serialize(record)?;
+                }
             }
+            ecc_writer.flush()?;
         }
-        ecc_writer.flush()?;
+    } else {
+        for (&cell, records) in &raw_counts {
+            let derived_counts = generate_erroneous_counts(records, &mut rng, &p0, &p1, p0.len());
+            for (&barcode, count) in derived_counts
+                .iter()
+                .map(|(barcode, errcount)| (barcode, errcount.values().sum()))
+                .filter(|(_, c)| *c > 0)
+                {
+                    let record = RecordRaw::new(cell, barcode, count);
+                    ecc_writer.serialize(record)?;
+                }
+        }
     }
     ecc_writer.flush()?;
     Ok(())
