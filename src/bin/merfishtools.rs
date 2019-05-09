@@ -433,11 +433,11 @@ fn main() -> Result<(), Error> {
                         .unwrap();
                     match merfishdata::Format::from_path(&raw_data) {
                         merfishdata::Format::Binary => expression
-                            .load_counts(&mut merfishdata::binary::Reader::from_file(&raw_data)?)?,
+                            .load_counts(&mut merfishdata::binary::Reader::from_file(&raw_data)?, merfishdata::Format::Binary)?,
                         merfishdata::Format::TSV => expression
-                            .load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?)?,
+                            .load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?, merfishdata::Format::TSV)?,
                         merfishdata::Format::Simulation => expression
-                            .load_counts(&mut merfishdata::sim::Reader::from_file(&raw_data)?)?,
+                            .load_counts(&mut merfishdata::sim::Reader::from_file(&raw_data)?, merfishdata::Format::Simulation)?,
                     }
                     expression.infer()
                 }
@@ -464,11 +464,11 @@ fn main() -> Result<(), Error> {
                             .unwrap();
                     match merfishdata::Format::from_path(&raw_data) {
                         merfishdata::Format::Binary => expression
-                            .load_counts(&mut merfishdata::binary::Reader::from_file(&raw_data)?)?,
+                            .load_counts(&mut merfishdata::binary::Reader::from_file(&raw_data)?, merfishdata::Format::Binary)?,
                         merfishdata::Format::TSV => expression
-                            .load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?)?,
+                            .load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?, merfishdata::Format::TSV)?,
                         merfishdata::Format::Simulation => expression
-                            .load_counts(&mut merfishdata::sim::Reader::from_file(&raw_data)?)?,
+                            .load_counts(&mut merfishdata::sim::Reader::from_file(&raw_data)?, merfishdata::Format::Simulation)?,
                     }
 
                     expression.infer()
