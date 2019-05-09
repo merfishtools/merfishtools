@@ -50,7 +50,7 @@ pub fn objective(
             (y[k] - s).powi(2)
         })
         .sum();
-    r / ((2 * NUM_CODES) as f32)
+    r
 }
 
 pub fn partial_objective(
@@ -79,5 +79,5 @@ pub fn partial_objective(
             g * (y[k] - f)
         })
         .sum();
-    -2. * r / (NUM_CODES as f32)
+    -r
 }

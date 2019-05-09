@@ -160,7 +160,7 @@ impl Expression for ExpressionJ {
 }
 
 impl ExpressionJ {
-    pub fn load_counts<'a, R>(&mut self, reader: &'a mut R) -> Result<(), Error>
+    pub fn load_counts<'a, R>(&mut self, reader: &'a mut R, format: crate::io::merfishdata::Format) -> Result<(), Error>
         where
             R: io::merfishdata::Reader<'a>,
     {

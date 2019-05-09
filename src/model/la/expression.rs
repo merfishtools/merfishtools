@@ -18,6 +18,9 @@ use crate::model::la::common::{Errors, Expr, ExprV, NUM_BITS, NUM_CODES};
 use crate::model::la::expression::Mode::ExpressionThenErrors;
 use crate::model::la::matrix::{CSR, csr_error_matrix, csr_successive_overrelaxation, error_dot, error_successive_overrelaxation};
 use crate::model::la::problem::{objective, partial_objective};
+use crate::io::merfishdata;
+use crate::model::la::hamming::hamming_distance16;
+use itertools::Itertools;
 
 #[derive(Builder)]
 #[builder(pattern = "owned")]
@@ -80,10 +83,19 @@ impl Expression for ExpressionT {
                 y[barcode as usize] += count as f32;
             }
         }
+//        for (i, (&xx, &yy)) in x_est.iter().zip(y.iter()).enumerate() {
+//            if xx != 0. || yy != 0. {
+//                dbg!((i, (xx, yy)));
+//            }
+//        }
+//        std::process::exit(0);
+        let magnitude = y.sum();
         if !self.absolute {
-            y /= y.sum();
-            x_est /= x_est.sum();
+            y /= magnitude;
+            x_est /= magnitude;
         }
+        let codewords = codemap.values().collect_vec();
+
         let yv = y.view();
         let mut x: Expr = x_est;
 
@@ -97,8 +109,13 @@ impl Expression for ExpressionT {
                     println!("Constructing CSR transition matrix");
                     let mat = csr_error_matrix(&e, hamming_dist.max(2));
                     println!("Estimating true expression via SOR");
-                    x = estimate_expression(&mat, x.view(), yv, hamming_dist, true).expect("Failed estimating expression");
-//                    x.iter_mut().filter(|&&mut v| v <= 1.).for_each(|v| *v = 0.);
+                    x = estimate_expression(&mat, x.view(), yv, hamming_dist, false).expect("Failed estimating expression");
+                    x.iter_mut().filter(|&&mut v| v <= 0.).for_each(|v| *v = 0.);
+                    if !self.absolute {
+                        x /= x.sum();
+                    }
+                    dbg!(codewords.iter().map(|&i| y[*i]).collect::<Vec<f32>>());
+                    dbg!(codewords.iter().map(|&i| x[*i]).collect::<Vec<f32>>());
                 }
             }
             Mode::ExpressionThenErrors => {
@@ -107,8 +124,13 @@ impl Expression for ExpressionT {
                     println!("Constructing CSR transition matrix");
                     let mat = csr_error_matrix(&e, hamming_dist.max(2));
                     println!("Estimating true expression via SOR");
-                    x = estimate_expression(&mat, x.view(), yv, hamming_dist, true).expect("Failed estimating expression");
-//                    x.iter_mut().filter(|&&mut v| v <= 1.).for_each(|v| *v = 0.);
+                    x = estimate_expression(&mat, x.view(), yv, hamming_dist, false).expect("Failed estimating expression");
+                    x.iter_mut().filter(|&&mut v| v <= 0.).for_each(|v| *v = 0.);
+                    if !self.absolute {
+                        x /= x.sum();
+                    }
+                    dbg!(codewords.iter().map(|&i| y[*i]).collect::<Vec<f32>>());
+                    dbg!(codewords.iter().map(|&i| x[*i]).collect::<Vec<f32>>());
                     println!("Estimating positional error probabilities via GD");
                     e = estimate_errors(x.view(), yv, &e, hamming_dist).expect("Failed estimating errors");
                     dbg!(&e);
@@ -128,10 +150,21 @@ impl Expression for ExpressionT {
                 corrected_countmap.iter().for_each(|(&barcode, &count)| {
                     x[barcode as usize] += count as f32;
                 });
-                x = estimate_expression(&mat, x.view(), y.view(), max_hamming_distance, true).expect("Failed estimating expression");
-                x.iter_mut().filter(|&&mut v| v <= 1.).for_each(|v| *v = 0.);
+                let magnitude_y = y.sum();
+                let magnitude_x = x.sum();
+                dbg!(magnitude_x);
+                if !self.absolute {
+                    y /= magnitude_y;
+                    x /= magnitude_x;
+                }
+                x = estimate_expression(&mat, x.view(), y.view(), max_hamming_distance, false).expect("Failed estimating expression");
+                x *= magnitude_x;
+//                x.iter_mut().filter(|&&mut v| v <= 1.).for_each(|v| *v = 0.);
 //                x.iter_mut().enumerate().filter(|(i, v)| corrected_countmap.contains_key(&(*i as u16))).for_each(|(_, v)| *v = 0.);
-                x.iter().enumerate().filter(|(i, &v)| v > 5.).for_each(|(i, v)| println!("{}\t{:016b}\t{}", cell, i, v));
+//                dbg!(codewords.iter().map(|&i| y[*i]).collect::<Vec<f32>>());
+//                dbg!(codewords.iter().map(|&i| x[*i]).collect::<Vec<f32>>());
+//                x.iter().enumerate().filter(|(i, &v)| v > 0.).for_each(|(i, v)| println!("{}\t{:016b}\t{}", cell, i, v));
+                codewords.iter().map(|&i| (i, x[*i])).for_each(|(i, v)| println!("{}\t{:016b}\t{}", cell, i, v));
                 println!();
             });
         Ok(())
@@ -139,7 +172,7 @@ impl Expression for ExpressionT {
 }
 
 impl ExpressionT {
-    pub fn load_counts<'a, R>(&mut self, reader: &'a mut R) -> Result<(), Error>
+    pub fn load_counts<'a, R>(&mut self, reader: &'a mut R, format: merfishdata::Format) -> Result<(), Error>
         where R: crate::io::merfishdata::Reader<'a> {
         let codebook = &crate::io::codebook::Codebook::from_file(&self.codebook_path())?;
 
@@ -148,39 +181,62 @@ impl ExpressionT {
 
         let mut rng = StdRng::seed_from_u64(self.seed);
 
+        let codewords: Vec<u16> = codebook.records()
+            .iter()
+            .map(|r| r.codeword().iter().rev().enumerate().map(|(i, bit)| (bit as u16) << i).sum())
+            .collect();
+
         for rec in reader.records() {
             let record = rec?;
             if !self.cells().is_match(&record.cell_name()) && codebook.contains(&record.feature_name()) {
                 continue;
             }
             let barcode = record.barcode(Some(codebook));
-            let raw_barcode = barcode;
+            let mut raw_barcode = barcode;
             let mut uncorrected_barcode = barcode;
-
-            // if the readout has been corrected, reconstruct the/an un-corrected barcode
-            if record.hamming_dist() == 1 {
-                let error_bit = match record.error_bit() {
-                    // the binary merfish format actually tells us at which position the error occurred
-                    Some(bit) => bit,
-
-                    // the tsv merfish format only states if a readout was bit-corrected or not
-                    // we will hence un-correct the barcode at random (according to p0/p1 probabilities)
-                    None => {
-                        let weights: Vec<_> = (0..NUM_BITS)
-                            .map(|i| {
-                                let bit = (barcode >> i) & 1;
-                                let p = match bit {
-                                    0 => &self.p0[i],
-                                    1 => &self.p1[i],
-                                    _ => panic!("bug: bit can only be 0 or 1")
-                                };
-                                p.0
-                            }).collect();
-                        let wc = WeightedIndex::new(&weights).unwrap();
-                        rng.sample(&wc) as u8
+            match format {
+                // simulated data is perturbed ground truth data,
+                // i.e. no 1-bit error correction has been performed
+                // ... so we do that now
+                merfishdata::Format::Simulation => {
+                    if record.hamming_dist() == 1 {
+                        let closest: Vec<u16> = codewords.iter()
+                            .map(|&cw| (cw, hamming_distance16(cw as usize, raw_barcode as usize)))
+                            .filter(|(cw, d)| *d == 1)
+                            .map(|(cw, _)| cw)
+                            .collect();
+                        if !closest.is_empty() {
+                            raw_barcode = closest[0];
+                        }
                     }
-                };
-                uncorrected_barcode ^= 1 << error_bit;
+                }
+                merfishdata::Format::TSV | merfishdata::Format::Binary => {
+                    // if the readout has been corrected, reconstruct the/an un-corrected barcode
+                    if record.hamming_dist() == 1 {
+                        let error_bit = match record.error_bit() {
+                            // the binary merfish format actually tells us at which position the error occurred
+                            Some(bit) => bit,
+
+                            // the tsv merfish format only states if a readout was bit-corrected or not
+                            // we will hence un-correct the barcode at random (according to p0/p1 probabilities)
+                            None => {
+                                let weights: Vec<_> = (0..NUM_BITS)
+                                    .map(|i| {
+                                        let bit = (barcode >> i) & 1;
+                                        let p = match bit {
+                                            0 => &self.p0[i],
+                                            1 => &self.p1[i],
+                                            _ => panic!("bug: bit can only be 0 or 1")
+                                        };
+                                        p.0
+                                    }).collect();
+                                let wc = WeightedIndex::new(&weights).unwrap();
+                                rng.sample(&wc) as u8
+                            }
+                        };
+                        uncorrected_barcode ^= 1 << error_bit;
+                    }
+                }
             }
 
             // TODO build Map<Cell, Map<Barcode, Count>>
@@ -222,7 +278,10 @@ fn _gradient_descent_hardcoded(e: &mut Errors,
         });
         println!("Estimating stepsize...");
         let o2 = objective(x, y, &e0, max_hamming_distance, x_ind);
-        let gradv = gradient.iter().flatten().map(|g: &f32| g.powi(2)).sum::<f32>();
+        // gradv → descent direction: -partial_objective^T · partial_objective
+        let gradv = -gradient.iter().flatten().map(|g: &f32| g.powi(2)).sum::<f32>();
+        dbg!(&gradient);
+        dbg!((o2, gradv));
         let mut alpha = alpha0;
         for _ in 0..17 {
             let mut e1 = *e0;
@@ -235,8 +294,10 @@ fn _gradient_descent_hardcoded(e: &mut Errors,
                     }
                 }
             }
+            // e1 = e0 + alpha · gradv
             let o1 = objective(x, y, &e1, max_hamming_distance, x_ind);
-            let o2 = o2 - c1 * alpha * gradv;
+            let o2 = o2 + c1 * alpha * gradv;
+            // armijo rule →  f(e0 + alpha · gradv) <= f(e0) + c1 · alpha · gradv?
             if o1 <= o2 {
                 break;
             }
@@ -256,7 +317,9 @@ fn _gradient_descent_hardcoded(e: &mut Errors,
         }
 //        println!("{:?}", &e0);
         let err = (gradient.iter().flatten().map(|g: &f32| g.powi(2)).sum::<f32>() / (gradient.len() as f32)).sqrt();
-        println!("{}: {:?}", i, err);
+//        let err = objective(x, y, &e0, max_hamming_distance, x_ind);
+        println!("{}: {:?}\t{:?}", i, err, alpha);
+        dbg!(&e0);
         if i >= min_iter {
             if err < target_error {
                 return (*e0, err, i);
@@ -271,7 +334,7 @@ pub fn estimate_errors(x: ExprV, y: ExprV, e: &Errors, max_hamming_distance: usi
     let max_iter = 256;
     let mut e0 = [[0.; NUM_BITS], [0.; NUM_BITS]];
     e0.clone_from_slice(e);
-    let (e, _error, num_iters) = _gradient_descent_hardcoded(&mut e0, y, x, 0.9, 0.25, max_hamming_distance, 4, max_iter, &x_ind[..]);
+    let (e, _error, num_iters) = _gradient_descent_hardcoded(&mut e0, y, x, 1e-8, 1., max_hamming_distance, 4, max_iter, &x_ind[..]);
     if num_iters == max_iter {
         Result::Err(())
     } else {
@@ -280,7 +343,7 @@ pub fn estimate_errors(x: ExprV, y: ExprV, e: &Errors, max_hamming_distance: usi
 }
 
 pub fn estimate_expression(mat: &CSR, x_est: ExprV, y: ExprV, max_hamming_distance: usize, keep_zeros: bool) -> Result<Expr, ()> {
-    if let Ok((x, _it, _err)) = csr_successive_overrelaxation(mat, y, x_est, 1.25, 5e-2, 256, keep_zeros) {
+    if let Ok((x, _it, _err)) = csr_successive_overrelaxation(mat, y, x_est, 1.25, 1e-7, 256, keep_zeros) {
         Ok(x)
     } else {
         Err(())

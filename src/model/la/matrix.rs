@@ -212,11 +212,12 @@ pub fn csr_successive_overrelaxation(a: &CSR,
             }
         }
         error = rmse((a * x.view()).view(), y);
+        dbg!(&error);
 //        println!("{:?}, {:?}", it, &error);
         if error.is_infinite() || error.is_nan() {
             return Err((it, error));
         }
-        if error < eps || (last_error - error).abs() <= 1e-5 {
+        if error < eps || (last_error - error).abs() <= 1e-7 {
 //            println!("{:?}, {:?}", x.slice(s![0..10; 1]), y.slice(s![0..10; 1]));
             return Ok((x.to_owned(), it, error));
         }
