@@ -113,29 +113,33 @@ impl Expression for ExpressionT {
             Mode::ErrorsThenExpression => {
                 for hamming_dist in 1..=max_hamming_distance {
                     println!("\n=== {:?} ===", hamming_dist);
+
+                    // set < 0. to 0., set non_codewords to 0., normalize to 1
+                    fix(&mut x, &non_codewords);
+
                     println!("Estimating positional error probabilities via GD");
                     e = estimate_errors(x.view(), yv, &e, hamming_dist).expect("Failed estimating errors");
                     dbg!(&e);
+
                     println!("Constructing CSR transition matrix");
                     let mat = csr_error_matrix(&e, hamming_dist.max(2));
+
                     println!("Estimating true expression via SOR");
-                    fix(&mut x, &non_codewords);
                     x = estimate_expression(&mat, x.view(), yv, hamming_dist, false).expect("Failed estimating expression");
-                    dbg!(codewords.iter().map(|&i| y[i]).collect::<Vec<f32>>());
-                    dbg!(codewords.iter().map(|&i| x[i]).collect::<Vec<f32>>());
                 }
             }
             Mode::ExpressionThenErrors => {
                 for hamming_dist in 1..=max_hamming_distance {
                     println!("\n=== {:?} ===", hamming_dist);
+
                     println!("Constructing CSR transition matrix");
                     let mat = csr_error_matrix(&e, hamming_dist.max(2));
+
                     println!("Estimating true expression via SOR");
                     fix(&mut x, &non_codewords);
                     x = estimate_expression(&mat, x.view(), yv, hamming_dist, false).expect("Failed estimating expression");
                     fix(&mut x, &non_codewords);
-                    dbg!(codewords.iter().map(|&i| y[i] * magnitude_y).collect::<Vec<f32>>());
-                    dbg!(codewords.iter().map(|&i| x[i] * magnitude_x).collect::<Vec<f32>>());
+
                     println!("Estimating positional error probabilities via GD");
                     e = estimate_errors(x.view(), yv, &e, hamming_dist).expect("Failed estimating errors");
                     dbg!(&e);
@@ -195,10 +199,23 @@ impl ExpressionT {
             .iter()
             .map(|r| r.codeword().iter().rev().enumerate().map(|(i, bit)| (bit as u16) << i).sum())
             .collect();
+        let expressed_codewords: Vec<u16> = codebook.records()
+            .iter()
+            .filter(|&r| r.expressed())
+            .map(|r| r.codeword().iter().rev().enumerate().map(|(i, bit)| (bit as u16) << i).sum())
+            .collect();
+        let unexpressed_codewords: Vec<u16> = codebook.records()
+            .iter()
+            .filter(|&r| !r.expressed())
+            .map(|r| r.codeword().iter().rev().enumerate().map(|(i, bit)| (bit as u16) << i).sum())
+            .collect();
 
         for rec in reader.records() {
             let record = rec?;
             if !self.cells().is_match(&record.cell_name()) && codebook.contains(&record.feature_name()) {
+                continue;
+            }
+            if !codebook.record(record.feature_id() as usize).expressed() {
                 continue;
             }
             let barcode = record.barcode(Some(codebook));
@@ -207,15 +224,15 @@ impl ExpressionT {
             match format {
                 // simulated data is perturbed ground truth data,
                 // i.e. no 1-bit error correction has been performed
-                // ... so we do that now
+                // ... so we do that now, if at all possible
                 merfishdata::Format::Simulation => {
                     if record.hamming_dist() == 1 {
-                        let closest: Vec<u16> = codewords.iter()
+                        let closest: Vec<u16> = expressed_codewords.iter()
                             .map(|&cw| (cw, hamming_distance16(cw as usize, raw_barcode as usize)))
                             .filter(|(cw, d)| *d == 1)
                             .map(|(cw, _)| cw)
                             .collect();
-                        if !closest.is_empty() {
+                        if closest.len() == 1 {
                             raw_barcode = closest[0];
                         }
                     }
@@ -290,8 +307,8 @@ fn _gradient_descent_hardcoded(e: &mut Errors,
         let o2 = objective(x, y, &e0, max_hamming_distance, x_ind);
         // gradv → descent direction: -partial_objective^T · partial_objective
         let gradv = -gradient.iter().flatten().map(|g: &f32| g.powi(2)).sum::<f32>();
-        dbg!(&gradient);
-        dbg!((o2, gradv));
+//        dbg!(&gradient);
+//        dbg!((o2, gradv));
         let mut alpha = alpha0;
         for _ in 0..17 {
             let mut e1 = *e0;
@@ -329,7 +346,7 @@ fn _gradient_descent_hardcoded(e: &mut Errors,
         let err = (gradient.iter().flatten().map(|g: &f32| g.powi(2)).sum::<f32>() / (gradient.len() as f32)).sqrt();
 //        let err = objective(x, y, &e0, max_hamming_distance, x_ind);
         println!("{}: {:?}\t{:?}", i, err, alpha);
-        dbg!(&e0);
+//        dbg!(&e0);
         if i >= min_iter {
             if err < target_error {
                 return (*e0, err, i);
