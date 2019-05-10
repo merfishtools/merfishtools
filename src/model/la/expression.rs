@@ -1,26 +1,27 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::iter::FromIterator;
 
 use bio::stats::Prob;
+use clap::arg_enum;
 use failure::Error;
+use itertools::Itertools;
 use ndarray::prelude::*;
 use rand;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use rayon::prelude::*;
 use regex::Regex;
-use clap::arg_enum;
 
 use crate::cli::Expression;
 use crate::io::codebook::{Codebook, FeatureID};
+use crate::io::merfishdata;
 use crate::io::merfishdata::MerfishRecord;
 use crate::model::bayes::readout::Counts;
-use crate::model::la::common::{Errors, Expr, ExprV, NUM_BITS, NUM_CODES};
+use crate::model::la::common::{Errors, Expr, ExprV, ExprVMut, NUM_BITS, NUM_CODES};
 use crate::model::la::expression::Mode::ExpressionThenErrors;
+use crate::model::la::hamming::hamming_distance16;
 use crate::model::la::matrix::{CSR, csr_error_matrix, csr_successive_overrelaxation, error_dot, error_successive_overrelaxation};
 use crate::model::la::problem::{objective, partial_objective};
-use crate::io::merfishdata;
-use crate::model::la::hamming::hamming_distance16;
-use itertools::Itertools;
 
 #[derive(Builder)]
 #[builder(pattern = "owned")]
@@ -53,12 +54,17 @@ impl Expression for ExpressionT {
 
     fn infer(&mut self) -> Result<(), Error> {
         let codebook = Codebook::from_file(&self.codebook_path()).unwrap();
-        let codemap: HashMap<&String, usize> = codebook.features().map(|feature| {
+        let codewords: HashSet<usize> = codebook.features().map(|feature| {
             let feature_id = codebook.get_id(feature);
             let idx: usize = codebook.record(feature_id).codeword()
                 .iter().rev().enumerate().map(|(i, bit)| (bit as usize) << i).sum();
-            (feature, idx)
+            idx
         }).collect();
+        let mut non_codewords: HashSet<usize> = (0..NUM_CODES).collect();
+        for cw in &codewords {
+            non_codewords.remove(cw);
+        }
+        let non_codewords = Vec::from_iter(non_codewords.iter().cloned());
 
         let raw_counts = &self.raw_counts;
         let corrected_counts = &self.corrected_counts;
@@ -89,12 +95,16 @@ impl Expression for ExpressionT {
 //            }
 //        }
 //        std::process::exit(0);
-        let magnitude = y.sum();
+
+
+        let magnitude_x = x_est.sum();
+        fix(&mut x_est, &non_codewords);
+        let magnitude_y = y.sum();
+        dbg!(magnitude_x);
+        dbg!(magnitude_y);
         if !self.absolute {
-            y /= magnitude;
-            x_est /= magnitude;
+            y /= magnitude_y;
         }
-        let codewords = codemap.values().collect_vec();
 
         let yv = y.view();
         let mut x: Expr = x_est;
@@ -109,13 +119,10 @@ impl Expression for ExpressionT {
                     println!("Constructing CSR transition matrix");
                     let mat = csr_error_matrix(&e, hamming_dist.max(2));
                     println!("Estimating true expression via SOR");
+                    fix(&mut x, &non_codewords);
                     x = estimate_expression(&mat, x.view(), yv, hamming_dist, false).expect("Failed estimating expression");
-                    x.iter_mut().filter(|&&mut v| v <= 0.).for_each(|v| *v = 0.);
-                    if !self.absolute {
-                        x /= x.sum();
-                    }
-                    dbg!(codewords.iter().map(|&i| y[*i]).collect::<Vec<f32>>());
-                    dbg!(codewords.iter().map(|&i| x[*i]).collect::<Vec<f32>>());
+                    dbg!(codewords.iter().map(|&i| y[i]).collect::<Vec<f32>>());
+                    dbg!(codewords.iter().map(|&i| x[i]).collect::<Vec<f32>>());
                 }
             }
             Mode::ExpressionThenErrors => {
@@ -124,13 +131,11 @@ impl Expression for ExpressionT {
                     println!("Constructing CSR transition matrix");
                     let mat = csr_error_matrix(&e, hamming_dist.max(2));
                     println!("Estimating true expression via SOR");
+                    fix(&mut x, &non_codewords);
                     x = estimate_expression(&mat, x.view(), yv, hamming_dist, false).expect("Failed estimating expression");
-                    x.iter_mut().filter(|&&mut v| v <= 0.).for_each(|v| *v = 0.);
-                    if !self.absolute {
-                        x /= x.sum();
-                    }
-                    dbg!(codewords.iter().map(|&i| y[*i]).collect::<Vec<f32>>());
-                    dbg!(codewords.iter().map(|&i| x[*i]).collect::<Vec<f32>>());
+                    fix(&mut x, &non_codewords);
+                    dbg!(codewords.iter().map(|&i| y[i] * magnitude_y).collect::<Vec<f32>>());
+                    dbg!(codewords.iter().map(|&i| x[i] * magnitude_x).collect::<Vec<f32>>());
                     println!("Estimating positional error probabilities via GD");
                     e = estimate_errors(x.view(), yv, &e, hamming_dist).expect("Failed estimating errors");
                     dbg!(&e);
@@ -150,25 +155,30 @@ impl Expression for ExpressionT {
                 corrected_countmap.iter().for_each(|(&barcode, &count)| {
                     x[barcode as usize] += count as f32;
                 });
-                let magnitude_y = y.sum();
+
                 let magnitude_x = x.sum();
+                fix(&mut x, &non_codewords);
+                let magnitude_y = y.sum();
                 dbg!(magnitude_x);
+                dbg!(magnitude_y);
                 if !self.absolute {
                     y /= magnitude_y;
-                    x /= magnitude_x;
                 }
                 x = estimate_expression(&mat, x.view(), y.view(), max_hamming_distance, false).expect("Failed estimating expression");
+                fix(&mut x, &non_codewords);
                 x *= magnitude_x;
-//                x.iter_mut().filter(|&&mut v| v <= 1.).for_each(|v| *v = 0.);
-//                x.iter_mut().enumerate().filter(|(i, v)| corrected_countmap.contains_key(&(*i as u16))).for_each(|(_, v)| *v = 0.);
-//                dbg!(codewords.iter().map(|&i| y[*i]).collect::<Vec<f32>>());
-//                dbg!(codewords.iter().map(|&i| x[*i]).collect::<Vec<f32>>());
-//                x.iter().enumerate().filter(|(i, &v)| v > 0.).for_each(|(i, v)| println!("{}\t{:016b}\t{}", cell, i, v));
-                codewords.iter().map(|&i| (i, x[*i])).for_each(|(i, v)| println!("{}\t{:016b}\t{}", cell, i, v));
-                println!();
+                x.iter().enumerate().filter(|(_, &v)| v > 0.).for_each(|(i, v)| println!("{}\t{:016b}\t{}", cell, i, v));
             });
         Ok(())
     }
+}
+
+fn fix(x: &mut Expr, non_codewords: &[usize]) {
+    x.iter_mut().filter(|&&mut v| v < 0.).for_each(|v| *v = 0.);
+    for &cw in non_codewords {
+        x[cw] = 0.;
+    }
+    *x /= x.sum();
 }
 
 impl ExpressionT {
@@ -334,7 +344,7 @@ pub fn estimate_errors(x: ExprV, y: ExprV, e: &Errors, max_hamming_distance: usi
     let max_iter = 256;
     let mut e0 = [[0.; NUM_BITS], [0.; NUM_BITS]];
     e0.clone_from_slice(e);
-    let (e, _error, num_iters) = _gradient_descent_hardcoded(&mut e0, y, x, 1e-8, 1., max_hamming_distance, 4, max_iter, &x_ind[..]);
+    let (e, _error, num_iters) = _gradient_descent_hardcoded(&mut e0, y, x, 0.0007, 1., max_hamming_distance, 4, max_iter, &x_ind[..]);
     if num_iters == max_iter {
         Result::Err(())
     } else {
