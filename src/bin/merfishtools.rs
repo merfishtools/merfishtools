@@ -70,11 +70,11 @@ merfishtools exp codebook.txt < data.txt > expression.txt"
         seed: u64,
 
         /// Prior probability of 0->1 error
-        #[structopt(long, default_value = "0.04", value_name = "FLOAT", multiple = true)]
+        #[structopt(long, default_value = "0.01", value_name = "FLOAT", multiple = true)]
         p0: Vec<f64>,
 
         /// Prior probability of 1->0 error
-        #[structopt(long, default_value = "0.04", value_name = "FLOAT", multiple = true)]
+        #[structopt(long, default_value = "0.09", value_name = "FLOAT", multiple = true)]
         p1: Vec<f64>,
 
         /// Regular expression to select cells from cell column (see above).
@@ -296,7 +296,7 @@ enum ExpressionMode {
         max_hamming_distance: usize,
 
         /// bla
-        #[structopt(long, short = "m", default_value="ExpressionThenErrors",
+        #[structopt(long, short = "m", default_value="ErrorsThenExpression",
             raw(possible_values = "&merfishtools::model::la::expression::Mode::variants()"),
             case_insensitive = true)]
         mode: merfishtools::model::la::expression::Mode,

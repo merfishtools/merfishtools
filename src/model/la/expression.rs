@@ -12,6 +12,9 @@ use rand::prelude::*;
 use rayon::prelude::*;
 use regex::Regex;
 
+use num_traits::float::Float;
+use derive_new::new;
+
 use crate::cli::Expression;
 use crate::io::merfishdata;
 use crate::io::merfishdata::MerfishRecord;
@@ -20,6 +23,17 @@ use crate::model::la::common::{Errors, Expr, ExprV, NUM_BITS, NUM_CODES};
 use crate::model::la::hamming::hamming_distance16;
 use crate::model::la::matrix::{CSR, csr_error_matrix, csr_successive_overrelaxation};
 use crate::model::la::problem::{objective, partial_objective};
+use crate::simulation::binary;
+use crate::io::codebook::Record;
+
+#[derive(Serialize, Deserialize, new)]
+pub struct RecordEstimate {
+    cell: String,
+    #[serde(with = "binary")]
+    barcode: u16,
+    #[serde(rename = "count")]
+    expression: f32,
+}
 
 #[derive(Builder)]
 #[builder(pattern = "owned")]
@@ -91,19 +105,12 @@ impl Expression for ExpressionT {
                 y[barcode as usize] += count as f32;
             }
         }
-//        for (i, (&xx, &yy)) in x_est.iter().zip(y.iter()).enumerate() {
-//            if xx != 0. || yy != 0. {
-//                dbg!((i, (xx, yy)));
-//            }
-//        }
-//        std::process::exit(0);
-
 
         let magnitude_x = x_est.sum();
         fix(&mut x_est, &non_codewords);
         let magnitude_y = y.sum();
-        dbg!(magnitude_x);
-        dbg!(magnitude_y);
+//        dbg!(magnitude_x);
+//        dbg!(magnitude_y);
         if !self.absolute {
             y /= magnitude_y;
         }
@@ -149,9 +156,15 @@ impl Expression for ExpressionT {
             }
         };
         let mat = csr_error_matrix(&e, 4);
-        self.raw_counts
+        let estimate_writer = self.estimate_path.as_ref().map(|path| {
+            csv::WriterBuilder::new()
+                .delimiter(b'\t')
+                .from_path(path)
+                .unwrap()
+        });
+        let all_records: Vec<RecordEstimate> = self.raw_counts
             .par_iter()
-            .for_each(|(cell, raw_countmap)| {
+            .flat_map(|(cell, raw_countmap)| {
                 let corrected_countmap = self.corrected_counts.get(cell).unwrap();
                 let mut y: Expr = Expr::zeros((NUM_CODES, ));
                 raw_countmap.iter().for_each(|(&barcode, &count)| {
@@ -165,16 +178,23 @@ impl Expression for ExpressionT {
                 let magnitude_x = x.sum();
                 fix(&mut x, &non_codewords);
                 let magnitude_y = y.sum();
-                dbg!(magnitude_x);
-                dbg!(magnitude_y);
+//                dbg!(magnitude_x);
+//                dbg!(magnitude_y);
                 if !self.absolute {
                     y /= magnitude_y;
                 }
                 x = estimate_expression(&mat, x.view(), y.view(), max_hamming_distance, false).expect("Failed estimating expression");
                 fix(&mut x, &non_codewords);
                 x *= magnitude_x;
-                x.iter().enumerate().filter(|(_, &v)| v > 0.).for_each(|(i, v)| println!("{}\t{:016b}\t{}", cell, i, v));
-            });
+                let records: Vec<RecordEstimate> = x.iter().enumerate().filter(|(_, &v)| v > 0.).map(|(i, &v)| RecordEstimate::new(cell.to_owned(), i as u16, v)).collect();
+                records
+            }).collect();
+        if let Some(mut writer) = estimate_writer {
+            for r in all_records {
+                writer.serialize(r)?;
+            }
+        }
+
         Ok(())
     }
 }
@@ -296,24 +316,28 @@ fn _gradient_descent_hardcoded(e: &mut Errors,
                                y_ind: &[usize]) -> (Errors, f32, usize) {
     let mut gradient: Errors = [[0.; NUM_BITS]; 2];
     let e0 = e;
-    let alpha0 = alpha;
     let mult: f32 = 0.5;
     let c1: f32 = 1e-4;
+    let mut last_err = f32::infinity();
+    let mut alpha1 = alpha;
     for i in 0..max_iter {
-        println!("Calculating gradient...");
+//        println!("Calculating gradient...");
         (0..2).for_each(|kind| {
             (0..NUM_BITS).for_each(|pos| {
                 let grad_value = partial_objective(x, y, &e0, pos, kind, max_hamming_distance, x_ind, y_ind);
                 gradient[kind][pos] = grad_value;
             });
         });
-        println!("Estimating stepsize...");
+//        dbg!(&gradient);
+//        println!("Estimating stepsize...");
         let o2 = objective(x, y, &e0, max_hamming_distance, x_ind, y_ind);
         // gradv → descent direction: -partial_objective^T · partial_objective
         let gradv = -gradient.iter().flatten().map(|g: &f32| g.powi(2)).sum::<f32>();
+
+//        alpha1 = 0.5 * alpha1 + 0.5 * (0.001 / (gradient.iter().flatten().map(|v: &f32| v.abs()).sum::<f32>() / (2 * NUM_BITS) as f32));
 //        dbg!(&gradient);
 //        dbg!((o2, gradv));
-        let mut alpha = alpha0;
+        let mut alpha = alpha1;
         for _ in 0..17 {
             let mut e1 = *e0;
             for kind in 0..2 {
@@ -349,9 +373,14 @@ fn _gradient_descent_hardcoded(e: &mut Errors,
 //        println!("{:?}", &e0);
         let err = (gradient.iter().flatten().map(|g: &f32| g.powi(2)).sum::<f32>() / (gradient.len() as f32)).sqrt();
 //        let err = objective(x, y, &e0, max_hamming_distance, x_ind);
-        println!("{}: {:?}\t{:?}", i, err, alpha);
+//        println!("{}: {:e}\t{:?}", i, err, alpha);
 //        dbg!(&e0);
         if i >= min_iter {
+            if last_err < err {
+                return (*e0, err, i);
+            } else {
+                last_err = err;
+            }
             if err < target_error {
                 return (*e0, err, i);
             }
@@ -365,7 +394,7 @@ pub fn estimate_errors(x: ExprV, y: ExprV, y_ind: &[usize], e: &Errors, max_hamm
     let max_iter = 256;
     let mut e0 = [[0.; NUM_BITS], [0.; NUM_BITS]];
     e0.clone_from_slice(e);
-    let (e, _error, num_iters) = _gradient_descent_hardcoded(&mut e0, y, x, 0.0007, 1., max_hamming_distance, 4, max_iter, &x_ind[..], &y_ind[..]);
+    let (e, _error, num_iters) = _gradient_descent_hardcoded(&mut e0, y, x, 1e-9, 5e5, max_hamming_distance, 4, max_iter, &x_ind[..], &y_ind[..]);
     if num_iters == max_iter {
         Result::Err(())
     } else {

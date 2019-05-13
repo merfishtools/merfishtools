@@ -213,7 +213,7 @@ pub fn csr_successive_overrelaxation(a: &CSR,
             }
         }
         error = rmse((a * x.view()).view(), y);
-        dbg!(&error);
+//        dbg!(&error);
 //        println!("{:?}, {:?}", it, &error);
         if error.is_infinite() || error.is_nan() {
             return Err((it, error));
