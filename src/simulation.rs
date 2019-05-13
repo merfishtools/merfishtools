@@ -1,18 +1,16 @@
-use core::fmt::Pointer;
 use std::collections::HashMap;
+use std::path::Path;
 
-use bio::stats::Prob;
 use derive_new::*;
 use failure::Error;
 use itertools::Itertools;
 use maplit::hashmap;
 use ndarray::Array;
-use rand::prelude::*;
 use rand::{Rng, SeedableRng};
-use serde::{Serialize, Serializer};
+use rand::prelude::*;
+use serde::Serialize;
 
 use crate::model::la::hamming::_NBITS16;
-use std::path::Path;
 
 type Barcode = u16;
 
@@ -118,8 +116,8 @@ pub fn generate_erroneous_counts(
 }
 
 pub mod binary {
-    use serde::de::Deserialize;
     use serde::{Deserializer, Serializer};
+    use serde::de::Deserialize;
 
     use crate::simulation::Barcode;
 

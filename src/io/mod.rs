@@ -5,6 +5,7 @@
 
 pub mod cdf;
 pub mod codebook;
+pub mod simple_codebook;
 pub mod estimation;
 pub mod merfishdata;
 

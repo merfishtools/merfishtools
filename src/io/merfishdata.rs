@@ -7,6 +7,7 @@ use std::path::Path;
 
 use bit_vec::BitVec;
 use failure::Fail;
+
 use crate::io::codebook::Codebook;
 
 pub type Readout = BitVec;
@@ -41,6 +42,7 @@ pub trait MerfishRecord {
     fn hamming_dist(&self) -> u8;
     fn error_bit(&self) -> Option<u8>;
     fn barcode(&self, codebook: Option<&Codebook>) -> u16;
+    fn count(&self) -> usize;
 }
 
 pub trait Reader<'a> {
@@ -52,11 +54,12 @@ pub trait Reader<'a> {
 }
 
 pub mod sim {
-    use std::io;
     use std::fs;
+    use std::io;
     use std::path::Path;
-    use crate::io::merfishdata::MerfishRecord;
+
     use crate::io::codebook::Codebook;
+    use crate::io::merfishdata::MerfishRecord;
     use crate::model::la::hamming::_NBITS16;
     use crate::simulation::binary;
 
@@ -90,7 +93,7 @@ pub mod sim {
         }
 
         fn hamming_dist(&self) -> u8 {
-            let d = (_NBITS16[self.barcode as usize] as isize - 4);
+            let d = _NBITS16[self.barcode as usize] as isize - 4;
             if d < 0 {
                 (-d) as u8
             } else {
@@ -102,9 +105,11 @@ pub mod sim {
             None
         }
 
-        fn barcode(&self, codebook: Option<&Codebook>) -> u16 {
+        fn barcode(&self, _codebook: Option<&Codebook>) -> u16 {
             self.barcode
         }
+
+        fn count(&self) -> usize { self.count }
     }
 
     /// A reader for MERFISH raw data.
@@ -145,8 +150,8 @@ pub mod tsv {
 
     use csv;
 
-    use crate::io::merfishdata::MerfishRecord;
     use crate::io::codebook::Codebook;
+    use crate::io::merfishdata::MerfishRecord;
 
     /// A 2D position in the microscope.
     #[derive(Serialize, Deserialize, Debug)]
@@ -212,6 +217,8 @@ pub mod tsv {
                 None => panic!("Codebook must not be None")
             }
         }
+
+        fn count(&self) -> usize { 1 }
     }
 
     /// A reader for MERFISH raw data.
@@ -256,10 +263,10 @@ pub mod binary {
     use byteorder::{ByteOrder, NativeEndian};
     use failure::Error;
 
+    use crate::io::codebook::Codebook;
     use crate::io::merfishdata::MerfishRecord;
 
     use super::Readout;
-    use crate::io::codebook::Codebook;
 
     /// Header of a binary merfish file.
     #[derive(Serialize, Deserialize, Debug)]
@@ -384,7 +391,9 @@ pub mod binary {
             } else { None }
         }
 
-        fn barcode(&self, codebook: Option<&Codebook>) -> u16 { self.barcode as u16 }
+        fn barcode(&self, _codebook: Option<&Codebook>) -> u16 { self.barcode as u16 }
+
+        fn count(&self) -> usize { 1 }
     }
 
     #[derive(Debug, Fail)]

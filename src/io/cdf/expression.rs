@@ -96,7 +96,7 @@ impl<R: io::Read> Reader<R> {
                 value: NotNaN::new(rec.expression).unwrap(),
                 prob: rec.prob,
             }));
-            let mut cdfs = features.entry(feature).or_insert_with(Vec::new);
+            let cdfs = features.entry(feature).or_insert_with(Vec::new);
             cdfs.push(cdf);
         }
         CDFs { inner: features }

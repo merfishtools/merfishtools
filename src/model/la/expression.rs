@@ -13,14 +13,12 @@ use rayon::prelude::*;
 use regex::Regex;
 
 use crate::cli::Expression;
-use crate::io::codebook::{Codebook, FeatureID};
 use crate::io::merfishdata;
 use crate::io::merfishdata::MerfishRecord;
-use crate::model::bayes::readout::Counts;
-use crate::model::la::common::{Errors, Expr, ExprV, ExprVMut, NUM_BITS, NUM_CODES};
-use crate::model::la::expression::Mode::ExpressionThenErrors;
+use crate::io::simple_codebook::SimpleCodebook;
+use crate::model::la::common::{Errors, Expr, ExprV, NUM_BITS, NUM_CODES};
 use crate::model::la::hamming::hamming_distance16;
-use crate::model::la::matrix::{CSR, csr_error_matrix, csr_successive_overrelaxation, error_dot, error_successive_overrelaxation};
+use crate::model::la::matrix::{CSR, csr_error_matrix, csr_successive_overrelaxation};
 use crate::model::la::problem::{objective, partial_objective};
 
 #[derive(Builder)]
@@ -53,19 +51,23 @@ impl Expression for ExpressionT {
     }
 
     fn infer(&mut self) -> Result<(), Error> {
-        let codebook = Codebook::from_file(&self.codebook_path()).unwrap();
-        let codewords: HashSet<usize> = codebook.features().map(|feature| {
-            let feature_id = codebook.get_id(feature);
-            let idx: usize = codebook.record(feature_id).codeword()
-                .iter().rev().enumerate().map(|(i, bit)| (bit as usize) << i).sum();
-            idx
-        }).collect();
-        let mut non_codewords: HashSet<usize> = (0..NUM_CODES).collect();
-        for cw in &codewords {
-            non_codewords.remove(cw);
-        }
-        let non_codewords = Vec::from_iter(non_codewords.iter().cloned());
+        let codebook = SimpleCodebook::from_file(&self.codebook_path()).unwrap();
 
+        let unexpressed_codewords: Vec<u16> = codebook.records()
+            .iter()
+            .filter(|&r| !r.expressed())
+            .map(|r| r.codeword())
+            .collect();
+        let y_ind: Vec<usize> = unexpressed_codewords.iter().map(|&v| v as usize).collect();
+
+        let expressed_codewords: HashSet<usize> = codebook.records().iter().filter(|r| r.expressed()).map(|r| r.codeword() as usize).collect();
+        let unexpressed_codewords: HashSet<usize> = codebook.records().iter().filter(|r| !r.expressed()).map(|r| r.codeword() as usize).collect();
+        let mut unused_codewords: HashSet<usize> = (0..NUM_CODES).collect();
+        for cw in &expressed_codewords {
+            unused_codewords.remove(cw);
+        }
+        let non_codewords = Vec::from_iter(unused_codewords.iter().cloned());
+//        let non_codewords = Vec::from_iter(unexpressed_codewords.iter().cloned());
         let raw_counts = &self.raw_counts;
         let corrected_counts = &self.corrected_counts;
         let max_hamming_distance = self.max_hamming_distance;
@@ -118,7 +120,7 @@ impl Expression for ExpressionT {
                     fix(&mut x, &non_codewords);
 
                     println!("Estimating positional error probabilities via GD");
-                    e = estimate_errors(x.view(), yv, &e, hamming_dist).expect("Failed estimating errors");
+                    e = estimate_errors(x.view(), yv, &y_ind[..], &e, hamming_dist).expect("Failed estimating errors");
                     dbg!(&e);
 
                     println!("Constructing CSR transition matrix");
@@ -141,7 +143,7 @@ impl Expression for ExpressionT {
                     fix(&mut x, &non_codewords);
 
                     println!("Estimating positional error probabilities via GD");
-                    e = estimate_errors(x.view(), yv, &e, hamming_dist).expect("Failed estimating errors");
+                    e = estimate_errors(x.view(), yv, &y_ind[..], &e, hamming_dist).expect("Failed estimating errors");
                     dbg!(&e);
                 }
             }
@@ -188,37 +190,37 @@ fn fix(x: &mut Expr, non_codewords: &[usize]) {
 impl ExpressionT {
     pub fn load_counts<'a, R>(&mut self, reader: &'a mut R, format: merfishdata::Format) -> Result<(), Error>
         where R: crate::io::merfishdata::Reader<'a> {
-        let codebook = &crate::io::codebook::Codebook::from_file(&self.codebook_path())?;
+        let codebook = &crate::io::simple_codebook::SimpleCodebook::from_file(&self.codebook_path())?;
 
         let mut corrected_counts: HashMap<String, HashMap<u16, usize>> = HashMap::new();
         let mut raw_counts: HashMap<String, HashMap<u16, usize>> = HashMap::new();
 
         let mut rng = StdRng::seed_from_u64(self.seed);
 
-        let codewords: Vec<u16> = codebook.records()
-            .iter()
-            .map(|r| r.codeword().iter().rev().enumerate().map(|(i, bit)| (bit as u16) << i).sum())
-            .collect();
+//        let codewords: Vec<u16> = codebook.records()
+//            .iter()
+//            .map(|r| r.codeword().iter().rev().enumerate().map(|(i, bit)| (bit as u16) << i).sum())
+//            .collect();
         let expressed_codewords: Vec<u16> = codebook.records()
             .iter()
             .filter(|&r| r.expressed())
-            .map(|r| r.codeword().iter().rev().enumerate().map(|(i, bit)| (bit as u16) << i).sum())
+            .map(|r| r.codeword())
             .collect();
         let unexpressed_codewords: Vec<u16> = codebook.records()
             .iter()
             .filter(|&r| !r.expressed())
-            .map(|r| r.codeword().iter().rev().enumerate().map(|(i, bit)| (bit as u16) << i).sum())
+            .map(|r| r.codeword())
             .collect();
 
         for rec in reader.records() {
             let record = rec?;
-            if !self.cells().is_match(&record.cell_name()) && codebook.contains(&record.feature_name()) {
-                continue;
-            }
-            if !codebook.record(record.feature_id() as usize).expressed() {
-                continue;
-            }
-            let barcode = record.barcode(Some(codebook));
+//            if !self.cells().is_match(&record.cell_name()) && codebook.contains(&record.feature_name()) {
+//                continue;
+//            }
+//            if !codebook.record(record.feature_id() as usize).expressed() {
+//                continue;
+//            }
+            let barcode = record.barcode(None);
             let mut raw_barcode = barcode;
             let mut uncorrected_barcode = barcode;
             match format {
@@ -229,7 +231,7 @@ impl ExpressionT {
                     if record.hamming_dist() == 1 {
                         let closest: Vec<u16> = expressed_codewords.iter()
                             .map(|&cw| (cw, hamming_distance16(cw as usize, raw_barcode as usize)))
-                            .filter(|(cw, d)| *d == 1)
+                            .filter(|(_cw, d)| *d == 1)
                             .map(|(cw, _)| cw)
                             .collect();
                         if closest.len() == 1 {
@@ -267,13 +269,14 @@ impl ExpressionT {
             }
 
             // TODO build Map<Cell, Map<Barcode, Count>>
+            let count = record.count();
             let cell_counts_corrected = corrected_counts.entry(record.cell_name()).or_insert_with(HashMap::new);
             let feature_counts_corrected = cell_counts_corrected.entry(raw_barcode).or_insert(0);
-            *feature_counts_corrected += 1;
+            *feature_counts_corrected += count;
 
             let cell_counts_raw = raw_counts.entry(record.cell_name()).or_insert_with(HashMap::new);
             let feature_counts_raw = cell_counts_raw.entry(uncorrected_barcode).or_insert(0);
-            *feature_counts_raw += 1;
+            *feature_counts_raw += count;
         }
         self.corrected_counts = corrected_counts;
         self.raw_counts = raw_counts;
@@ -289,7 +292,8 @@ fn _gradient_descent_hardcoded(e: &mut Errors,
                                max_hamming_distance: usize,
                                min_iter: usize,
                                max_iter: usize,
-                               x_ind: &[usize]) -> (Errors, f32, usize) {
+                               x_ind: &[usize],
+                               y_ind: &[usize]) -> (Errors, f32, usize) {
     let mut gradient: Errors = [[0.; NUM_BITS]; 2];
     let e0 = e;
     let alpha0 = alpha;
@@ -299,12 +303,12 @@ fn _gradient_descent_hardcoded(e: &mut Errors,
         println!("Calculating gradient...");
         (0..2).for_each(|kind| {
             (0..NUM_BITS).for_each(|pos| {
-                let grad_value = partial_objective(x, y, &e0, pos, kind, max_hamming_distance, x_ind);
+                let grad_value = partial_objective(x, y, &e0, pos, kind, max_hamming_distance, x_ind, y_ind);
                 gradient[kind][pos] = grad_value;
             });
         });
         println!("Estimating stepsize...");
-        let o2 = objective(x, y, &e0, max_hamming_distance, x_ind);
+        let o2 = objective(x, y, &e0, max_hamming_distance, x_ind, y_ind);
         // gradv → descent direction: -partial_objective^T · partial_objective
         let gradv = -gradient.iter().flatten().map(|g: &f32| g.powi(2)).sum::<f32>();
 //        dbg!(&gradient);
@@ -322,7 +326,7 @@ fn _gradient_descent_hardcoded(e: &mut Errors,
                 }
             }
             // e1 = e0 + alpha · gradv
-            let o1 = objective(x, y, &e1, max_hamming_distance, x_ind);
+            let o1 = objective(x, y, &e1, max_hamming_distance, x_ind, y_ind);
             let o2 = o2 + c1 * alpha * gradv;
             // armijo rule →  f(e0 + alpha · gradv) <= f(e0) + c1 · alpha · gradv?
             if o1 <= o2 {
@@ -356,12 +360,12 @@ fn _gradient_descent_hardcoded(e: &mut Errors,
     return (*e0, std::f32::INFINITY, max_iter);
 }
 
-pub fn estimate_errors(x: ExprV, y: ExprV, e: &Errors, max_hamming_distance: usize) -> Result<Errors, ()> {
+pub fn estimate_errors(x: ExprV, y: ExprV, y_ind: &[usize], e: &Errors, max_hamming_distance: usize) -> Result<Errors, ()> {
     let x_ind: Vec<usize> = x.iter().enumerate().filter(|&(i, &v)| v != 0.).map(|(i, _)| i).collect();
     let max_iter = 256;
     let mut e0 = [[0.; NUM_BITS], [0.; NUM_BITS]];
     e0.clone_from_slice(e);
-    let (e, _error, num_iters) = _gradient_descent_hardcoded(&mut e0, y, x, 0.0007, 1., max_hamming_distance, 4, max_iter, &x_ind[..]);
+    let (e, _error, num_iters) = _gradient_descent_hardcoded(&mut e0, y, x, 0.0007, 1., max_hamming_distance, 4, max_iter, &x_ind[..], &y_ind[..]);
     if num_iters == max_iter {
         Result::Err(())
     } else {

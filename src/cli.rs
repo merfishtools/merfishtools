@@ -24,7 +24,6 @@ use crate::model::bayes;
 use crate::model::bayes::cv::CV;
 use crate::model::bayes::foldchange::LogFC;
 use crate::model::bayes::readout::Counts;
-use std::collections::HashMap;
 
 pub struct Selection {
     pub expmnt: String,
@@ -160,7 +159,7 @@ impl Expression for ExpressionJ {
 }
 
 impl ExpressionJ {
-    pub fn load_counts<'a, R>(&mut self, reader: &'a mut R, format: crate::io::merfishdata::Format) -> Result<(), Error>
+    pub fn load_counts<'a, R>(&mut self, reader: &'a mut R, _format: crate::io::merfishdata::Format) -> Result<(), Error>
         where
             R: io::merfishdata::Reader<'a>,
     {

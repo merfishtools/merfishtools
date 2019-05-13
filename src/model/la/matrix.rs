@@ -1,12 +1,13 @@
-use crate::model::la::common::{Errors, NUM_BITS, NUM_CODES, Expr, ExprV, ExprVMut};
-use crate::model::la::hamming::hamming_distance16;
-use crate::model::la::problem::prob;
-use ndarray::{Array1, Axis, ArrayView1};
+use std::ops::Mul;
+
+use ndarray::{Array1, ArrayView1, Axis};
 use ndarray::prelude::*;
 use ndarray_parallel::*;
 use rayon::prelude::*;
-use std::ops::Mul;
-use rand::prelude::*;
+
+use crate::model::la::common::{Errors, Expr, ExprV, NUM_BITS, NUM_CODES};
+use crate::model::la::hamming::hamming_distance16;
+use crate::model::la::problem::prob;
 
 // NNZ = {i: num_entries(i) for i in range(2, 16 + 1)}
 // Pre-calculate the number of nonzero entries for CSR representation
@@ -95,7 +96,7 @@ macro_rules! impl_mul_arr {
                             .map(|k| self.data[k] * rhs[self.columns[k]])
                             .sum::<f32>();
                         // v is actually a single value
-                        v.mapv_inplace(|s| x);
+                        v.mapv_inplace(|_s| x);
                 });
                 result
             }
@@ -245,7 +246,7 @@ pub fn error_successive_overrelaxation(e: &Errors,
                 .map(|col| prob(row, col, e) * x[col])
                 .sum();
             let diag = prob(row, row, e);
-            x[row] = ((1. - w) * x[row] + (w / diag) * (y[row] - sigma));
+            x[row] = (1. - w) * x[row] + (w / diag) * (y[row] - sigma);
         }
         error = rmse(error_dot(e, x.view(), max_hamming_distance).view(), y.view());
         if error < eps {

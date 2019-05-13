@@ -74,7 +74,7 @@ merfishtools exp codebook.txt < data.txt > expression.txt"
         p0: Vec<f64>,
 
         /// Prior probability of 1->0 error
-        #[structopt(long, default_value = "0.10", value_name = "FLOAT", multiple = true)]
+        #[structopt(long, default_value = "0.04", value_name = "FLOAT", multiple = true)]
         p1: Vec<f64>,
 
         /// Regular expression to select cells from cell column (see above).

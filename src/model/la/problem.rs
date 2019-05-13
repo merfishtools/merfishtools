@@ -1,6 +1,7 @@
-use crate::model::la::common::{Errors, NUM_BITS, NUM_CODES, ExprV};
-use crate::model::la::hamming::hamming_distance16;
 use rayon::prelude::*;
+
+use crate::model::la::common::{Errors, ExprV, NUM_BITS};
+use crate::model::la::hamming::hamming_distance16;
 
 fn _prob(i: usize, j: usize, k: usize, e: &Errors) -> f32 {
     let i_k = (i >> k) & 1; // kth bit in barcode i
@@ -37,9 +38,11 @@ pub fn objective(
     e: &Errors,
     max_hamming_distance: usize,
     x_ind: &[usize],
+    y_ind: &[usize],
 ) -> f32 {
-    let r: f32 = (0..NUM_CODES)
+    let r: f32 = y_ind
         .into_par_iter()
+        .cloned()
         .map(|k| {
             let s: f32 = x_ind
                 .iter()
@@ -61,9 +64,11 @@ pub fn partial_objective(
     kind: usize,
     max_hamming_distance: usize,
     x_ind: &[usize],
+    y_ind: &[usize],
 ) -> f32 {
-    let r: f32 = (0..NUM_CODES)
+    let r: f32 = y_ind
         .into_par_iter()
+        .cloned()
         .map(|k| {
             let (f, g) = x_ind
                 .iter()
