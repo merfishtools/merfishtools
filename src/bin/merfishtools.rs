@@ -307,6 +307,10 @@ enum ExpressionMode {
         #[structopt(long, short = "o", value_name = "TSV-FILE")]
         estimate: Option<String>,
 
+        /// Path to write estimated transition probabilities to.
+        #[structopt(long, short = "e", value_name = "TSV-FILE")]
+        errors: Option<String>,
+
         /// Whether to use absolute counts or relative frequencies
         #[structopt(long, short = "a")]
         absolute: bool
@@ -444,6 +448,7 @@ fn main() -> Result<(), Error> {
                 ExpressionMode::LA {
                     max_hamming_distance,
                     estimate,
+                    errors,
                     mode,
                     absolute,
                 } => {
@@ -453,6 +458,7 @@ fn main() -> Result<(), Error> {
                             .p1(convert_err_rates(p1))
                             .codebook_path(codebook.to_owned())
                             .estimate_path(estimate.map(|v| v.to_owned()))
+                            .errors_path(errors.map(|v| v.to_owned()))
                             .threads(threads)
                             .cells(Regex::new(&cells)?)
                             .max_hamming_distance(max_hamming_distance) // TODO introduce mhd option

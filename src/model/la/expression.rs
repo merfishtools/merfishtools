@@ -42,6 +42,7 @@ pub struct ExpressionT {
     p1: Vec<Prob>,
     codebook_path: String,
     estimate_path: Option<String>,
+    errors_path: Option<String>,
     threads: usize,
     cells: Regex,
     bits: usize,
@@ -186,13 +187,15 @@ impl Expression for ExpressionT {
                 x = estimate_expression(&mat, x.view(), y.view(), max_hamming_distance, false).expect("Failed estimating expression");
                 fix(&mut x, &non_codewords);
                 x *= magnitude_x;
-                let records: Vec<RecordEstimate> = x.iter().enumerate().filter(|(_, &v)| v > 0.).map(|(i, &v)| RecordEstimate::new(cell.to_owned(), i as u16, v)).collect();
-                records
+                x.iter().enumerate().filter(|(_, &v)| v > 0.).map(|(i, &v)| RecordEstimate::new(cell.to_owned(), i as u16, v)).collect::<Vec<RecordEstimate>>()
             }).collect();
         if let Some(mut writer) = estimate_writer {
             for r in all_records {
                 writer.serialize(r)?;
             }
+        }
+        if let Some(errors_path) = &self.errors_path {
+            std::fs::write(errors_path, format!("{:?}", &e))?;
         }
 
         Ok(())
@@ -248,14 +251,18 @@ impl ExpressionT {
                 // i.e. no 1-bit error correction has been performed
                 // ... so we do that now, if at all possible
                 merfishdata::Format::Simulation => {
-                    if record.hamming_dist() == 1 {
-                        let closest: Vec<u16> = expressed_codewords.iter()
-                            .map(|&cw| (cw, hamming_distance16(cw as usize, raw_barcode as usize)))
-                            .filter(|(_cw, d)| *d == 1)
-                            .map(|(cw, _)| cw)
-                            .collect();
-                        if closest.len() == 1 {
-                            raw_barcode = closest[0];
+                    for dist in 1..=4u8 {
+                        if record.hamming_dist() == dist {
+                            let closest: Vec<u16> = expressed_codewords.iter()
+                                .map(|&cw| (cw, hamming_distance16(cw as usize, raw_barcode as usize)))
+                                .filter(|(_cw, d)| *d == dist as usize)
+                                .map(|(cw, _)| cw)
+                                .collect();
+                            if closest.len() == 1 {
+                                dbg!("FOUND ONE!");
+                                raw_barcode = closest[0];
+                                break;
+                            }
                         }
                     }
                 }
