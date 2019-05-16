@@ -330,15 +330,15 @@ fn _gradient_descent_hardcoded(e: &mut Errors,
     let mut last_err = f32::infinity();
     let mut alpha1 = alpha;
     for i in 0..max_iter {
-        println!("Calculating gradient...");
+//        println!("Calculating gradient...");
         (0..2).for_each(|kind| {
             (0..NUM_BITS).for_each(|pos| {
                 let grad_value = partial_objective(x, y, &e0, pos, kind, max_hamming_distance, x_ind, y_ind);
                 gradient[kind][pos] = grad_value;
             });
         });
-        dbg!(&gradient);
-        println!("Estimating stepsize...");
+//        dbg!(&gradient);
+//        println!("Estimating stepsize...");
         let o2 = objective(x, y, &e0, max_hamming_distance, x_ind, y_ind);
         // gradv → descent direction: -partial_objective^T · partial_objective
         let gradv = -gradient.iter().flatten().map(|g: &f32| g.powi(2)).sum::<f32>();
@@ -386,7 +386,7 @@ fn _gradient_descent_hardcoded(e: &mut Errors,
 //        println!("{:?}", &e0);
         let err = (gradient.iter().flatten().map(|g: &f32| g.powi(2)).sum::<f32>() / (gradient.len() as f32)).sqrt();
 //        let err = objective(x, y, &e0, max_hamming_distance, x_ind);
-        println!("{}: {:e}\t{:?}", i, err, alpha);
+//        println!("{}: {:e}\t{:?}", i, err, alpha);
 //        dbg!(&e0);
         if i >= min_iter {
             if last_err < err {
