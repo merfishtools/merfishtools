@@ -101,9 +101,11 @@ impl Expression for ExpressionT {
                 x_est[barcode as usize] += count as f32;
             }
         }
+        let uniform = rand::distributions::Uniform::new(0f32, 1.);
+        let mut rng = StdRng::seed_from_u64(self.seed);
         for (_cell, feature_counts) in raw_counts {
             for (&barcode, &count) in feature_counts {
-                y[barcode as usize] += count as f32;
+                y[barcode as usize] += count as f32 + rng.sample(&uniform);
             }
         }
 
