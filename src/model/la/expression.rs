@@ -125,36 +125,40 @@ impl Expression for ExpressionT {
             Mode::ErrorsThenExpression => {
                 for hamming_dist in 1..=max_hamming_distance {
                     println!("\n=== {:?} ===", hamming_dist);
+                    let num_repeat_iters = if hamming_dist == max_hamming_distance { 4 } else { 1 };
+                    for _ in 0..num_repeat_iters {
+                        // set < 0. to 0., set non_codewords to 0., normalize to 1
+                        fix(&mut x, &non_codewords);
 
-                    // set < 0. to 0., set non_codewords to 0., normalize to 1
-                    fix(&mut x, &non_codewords);
+                        println!("Estimating positional error probabilities via GD");
+                        e = estimate_errors(x.view(), yv, &y_ind[..], &e, hamming_dist).expect("Failed estimating errors");
+                        dbg!(&e);
 
-                    println!("Estimating positional error probabilities via GD");
-                    e = estimate_errors(x.view(), yv, &y_ind[..], &e, hamming_dist).expect("Failed estimating errors");
-                    dbg!(&e);
+                        println!("Constructing CSR transition matrix");
+                        let mat = csr_error_matrix(&e, hamming_dist.max(2));
 
-                    println!("Constructing CSR transition matrix");
-                    let mat = csr_error_matrix(&e, hamming_dist.max(2));
-
-                    println!("Estimating true expression via SOR");
-                    x = estimate_expression(&mat, x.view(), yv, hamming_dist, false).expect("Failed estimating expression");
+                        println!("Estimating true expression via SOR");
+                        x = estimate_expression(&mat, x.view(), yv, hamming_dist, false).expect("Failed estimating expression");
+                    }
                 }
             }
             Mode::ExpressionThenErrors => {
                 for hamming_dist in 1..=max_hamming_distance {
                     println!("\n=== {:?} ===", hamming_dist);
+                    let num_repeat_iters = if hamming_dist == max_hamming_distance { 4 } else { 1 };
+                    for _ in 0..num_repeat_iters {
+                        println!("Constructing CSR transition matrix");
+                        let mat = csr_error_matrix(&e, hamming_dist.max(2));
 
-                    println!("Constructing CSR transition matrix");
-                    let mat = csr_error_matrix(&e, hamming_dist.max(2));
+                        println!("Estimating true expression via SOR");
+                        fix(&mut x, &non_codewords);
+                        x = estimate_expression(&mat, x.view(), yv, hamming_dist, false).expect("Failed estimating expression");
+                        fix(&mut x, &non_codewords);
 
-                    println!("Estimating true expression via SOR");
-                    fix(&mut x, &non_codewords);
-                    x = estimate_expression(&mat, x.view(), yv, hamming_dist, false).expect("Failed estimating expression");
-                    fix(&mut x, &non_codewords);
-
-                    println!("Estimating positional error probabilities via GD");
-                    e = estimate_errors(x.view(), yv, &y_ind[..], &e, hamming_dist).expect("Failed estimating errors");
-                    dbg!(&e);
+                        println!("Estimating positional error probabilities via GD");
+                        e = estimate_errors(x.view(), yv, &y_ind[..], &e, hamming_dist).expect("Failed estimating errors");
+                        dbg!(&e);
+                    }
                 }
             }
         };
