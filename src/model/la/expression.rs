@@ -125,7 +125,7 @@ impl Expression for ExpressionT {
             Mode::ErrorsThenExpression => {
                 for hamming_dist in 1..=max_hamming_distance {
                     println!("\n=== {:?} ===", hamming_dist);
-                    let num_repeat_iters = if hamming_dist == max_hamming_distance { 4 } else { 1 };
+                    let num_repeat_iters = if hamming_dist == max_hamming_distance { 3 } else { 1 };
                     for _ in 0..num_repeat_iters {
                         // set < 0. to 0., set non_codewords to 0., normalize to 1
                         fix(&mut x, &non_codewords);
@@ -145,7 +145,7 @@ impl Expression for ExpressionT {
             Mode::ExpressionThenErrors => {
                 for hamming_dist in 1..=max_hamming_distance {
                     println!("\n=== {:?} ===", hamming_dist);
-                    let num_repeat_iters = if hamming_dist == max_hamming_distance { 4 } else { 1 };
+                    let num_repeat_iters = if hamming_dist == max_hamming_distance { 3 } else { 1 };
                     for _ in 0..num_repeat_iters {
                         println!("Constructing CSR transition matrix");
                         let mat = csr_error_matrix(&e, hamming_dist.max(2));
