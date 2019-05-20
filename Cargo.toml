@@ -43,12 +43,16 @@ derive-new = "0.5"
 num-traits = "0.2"
 
 [features]
-14bits = []
+14bit = []
 
 [[bin]]
-name="merfishtools14"
-path="src/bin/merfishtools.rs"
-required-features = ["14bits"]
+name="barnacleboy14"
+path="src/bin/barnacleboy.rs"
+required-features = ["14bit"]
+
+[[bin]]
+name="barnacleboy"
+path="src/bin/barnacleboy.rs"
 
 [[bin]]
 name="merfishtools"

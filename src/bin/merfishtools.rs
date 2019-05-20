@@ -5,8 +5,6 @@
 
 use bio::stats::Prob;
 use clap::AppSettings::{ColoredHelp, DeriveDisplayOrder};
-use clap::_clap_count_exprs;
-use clap::arg_enum;
 use failure::Error;
 use itertools::Itertools;
 use ordered_float::NotNaN;
@@ -85,8 +83,21 @@ merfishtools exp codebook.txt < data.txt > expression.txt"
         #[structopt(long, short, default_value = "1", value_name = "INT")]
         threads: usize,
 
-        #[structopt(subcommand)]
-        mode: ExpressionMode,
+        /// Width of the window to calculate PMF for.
+        #[structopt(long, default_value = "100", value_name = "INT")]
+        pmf_window_width: u32,
+
+        /// Path to write expected value and standard deviation estimates of expression to.
+        ///
+        /// Output is formatted into columns: cell, feature, expected value, standard deviation
+        #[structopt(long, value_name = "TSV-FILE")]
+        estimate: Option<String>,
+
+        /// Path to write global statistics per cell to.
+        ///
+        /// Output is formatted into columns: cell, noise-rate
+        #[structopt(long, value_name = "TSV-FILE")]
+        stats: Option<String>,
     },
 
     #[structopt(
@@ -261,115 +272,6 @@ codeword"
         /// misidentification probes.
         not_expressed: Option<String>,
     },
-    #[structopt(name = "simulate", about = "Generate raw merfish data")]
-    Simulation {
-        #[structopt(long, value_name = "INT")]
-        seed: Option<u64>,
-
-        #[structopt(subcommand)]
-        mode: SimulationMode,
-    },
-}
-
-#[derive(StructOpt)]
-enum ExpressionMode {
-    Bayes {
-        /// Width of the window to calculate PMF for.
-        #[structopt(long, default_value = "100", value_name = "INT")]
-        pmf_window_width: u32,
-
-        /// Path to write expected value and standard deviation estimates of expression to.
-        ///
-        /// Output is formatted into columns: cell, feature, expected value, standard deviation
-        #[structopt(long, value_name = "TSV-FILE")]
-        estimate: Option<String>,
-
-        /// Path to write global statistics per cell to.
-        ///
-        /// Output is formatted into columns: cell, noise-rate
-        #[structopt(long, value_name = "TSV-FILE")]
-        stats: Option<String>,
-    },
-    LA {
-        /// bla
-        #[structopt(long, short = "d", value_name = "INT", default_value = "3")]
-        max_hamming_distance: usize,
-
-        #[structopt(long, short = "w", value_name = "FLOAT", default_value = "1.25")]
-        omega: f32,
-
-        /// bla
-        #[structopt(long, short = "m", default_value = "ErrorsThenExpression",
-        raw(possible_values = "&merfishtools::model::la::expression::Mode::variants()"),
-        case_insensitive = true)]
-        mode: merfishtools::model::la::expression::Mode,
-
-        /// Path to write expected value of expression to.
-        ///
-        /// Output is formatted into columns: cell, feature, expected value
-        #[structopt(long, short = "o", value_name = "TSV-FILE")]
-        estimate: Option<String>,
-
-        /// Path to write estimated transition probabilities to.
-        #[structopt(long, short = "e", value_name = "TSV-FILE")]
-        errors: Option<String>,
-
-    },
-}
-
-#[derive(StructOpt)]
-enum SimulationMode {
-    #[structopt(name = "raw")]
-    Raw {
-        #[structopt(value_name = "NUM BITS")]
-        bits: u8,
-
-        #[structopt(value_name = "HAMMING DISTANCE")]
-        min_hamming_distance: u8,
-
-        #[structopt(long, short = "-o", value_name = "FILE")]
-        raw_expression_path: Option<String>,
-
-        #[structopt(long, short = "s", value_name = "SET BITS")]
-        set_bits: Option<u8>,
-
-        #[structopt(long, short = "c", value_name = "INT")]
-        num_cells: Option<usize>,
-
-        #[structopt(long, short = "b", value_name = "INT")]
-        num_barcodes: Option<usize>,
-
-        #[structopt(long, short = "l", value_name = "FLOAT", default_value = "50.")]
-        lambda: f64,
-    },
-    #[structopt(name = "observed")]
-    Observed {
-        #[structopt(long, short = "i", value_name = "FILE")]
-        raw_expression_path: Option<String>,
-
-        #[structopt(long, short = "o", value_name = "FILE")]
-        ecc_expression_path: Option<String>,
-
-        /// Prior probability of 0->1 error
-        #[structopt(long, default_value = "0.04", value_name = "FLOAT", multiple = true)]
-        p0: Vec<f64>,
-
-        /// Prior probability of 1->0 error
-        #[structopt(long, default_value = "0.10", value_name = "FLOAT", multiple = true)]
-        p1: Vec<f64>,
-
-        /// TODO whether to group or split by readout
-        #[structopt(long, short = "g")]
-        group: bool,
-    },
-}
-
-arg_enum! {
-    #[derive(Debug)]
-    enum Mode {
-        Bayes,
-        LA,
-    }
 }
 
 #[allow(non_snake_case)]
@@ -407,8 +309,10 @@ fn main() -> Result<(), Error> {
             p0,
             p1,
             cells,
-            mode,
             threads,
+            estimate,
+            stats,
+            pmf_window_width
         } => {
             let convert_err_rates = |values: Vec<f64>| match values.len() {
                 1 => vec![Prob::checked(values[0]).unwrap(); 32],
@@ -417,69 +321,27 @@ fn main() -> Result<(), Error> {
                     .map(|p| Prob::checked(p).unwrap())
                     .collect_vec(),
             };
-            match mode {
-                ExpressionMode::Bayes {
-                    estimate,
-                    stats,
-                    pmf_window_width
-                } => {
-                    let mut expression = cli::ExpressionJBuilder::default()
-                        .p0(convert_err_rates(p0))
-                        .p1(convert_err_rates(p1))
-                        .codebook_path(codebook.to_owned())
-                        .estimate_path(estimate.map(|v| v.to_owned()))
-                        .stats_path(stats.map(|v| v.to_owned()))
-                        .threads(threads)
-                        .cells(Regex::new(&cells)?)
-                        .window_width(pmf_window_width)
-                        .seed(seed)
-                        .build()
-                        .unwrap();
-                    match merfishdata::Format::from_path(&raw_data) {
-                        merfishdata::Format::Binary => expression
-                            .load_counts(&mut merfishdata::binary::Reader::from_file(&raw_data)?, merfishdata::Format::Binary)?,
-                        merfishdata::Format::TSV => expression
-                            .load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?, merfishdata::Format::TSV)?,
-                        merfishdata::Format::Simulation => expression
-                            .load_counts(&mut merfishdata::sim::Reader::from_file(&raw_data)?, merfishdata::Format::Simulation)?,
-                    }
-                    expression.infer()
-                }
-                ExpressionMode::LA {
-                    max_hamming_distance,
-                    estimate,
-                    omega,
-                    errors,
-                    mode,
-                } => {
-                    let mut expression =
-                        merfishtools::model::la::expression::ExpressionTBuilder::default()
-                            .p0(convert_err_rates(p0))
-                            .p1(convert_err_rates(p1))
-                            .codebook_path(codebook.to_owned())
-                            .estimate_path(estimate.map(|v| v.to_owned()))
-                            .errors_path(errors.map(|v| v.to_owned()))
-                            .threads(threads)
-                            .cells(Regex::new(&cells)?)
-                            .max_hamming_distance(max_hamming_distance) // TODO introduce mhd option
-                            .bits(16)
-                            .mode(mode)
-                            .omega(omega)
-                            .seed(seed)
-                            .build()
-                            .unwrap();
-                    match merfishdata::Format::from_path(&raw_data) {
-                        merfishdata::Format::Binary => expression
-                            .load_counts(&mut merfishdata::binary::Reader::from_file(&raw_data)?, merfishdata::Format::Binary)?,
-                        merfishdata::Format::TSV => expression
-                            .load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?, merfishdata::Format::TSV)?,
-                        merfishdata::Format::Simulation => expression
-                            .load_counts(&mut merfishdata::sim::Reader::from_file(&raw_data)?, merfishdata::Format::Simulation)?,
-                    }
-
-                    expression.infer()
-                }
+            let mut expression = cli::ExpressionJBuilder::default()
+                .p0(convert_err_rates(p0))
+                .p1(convert_err_rates(p1))
+                .codebook_path(codebook.to_owned())
+                .estimate_path(estimate.map(|v| v.to_owned()))
+                .stats_path(stats.map(|v| v.to_owned()))
+                .threads(threads)
+                .cells(Regex::new(&cells)?)
+                .window_width(pmf_window_width)
+                .seed(seed)
+                .build()
+                .unwrap();
+            match merfishdata::Format::from_path(&raw_data) {
+                merfishdata::Format::Binary => expression
+                    .load_counts(&mut merfishdata::binary::Reader::from_file(&raw_data)?, merfishdata::Format::Binary)?,
+                merfishdata::Format::TSV => expression
+                    .load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?, merfishdata::Format::TSV)?,
+                merfishdata::Format::Simulation => expression
+                    .load_counts(&mut merfishdata::sim::Reader::from_file(&raw_data)?, merfishdata::Format::Simulation)?,
             }
+            expression.infer()
         }
 
         Command::DifferentialExpression {
@@ -531,48 +393,5 @@ fn main() -> Result<(), Error> {
             let not_expressed_pattern = not_expressed.as_ref().map(String::as_ref);
             cli::gen_codebook(&words, not_expressed_pattern)
         }
-        Command::Simulation { seed, mode } => match mode {
-            SimulationMode::Raw {
-                bits,
-                min_hamming_distance,
-                raw_expression_path,
-                set_bits,
-                num_cells,
-                num_barcodes,
-                lambda,
-            } => merfishtools::simulation::simulate_raw_counts(
-                bits,
-                min_hamming_distance,
-                raw_expression_path,
-                set_bits,
-                num_cells,
-                num_barcodes,
-                lambda,
-                seed,
-            ),
-            SimulationMode::Observed {
-                raw_expression_path,
-                ecc_expression_path,
-                p0,
-                p1,
-                group,
-            } => {
-                let convert_err_rates = |values: Vec<f64>| match values.len() {
-                    1 => vec![Prob::checked(values[0]).unwrap().0; 16],
-                    _ => values
-                        .into_iter()
-                        .map(|p| Prob::checked(p).unwrap().0)
-                        .collect_vec(),
-                };
-                merfishtools::simulation::simulate_observed_counts(
-                    raw_expression_path,
-                    ecc_expression_path,
-                    convert_err_rates(p0),
-                    convert_err_rates(p1),
-                    true,  // FIXME use group instead.
-                    seed,
-                )
-            }
-        },
     }
 }

@@ -5,8 +5,7 @@ use ndarray::prelude::*;
 use ndarray_parallel::*;
 use rayon::prelude::*;
 
-use crate::model::la::common::{Errors, Expr, ExprV, NUM_BITS, NUM_CODES};
-use crate::model::la::hamming::hamming_distance16;
+use crate::model::la::common::{Errors, Expr, ExprV, NUM_BITS, NUM_CODES, hamming_distance};
 use crate::model::la::problem::prob;
 
 // NNZ = {i: num_entries(i) for i in range(2, 16 + 1)}
@@ -129,7 +128,7 @@ pub fn csr_error_matrix(e: &Errors, max_hamming_distance: usize) -> CSR {
     let mut global_inc = 0;
     (0..NUM_CODES).for_each(|i| {
         let mut col_inc = 0;
-        (0..NUM_CODES).filter(|&j| hamming_distance16(i, j) <= max_hamming_distance)
+        (0..NUM_CODES).filter(|&j| hamming_distance(i, j) <= max_hamming_distance)
             .for_each(|j| {
                 data[global_inc] = prob(j, i, e);
                 indices[global_inc] = j;
@@ -147,7 +146,7 @@ pub fn error_dot(e: &Errors, y: ArrayView1<f32>, max_hamming_distance: usize) ->
         .into_par_iter()
         .enumerate()
         .for_each(|(i, mut v)| {
-            (0..NUM_CODES).filter(|j| hamming_distance16(i, *j) <= max_hamming_distance)
+            (0..NUM_CODES).filter(|j| hamming_distance(i, *j) <= max_hamming_distance)
                 .for_each(|j| {
                     v.mapv_inplace(|_| prob(j, i, e) * y[j]);
                 });
@@ -242,7 +241,7 @@ pub fn error_successive_overrelaxation(e: &Errors,
     for it in 0..max_iter {
         for row in 0..nrows {
             let sigma: f32 = (0..NUM_CODES)
-                .filter(|&k| row != k && hamming_distance16(row, k) <= max_hamming_distance)
+                .filter(|&k| row != k && hamming_distance(row, k) <= max_hamming_distance)
                 .map(|col| prob(row, col, e) * x[col])
                 .sum();
             let diag = prob(row, row, e);

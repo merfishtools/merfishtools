@@ -1,10 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 
-use bio::stats::Prob;
 use clap::arg_enum;
 use failure::Error;
-use itertools::Itertools;
 use ndarray::prelude::*;
 use rand;
 use rand::distributions::WeightedIndex;
@@ -19,12 +17,10 @@ use crate::cli::Expression;
 use crate::io::merfishdata;
 use crate::io::merfishdata::MerfishRecord;
 use crate::io::simple_codebook::SimpleCodebook;
-use crate::model::la::common::{Errors, Expr, ExprV, NUM_BITS, NUM_CODES};
-use crate::model::la::hamming::hamming_distance16;
+use crate::model::la::common::{Errors, Expr, ExprV, NUM_BITS, NUM_CODES, hamming_distance};
 use crate::model::la::matrix::{CSR, csr_error_matrix, csr_successive_overrelaxation};
 use crate::model::la::problem::{objective, partial_objective};
 use crate::simulation::binary;
-use crate::io::codebook::Record;
 
 #[derive(Serialize, Deserialize, new)]
 pub struct RecordEstimate {
@@ -35,24 +31,21 @@ pub struct RecordEstimate {
     expression: f32,
 }
 
-#[derive(Builder)]
-#[builder(pattern = "owned")]
+#[derive(new)]
 pub struct ExpressionT {
-    p0: Vec<Prob>,
-    p1: Vec<Prob>,
+    p0: Vec<f64>,
+    p1: Vec<f64>,
     codebook_path: String,
     estimate_path: Option<String>,
     errors_path: Option<String>,
-    threads: usize,
     cells: Regex,
-    bits: usize,
     max_hamming_distance: usize,
     omega: f32,
     mode: Mode,
     seed: u64,
-    #[builder(setter(skip))]
+    #[new(default)]
     corrected_counts: HashMap<String, HashMap<u16, usize>>,
-    #[builder(setter(skip))]
+    #[new(default)]
     raw_counts: HashMap<String, HashMap<u16, usize>>,
 }
 
@@ -76,7 +69,7 @@ impl Expression for ExpressionT {
         let y_ind: Vec<usize> = unexpressed_codewords.iter().map(|&v| v as usize).collect();
 
         let expressed_codewords: HashSet<usize> = codebook.records().iter().filter(|r| r.expressed()).map(|r| r.codeword() as usize).collect();
-        let unexpressed_codewords: HashSet<usize> = codebook.records().iter().filter(|r| !r.expressed()).map(|r| r.codeword() as usize).collect();
+        let _unexpressed_codewords: HashSet<usize> = codebook.records().iter().filter(|r| !r.expressed()).map(|r| r.codeword() as usize).collect();
         let mut unused_codewords: HashSet<usize> = (0..NUM_CODES).collect();
         for cw in &expressed_codewords {
             unused_codewords.remove(cw);
@@ -109,8 +102,8 @@ impl Expression for ExpressionT {
             }
         }
 
-        let magnitude_x = x_est.sum();
-        fix(&mut x_est, &non_codewords);
+        let _magnitude_x = x_est.sum();
+        adjust(&mut x_est, &non_codewords);
         let magnitude_y = y.sum();
         y /= magnitude_y;
 
@@ -126,7 +119,7 @@ impl Expression for ExpressionT {
                     let num_repeat_iters = if hamming_dist == max_hamming_distance { 3 } else { 1 };
                     for _ in 0..num_repeat_iters {
                         // set < 0. to 0., set non_codewords to 0., normalize to 1
-                        fix(&mut x, &non_codewords);
+                        adjust(&mut x, &non_codewords);
 
                         println!("Estimating positional error probabilities via GD");
                         e = estimate_errors(x.view(), yv, &y_ind[..], &e, hamming_dist).expect("Failed estimating errors");
@@ -136,7 +129,7 @@ impl Expression for ExpressionT {
                         let mat = csr_error_matrix(&e, hamming_dist.max(2));
 
                         println!("Estimating true expression via SOR");
-                        x = estimate_expression(&mat, x.view(), yv, hamming_dist, w, false).expect("Failed estimating expression");
+                        x = estimate_expression(&mat, x.view(), yv, w, false).expect("Failed estimating expression");
                     }
                 }
             }
@@ -149,9 +142,9 @@ impl Expression for ExpressionT {
                         let mat = csr_error_matrix(&e, hamming_dist.max(2));
 
                         println!("Estimating true expression via SOR");
-                        fix(&mut x, &non_codewords);
-                        x = estimate_expression(&mat, x.view(), yv, hamming_dist, w, false).expect("Failed estimating expression");
-                        fix(&mut x, &non_codewords);
+                        adjust(&mut x, &non_codewords);
+                        x = estimate_expression(&mat, x.view(), yv, w, false).expect("Failed estimating expression");
+                        adjust(&mut x, &non_codewords);
 
                         println!("Estimating positional error probabilities via GD");
                         e = estimate_errors(x.view(), yv, &y_ind[..], &e, hamming_dist).expect("Failed estimating errors");
@@ -181,13 +174,13 @@ impl Expression for ExpressionT {
                 });
 
                 let magnitude_x = x.sum();
-                fix(&mut x, &non_codewords);
+                adjust(&mut x, &non_codewords);
                 let magnitude_y = y.sum();
 //                dbg!(magnitude_x);
 //                dbg!(magnitude_y);
                 y /= magnitude_y;
-                x = estimate_expression(&mat, x.view(), y.view(), max_hamming_distance, w, false).expect("Failed estimating expression");
-                fix(&mut x, &non_codewords);
+                x = estimate_expression(&mat, x.view(), y.view(), w, false).expect("Failed estimating expression");
+                adjust(&mut x, &non_codewords);
                 x *= magnitude_x;
                 x.iter().enumerate().filter(|(_, &v)| v > 0.).map(|(i, &v)| RecordEstimate::new(cell.to_owned(), i as u16, v)).collect::<Vec<RecordEstimate>>()
             }).collect();
@@ -204,7 +197,7 @@ impl Expression for ExpressionT {
     }
 }
 
-fn fix(x: &mut Expr, non_codewords: &[usize]) {
+fn adjust(x: &mut Expr, non_codewords: &[usize]) {
     x.iter_mut().filter(|&&mut v| v < 0.).for_each(|v| *v = 0.);
     for &cw in non_codewords {
         x[cw] = 0.;
@@ -222,16 +215,12 @@ impl ExpressionT {
 
         let mut rng = StdRng::seed_from_u64(self.seed);
 
-//        let codewords: Vec<u16> = codebook.records()
-//            .iter()
-//            .map(|r| r.codeword().iter().rev().enumerate().map(|(i, bit)| (bit as u16) << i).sum())
-//            .collect();
         let expressed_codewords: Vec<u16> = codebook.records()
             .iter()
             .filter(|&r| r.expressed())
             .map(|r| r.codeword())
             .collect();
-        let unexpressed_codewords: Vec<u16> = codebook.records()
+        let _unexpressed_codewords: Vec<u16> = codebook.records()
             .iter()
             .filter(|&r| !r.expressed())
             .map(|r| r.codeword())
@@ -250,13 +239,13 @@ impl ExpressionT {
             let mut uncorrected_barcode = barcode;
             match format {
                 // simulated data is perturbed ground truth data,
-                // i.e. no 1-bit error correction has been performed
+                // i.e. no error correction has been performed
                 // ... so we do that now, if at all possible
                 merfishdata::Format::Simulation => {
                     for dist in 1..=4u8 {
                         if record.hamming_dist() == dist {
                             let closest: Vec<u16> = expressed_codewords.iter()
-                                .map(|&cw| (cw, hamming_distance16(cw as usize, raw_barcode as usize)))
+                                .map(|&cw| (cw, hamming_distance(cw as usize, raw_barcode as usize)))
                                 .filter(|(_cw, d)| *d == dist as usize)
                                 .map(|(cw, _)| cw)
                                 .collect();
@@ -282,13 +271,13 @@ impl ExpressionT {
                                     .map(|i| {
                                         let bit = (barcode >> i) & 1;
                                         let p = match bit {
-                                            0 => &self.p0[i],
-                                            1 => &self.p1[i],
+                                            0 => self.p0[i],
+                                            1 => self.p1[i],
                                             _ => panic!("bug: bit can only be 0 or 1")
                                         };
-                                        p.0
+                                        p
                                     }).collect();
-                                let wc = WeightedIndex::new(&weights).unwrap();
+                                let wc = WeightedIndex::new(weights).unwrap();
                                 rng.sample(&wc) as u8
                             }
                         };
@@ -297,7 +286,6 @@ impl ExpressionT {
                 }
             }
 
-            // TODO build Map<Cell, Map<Barcode, Count>>
             let count = record.count();
             let cell_counts_corrected = corrected_counts.entry(record.cell_name()).or_insert_with(HashMap::new);
             let feature_counts_corrected = cell_counts_corrected.entry(raw_barcode).or_insert(0);
@@ -328,7 +316,7 @@ fn _gradient_descent_hardcoded(e: &mut Errors,
     let mult: f32 = 0.5;
     let c1: f32 = 1e-4;
     let mut last_err = f32::infinity();
-    let mut alpha1 = alpha;
+    let alpha1 = alpha;
     for i in 0..max_iter {
 //        println!("Calculating gradient...");
         (0..2).for_each(|kind| {
@@ -403,7 +391,7 @@ fn _gradient_descent_hardcoded(e: &mut Errors,
 }
 
 pub fn estimate_errors(x: ExprV, y: ExprV, y_ind: &[usize], e: &Errors, max_hamming_distance: usize) -> Result<Errors, ()> {
-    let x_ind: Vec<usize> = x.iter().enumerate().filter(|&(i, &v)| v != 0.).map(|(i, _)| i).collect();
+    let x_ind: Vec<usize> = x.iter().enumerate().filter(|&(_i, &v)| v != 0.).map(|(i, _)| i).collect();
     let max_iter = 256;
     let mut e0 = [[0.; NUM_BITS], [0.; NUM_BITS]];
     e0.clone_from_slice(e);
@@ -415,7 +403,7 @@ pub fn estimate_errors(x: ExprV, y: ExprV, y_ind: &[usize], e: &Errors, max_hamm
     }
 }
 
-pub fn estimate_expression(mat: &CSR, x_est: ExprV, y: ExprV, max_hamming_distance: usize, w: f32, keep_zeros: bool) -> Result<Expr, ()> {
+pub fn estimate_expression(mat: &CSR, x_est: ExprV, y: ExprV, w: f32, keep_zeros: bool) -> Result<Expr, ()> {
     if let Ok((x, _it, _err)) = csr_successive_overrelaxation(mat, y, x_est, w, 1e-7, 256, keep_zeros) {
         Ok(x)
     } else {
