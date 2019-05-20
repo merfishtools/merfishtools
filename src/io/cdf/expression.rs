@@ -13,7 +13,7 @@ use bio::stats::probs::cdf;
 use csv;
 use failure::Error;
 use itertools::Itertools;
-use ordered_float::NotNaN;
+use ordered_float::NotNan;
 
 use crate::model::bayes::expression::{CDF, NormalizedCDF};
 
@@ -93,7 +93,7 @@ impl<R: io::Read> Reader<R> {
             .group_by(|rec: &Record| (rec.cell.clone(), rec.feature.clone()));
         for ((_, feature), records) in &groups {
             let cdf = NormalizedCDF::from_cdf(records.map(|rec| cdf::Entry {
-                value: NotNaN::new(rec.expression).unwrap(),
+                value: NotNan::new(rec.expression).unwrap(),
                 prob: rec.prob,
             }));
             let cdfs = features.entry(feature).or_insert_with(Vec::new);

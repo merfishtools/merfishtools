@@ -1,14 +1,14 @@
-use ordered_float::NotNaN;
+use ordered_float::NotNan;
 
 use bio::stats::probs;
 
 use crate::model;
 
-pub type MeanExpression = NotNaN<f64>;
+pub type MeanExpression = NotNan<f64>;
 pub type CDF = probs::cdf::CDF<MeanExpression>;
 
 pub fn cdf(expression_cdfs: &[model::bayes::expression::NormalizedCDF], pseudocounts: f64) -> CDF {
-    let pseudocounts = NotNaN::new(pseudocounts).unwrap();
+    let pseudocounts = NotNan::new(pseudocounts).unwrap();
 
     if expression_cdfs.len() == 1 {
         let mut cdf = expression_cdfs[0].clone();

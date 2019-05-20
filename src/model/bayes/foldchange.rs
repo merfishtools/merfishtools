@@ -1,12 +1,12 @@
 use itertools::Itertools;
 use num::rational;
-use ordered_float::NotNaN;
+use ordered_float::NotNan;
 
 use bio::stats::probs;
 
 use crate::model;
 
-pub type LogFC = NotNaN<f64>;
+pub type LogFC = NotNan<f64>;
 pub type FC = rational::Ratio<u64>;
 
 pub type CDF = probs::cdf::CDF<LogFC>;
@@ -22,7 +22,7 @@ pub fn cdf(a: &model::bayes::expressionset::CDF, b: &model::bayes::expressionset
         for b in &b_pmf {
             let b_mean = *b.value;
             // the PMFs should not contain NaNs.
-            let log2fc = NotNaN::new((a_mean).log2() - (b_mean).log2()).unwrap();
+            let log2fc = NotNan::new((a_mean).log2() - (b_mean).log2()).unwrap();
             pmf.push(probs::cdf::Entry {
                 value: log2fc,
                 prob: a.prob + b.prob,

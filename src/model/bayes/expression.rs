@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ordered_float::NotNaN;
+use ordered_float::NotNan;
 
 use bio::stats::probs;
 use bio::stats::LogProb;
@@ -8,7 +8,7 @@ use crate::io::codebook::FeatureID;
 use crate::model;
 
 pub type CDF = probs::cdf::CDF<u32>;
-pub type NormalizedCDF = probs::cdf::CDF<NotNaN<f64>>;
+pub type NormalizedCDF = probs::cdf::CDF<NotNan<f64>>;
 
 /// Calculate CDF of expression.
 ///

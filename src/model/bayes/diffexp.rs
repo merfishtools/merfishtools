@@ -3,14 +3,14 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use ordered_float::NotNaN;
+use ordered_float::NotNan;
 
 use bio::stats::probs;
 use bio::stats::LogProb;
 
 use crate::model;
 
-pub type DiffexpMeasure = NotNaN<f64>;
+pub type DiffexpMeasure = NotNan<f64>;
 pub type CDF = probs::cdf::CDF<DiffexpMeasure>;
 
 /// An estimate of differential expression.

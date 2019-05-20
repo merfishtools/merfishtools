@@ -18,7 +18,7 @@ fern = "0.5"
 cue = "0.1"
 GSL = "1.1"
 ordered-float = "1.0"
-approx = "0.1"
+approx = "0.3"
 fnv = "1.0"
 clap = {version = "2.32", features = ["yaml", "color", "suggestions"]}
 rand = "0.6"

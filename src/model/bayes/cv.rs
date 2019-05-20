@@ -3,18 +3,18 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use ordered_float::NotNaN;
+use ordered_float::NotNan;
 
 use bio::stats::probs;
 
 use crate::model;
 
-pub type CV = NotNaN<f64>;
+pub type CV = NotNan<f64>;
 pub type CDF = probs::cdf::CDF<CV>;
 
 /// Calculate CDF for differential expression.
 pub fn cdf(cdfs: &[model::bayes::expressionset::CDF]) -> CDF {
-    model::bayes::meanvar::cdf(cdfs, |mean, var| NotNaN::new(var.sqrt()).unwrap() / mean)
+    model::bayes::meanvar::cdf(cdfs, |mean, var| NotNan::new(var.sqrt()).unwrap() / mean)
         .reduce()
         .sample(100)
 }
@@ -124,7 +124,7 @@ pub fn cdf(cdfs: &[model::bayes::expressionset::CDF]) -> CDF {
 //         let cdf = cdf(&[cdf1, cdf2, cdf3]);
 //         println!("{}", cdf.map().unwrap());
 //
-//         println!("{:?}", model::diffexp::estimate(&cdf, NotNaN::new(0.5).unwrap()));
+//         println!("{:?}", model::diffexp::estimate(&cdf, NotNan::new(0.5).unwrap()));
 //
 //         // TODO add proper test case
 //     }
