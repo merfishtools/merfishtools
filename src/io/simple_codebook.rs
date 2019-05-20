@@ -1,24 +1,21 @@
 use std::path::Path;
 
 use itertools::Itertools;
-use serde::{Deserialize, Deserializer, Serialize};
 use serde::de::Error;
 use serde::de::Unexpected;
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::simulation::binary;
 
 /// Deserialize bool from String with custom value mapping
 fn bool_from_string<'de, D>(deserializer: D) -> Result<bool, D::Error>
-    where
-        D: Deserializer<'de>,
+where
+    D: Deserializer<'de>,
 {
     match String::deserialize(deserializer)?.as_ref() {
         "1" => Ok(true),
         "0" => Ok(false),
-        other => Err(Error::invalid_value(
-            Unexpected::Str(other),
-            &"1 or 0",
-        )),
+        other => Err(Error::invalid_value(Unexpected::Str(other), &"1 or 0")),
     }
 }
 
@@ -38,7 +35,9 @@ impl Record {
         &self.name
     }
 
-    pub fn codeword(&self) -> u16 { self.codeword }
+    pub fn codeword(&self) -> u16 {
+        self.codeword
+    }
 
     pub fn expressed(&self) -> bool {
         self.expressed
@@ -46,16 +45,17 @@ impl Record {
 }
 
 pub struct SimpleCodebook {
-    records: Vec<Record>
+    records: Vec<Record>,
 }
 
 impl SimpleCodebook {
     pub fn from_file<P: AsRef<Path>>(path: P) -> csv::Result<Self> {
         let mut rdr = csv::ReaderBuilder::new().delimiter(b'\t').from_path(path)?;
-        let records: Vec<Record> = rdr.deserialize().map(|r| r.expect("Failed reading codebook record.")).collect_vec();
-        Ok(SimpleCodebook {
-            records
-        })
+        let records: Vec<Record> = rdr
+            .deserialize()
+            .map(|r| r.expect("Failed reading codebook record."))
+            .collect_vec();
+        Ok(SimpleCodebook { records })
     }
     pub fn records(&self) -> &Vec<Record> {
         &self.records

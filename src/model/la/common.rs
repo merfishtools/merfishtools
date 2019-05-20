@@ -1,4 +1,4 @@
-use ndarray::prelude::{ArrayView1, Array1, ArrayViewMut1};
+use ndarray::prelude::{Array1, ArrayView1, ArrayViewMut1};
 
 #[cfg(feature = "14bit")]
 pub const NUM_BITS: usize = 14;

@@ -59,7 +59,8 @@ pub trait AbstractFeatureModel {
         // numeric rounding would not work if many of the probabilities are small enough to yield
         // expectations less than 1
         let uniform = rand::distributions::Uniform::new(0., 1.);
-        let mut stochastic_round = |v: f64| v.floor() as u32 + (rng.sample(uniform) <= v % 1.0) as u32;
+        let mut stochastic_round =
+            |v: f64| v.floor() as u32 + (rng.sample(uniform) <= v % 1.0) as u32;
 
         let mut rest = x;
         for i in idx {
@@ -409,7 +410,8 @@ impl NoiseModel {
             prob_not_expressed_mismatch,
             prob_total_miscall_exact,
             prob_total_miscall_mismatch,
-        ]).ln_one_minus_exp();
+        ])
+        .ln_one_minus_exp();
 
         NoiseModel {
             feature_id,

@@ -76,7 +76,8 @@ pub fn estimate<I: Iterator<Item = (String, Readout)>>(
                         Some(feat_p[(feature_id, k)] * w)
                     }
                 })
-                .sum::<f64>() / total_weight;
+                .sum::<f64>()
+                / total_weight;
             if total_weight == 0.0 {
                 panic!("no readouts to estimate error rate at position {}", k);
             }

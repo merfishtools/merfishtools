@@ -1,5 +1,5 @@
-use std::process::Command;
 use std::path::Path;
+use std::process::Command;
 
 // fn test_output(result: &str, expected: &str) {
 //     assert!(Command::new("cmp")
@@ -100,7 +100,6 @@ fn test_exp_mhd4v2_real() {
 
 #[test]
 fn test_estimate_error_rates_real() {
-
     assert!(run_cmd(
         "merfishtools -v est-error-rates tests/codebook/140genesData.1.txt /tmp/merfishtools.140genesData.readouts.simple.txt > tests/results/140genesData.error-rates.tsv",
         Some("grep -P '^3\\t' tests/data/140genesData.readouts.txt | cut -f2,3,4 > /tmp/merfishtools.140genesData.readouts.simple.txt; ")

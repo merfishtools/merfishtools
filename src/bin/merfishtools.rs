@@ -18,8 +18,8 @@ use merfishtools::io::merfishdata;
 
 #[derive(StructOpt)]
 #[structopt(
-name = "merfishtools",
-raw(global_settings = "&[ColoredHelp, DeriveDisplayOrder]")
+    name = "merfishtools",
+    raw(global_settings = "&[ColoredHelp, DeriveDisplayOrder]")
 )]
 struct Opt {
     #[structopt(long, short, name = "verbose", parse(from_occurrences))]
@@ -33,9 +33,9 @@ struct Opt {
 #[structopt(rename_all = "kebab-case")]
 enum Command {
     #[structopt(
-    name = "exp",
-    about = "Estimate expressions for each feature (e.g. gene or transcript) in each cell.",
-    after_help = "\
+        name = "exp",
+        about = "Estimate expressions for each feature (e.g. gene or transcript) in each cell.",
+        after_help = "\
 This command estimates expressions for each feature (e.g. gene or transcript) in each cell.
 Results are provided as PMF (probability mass function) in columns:
 
@@ -101,9 +101,9 @@ merfishtools exp codebook.txt < data.txt > expression.txt"
     },
 
     #[structopt(
-    name = "diffexp",
-    about = "Test for differential expression between two groups of cells.",
-    after_help = "\
+        name = "diffexp",
+        about = "Test for differential expression between two groups of cells.",
+        after_help = "\
 This command calculates, for given expression PMFs (generated with merfishtools exp), differentially expressed features (e.g. genes or transcripts) between groups of cells given as separate input data.
 Results are provided as columns:
 
@@ -144,9 +144,9 @@ merfishtools diffexp data1.txt data2.txt > diffexp.txt"
     },
 
     #[structopt(
-    name = "multidiffexp",
-    about = "Test for differential expression between multiple groups of cells.",
-    after_help = "\
+        name = "multidiffexp",
+        about = "Test for differential expression between multiple groups of cells.",
+        after_help = "\
 This command calculates, for given expression PMFs (obtained with merfishtools exp), differentially expressed features (e.g. genes or transcripts) between groups of cells given as separate input data.
 Results are provided as columns:
 
@@ -184,9 +184,9 @@ merfishtools multidiffexp data1.txt data2.txt data3.txt > diffexp.txt"
         threads: usize,
     },
     #[structopt(
-    name = "est-error-rates",
-    about = "Estimate 0-1 and 1-0 error rates.",
-    after_help = "\
+        name = "est-error-rates",
+        about = "Estimate 0-1 and 1-0 error rates.",
+        after_help = "\
 This command estimates 0-1 and 1-0 error rates from given MERFISH
 readouts.
 
@@ -216,9 +216,9 @@ the 1-0 error rate."
         raw_data: String,
     },
     #[structopt(
-    name = "gen-mhd4",
-    about = "Generate MERFISH MHD4 codebook with given parameters.",
-    after_help = "\
+        name = "gen-mhd4",
+        about = "Generate MERFISH MHD4 codebook with given parameters.",
+        after_help = "\
 This command generates a codebook with the given parameters.
 Currently, the number of bits (N) is fixed to 16.
 
@@ -243,9 +243,9 @@ codeword"
         not_expressed: Option<String>,
     },
     #[structopt(
-    name = "gen-mhd2",
-    about = "Generate MERFISH MHD2 codebook with given parameters.",
-    after_help = "\
+        name = "gen-mhd2",
+        about = "Generate MERFISH MHD2 codebook with given parameters.",
+        after_help = "\
 This command generates a codebook with the given parameters.
 
 Example usage:
@@ -279,19 +279,17 @@ fn main() -> Result<(), Error> {
     let opt = Opt::from_args(); // .version(env!("CARGO_PKG_VERSION"));
 
     fern::Dispatch::new()
-        .format(|out, msg, record|
-            match record.level() {
-                log::Level::Debug => out.finish(format_args!("DEBUG: {}", msg)),
-                _ => out.finish(msg.to_owned()),
-            }
-        )
+        .format(|out, msg, record| match record.level() {
+            log::Level::Debug => out.finish(format_args!("DEBUG: {}", msg)),
+            _ => out.finish(msg.to_owned()),
+        })
         .level(match opt.verbosity {
             0 => log::LevelFilter::Info,
             _ => log::LevelFilter::Debug,
         })
         .chain(std::io::stderr())
         .apply()?;
-    
+
     match opt.subcommand {
         // it is not yet possible to use `exp @ Command::Expression { .. } => { do stuff with exp }`
         // see https://github.com/rust-lang/rfcs/pull/2593
@@ -306,7 +304,7 @@ fn main() -> Result<(), Error> {
             threads,
             estimate,
             stats,
-            pmf_window_width
+            pmf_window_width,
         } => {
             let convert_err_rates = |values: Vec<f64>| match values.len() {
                 1 => vec![Prob::checked(values[0]).unwrap(); 32],
@@ -328,12 +326,18 @@ fn main() -> Result<(), Error> {
                 .build()
                 .unwrap();
             match merfishdata::Format::from_path(&raw_data) {
-                merfishdata::Format::Binary => expression
-                    .load_counts(&mut merfishdata::binary::Reader::from_file(&raw_data)?, merfishdata::Format::Binary)?,
-                merfishdata::Format::TSV => expression
-                    .load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?, merfishdata::Format::TSV)?,
-                merfishdata::Format::Simulation => expression
-                    .load_counts(&mut merfishdata::sim::Reader::from_file(&raw_data)?, merfishdata::Format::Simulation)?,
+                merfishdata::Format::Binary => expression.load_counts(
+                    &mut merfishdata::binary::Reader::from_file(&raw_data)?,
+                    merfishdata::Format::Binary,
+                )?,
+                merfishdata::Format::TSV => expression.load_counts(
+                    &mut merfishdata::tsv::Reader::from_file(&raw_data)?,
+                    merfishdata::Format::TSV,
+                )?,
+                merfishdata::Format::Simulation => expression.load_counts(
+                    &mut merfishdata::sim::Reader::from_file(&raw_data)?,
+                    merfishdata::Format::Simulation,
+                )?,
             }
             expression.infer()
         }

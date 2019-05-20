@@ -6,8 +6,8 @@ use failure::Error;
 use itertools::Itertools;
 use maplit::hashmap;
 use ndarray::Array;
-use rand::{Rng, SeedableRng};
 use rand::prelude::*;
+use rand::{Rng, SeedableRng};
 use serde::Serialize;
 
 type Barcode = u16;
@@ -114,22 +114,22 @@ pub fn generate_erroneous_counts(
 }
 
 pub mod binary {
-    use serde::{Deserializer, Serializer};
     use serde::de::Deserialize;
+    use serde::{Deserializer, Serializer};
 
     use crate::simulation::Barcode;
 
     pub(crate) fn serialize<S>(barcode: &Barcode, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         let repr = format!("{:016b}", barcode);
         serializer.serialize_str(&repr)
     }
 
     pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<Barcode, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         let repr: String = String::deserialize(deserializer)?;
         let barcode = repr.chars().rev().enumerate().fold(0u16, |acc, (i, c)| {
@@ -333,10 +333,10 @@ pub fn simulate_observed_counts(
                 .iter()
                 .map(|(barcode, errcount)| (barcode, errcount.values().sum()))
                 .filter(|(_, c)| *c > 0)
-                {
-                    let record = RecordRaw::new(cell, barcode, count);
-                    ecc_writer.serialize(record)?;
-                }
+            {
+                let record = RecordRaw::new(cell, barcode, count);
+                ecc_writer.serialize(record)?;
+            }
         }
     }
     ecc_writer.flush()?;

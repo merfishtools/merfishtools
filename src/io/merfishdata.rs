@@ -12,14 +12,12 @@ use crate::io::codebook::Codebook;
 
 pub type Readout = BitVec;
 
-
 /// Enumeration of all accepted input formats.
 pub enum Format {
     TSV,
     Binary,
     Simulation,
 }
-
 
 impl Format {
     /// Infer input format from given path.
@@ -31,7 +29,6 @@ impl Format {
         }
     }
 }
-
 
 pub trait MerfishRecord {
     fn cell_id(&self) -> u32;
@@ -48,7 +45,7 @@ pub trait MerfishRecord {
 pub trait Reader<'a> {
     type Record: MerfishRecord;
     type Error: Fail;
-    type Iterator: Iterator<Item=Result<Self::Record, Self::Error>> + 'a;
+    type Iterator: Iterator<Item = Result<Self::Record, Self::Error>> + 'a;
 
     fn records(&'a mut self) -> Self::Iterator;
 }
@@ -108,7 +105,9 @@ pub mod sim {
             self.barcode
         }
 
-        fn count(&self) -> usize { self.count }
+        fn count(&self) -> usize {
+            self.count
+        }
     }
 
     /// A reader for MERFISH raw data.
@@ -203,7 +202,9 @@ pub mod tsv {
             self.hamming_dist
         }
 
-        fn error_bit(&self) -> Option<u8> { None }
+        fn error_bit(&self) -> Option<u8> {
+            None
+        }
 
         fn barcode(&self, codebook: Option<&Codebook>) -> u16 {
             assert!(!codebook.is_none());
@@ -211,13 +212,19 @@ pub mod tsv {
                 Some(cb) => {
                     let feature_id = cb.get_id(&self.feature_name());
                     let cw = cb.record(feature_id).codeword();
-                    cw.iter().rev().enumerate().map(|(i, bit)| (bit as u16) << i).sum()
+                    cw.iter()
+                        .rev()
+                        .enumerate()
+                        .map(|(i, bit)| (bit as u16) << i)
+                        .sum()
                 }
-                None => panic!("Codebook must not be None")
+                None => panic!("Codebook must not be None"),
             }
         }
 
-        fn count(&self) -> usize { 1 }
+        fn count(&self) -> usize {
+            1
+        }
     }
 
     /// A reader for MERFISH raw data.
@@ -380,19 +387,29 @@ pub mod binary {
         }
 
         fn hamming_dist(&self) -> u8 {
-            assert!(self.is_exact <= 1, "unexpected value in field is_exact: {}", self.is_exact);
+            assert!(
+                self.is_exact <= 1,
+                "unexpected value in field is_exact: {}",
+                self.is_exact
+            );
             1 - self.is_exact
         }
 
         fn error_bit(&self) -> Option<u8> {
             if self.error_bit > 0 {
                 Some(self.error_bit - 1)
-            } else { None }
+            } else {
+                None
+            }
         }
 
-        fn barcode(&self, _codebook: Option<&Codebook>) -> u16 { self.barcode as u16 }
+        fn barcode(&self, _codebook: Option<&Codebook>) -> u16 {
+            self.barcode as u16
+        }
 
-        fn count(&self) -> usize { 1 }
+        fn count(&self) -> usize {
+            1
+        }
     }
 
     #[derive(Debug, Fail)]
@@ -400,7 +417,7 @@ pub mod binary {
         #[fail(display = "unsupported version: {}", version)]
         UnsupportedVersion { version: u8 },
         #[fail(
-        display = "header is corrupt, i.e. might not have been written properly (while in append mode)"
+            display = "header is corrupt, i.e. might not have been written properly (while in append mode)"
         )]
         Corrupt,
     }

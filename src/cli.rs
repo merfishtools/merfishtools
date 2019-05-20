@@ -159,16 +159,22 @@ impl Expression for ExpressionJ {
 }
 
 impl ExpressionJ {
-    pub fn load_counts<'a, R>(&mut self, reader: &'a mut R, _format: crate::io::merfishdata::Format) -> Result<(), Error>
-        where
-            R: io::merfishdata::Reader<'a>,
+    pub fn load_counts<'a, R>(
+        &mut self,
+        reader: &'a mut R,
+        _format: crate::io::merfishdata::Format,
+    ) -> Result<(), Error>
+    where
+        R: io::merfishdata::Reader<'a>,
     {
         let codebook = io::codebook::Codebook::from_file(&self.codebook_path())?;
 
         let mut counts = collections::HashMap::new();
         for res in reader.records() {
             let record = res?;
-            if !self.cells().is_match(&record.cell_name()) && codebook.contains(&record.feature_name()) {
+            if !self.cells().is_match(&record.cell_name())
+                && codebook.contains(&record.feature_name())
+            {
                 continue;
             }
 
@@ -200,7 +206,6 @@ impl ExpressionJ {
         Ok(())
     }
 }
-
 
 /// Estimate differential expression over two conditions via fold changes.
 pub fn differential_expression(
@@ -269,7 +274,8 @@ pub fn differential_expression(
         estimates
             .iter()
             .map(|&(_, ref a)| a.differential_expression_pep),
-    ).collect_vec();
+    )
+    .collect_vec();
 
     for (i, ((feature, estimate), fd)) in estimates.into_iter().zip(expected_fds).enumerate() {
         let fdr = LogProb(*fd - (i as f64 + 1.0).ln());
@@ -357,7 +363,8 @@ pub fn multi_differential_expression(
         estimates
             .iter()
             .map(|&(_, ref a)| a.differential_expression_pep),
-    ).collect_vec();
+    )
+    .collect_vec();
     for (i, ((feature, estimate), fd)) in estimates.into_iter().zip(expected_fds).enumerate() {
         let fdr = LogProb(*fd - (i as f64 + 1.0).ln());
         est_writer.write(

@@ -7,8 +7,8 @@ use ordered_float::NotNan;
 use rand::prelude::*;
 
 use crate::io::codebook::{Codebook, FeatureID};
-use crate::model::bayes::readout::{Counts, Expressions, FeatureModel, Miscalls, NoiseModel, Xi};
 use crate::model::bayes::readout::feature_model::AbstractFeatureModel;
+use crate::model::bayes::readout::{Counts, Expressions, FeatureModel, Miscalls, NoiseModel, Xi};
 
 pub struct JointModel {
     feature_models: HashMap<FeatureID, FeatureModel>,
@@ -55,8 +55,7 @@ impl JointModel {
 
         // calculate start values (we take random numbers as start expression)
         let start_range = rand::distributions::Uniform::new(1, 10000);
-        let mut expressions =
-            Array1::from_iter(rng.sample_iter(&start_range).take(feature_count));
+        let mut expressions = Array1::from_iter(rng.sample_iter(&start_range).take(feature_count));
         for &feat_id in &not_expressed_feature_ids {
             expressions[feat_id] = 0;
         }
@@ -146,7 +145,8 @@ impl JointModel {
                 .iter()
                 .map(|&c| NotNan::new(c.abs()).unwrap())
                 .max()
-                .unwrap() <= 1.0;
+                .unwrap()
+                <= 1.0;
 
             if i >= change_window && convergence {
                 debug!("Convergence reached, stopping EM algorithm.");

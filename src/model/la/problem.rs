@@ -1,6 +1,6 @@
 use rayon::prelude::*;
 
-use crate::model::la::common::{Errors, ExprV, NUM_BITS, hamming_distance};
+use crate::model::la::common::{hamming_distance, Errors, ExprV, NUM_BITS};
 
 fn _prob(i: usize, j: usize, k: usize, e: &Errors) -> f32 {
     let i_k = (i >> k) & 1; // kth bit in barcode i

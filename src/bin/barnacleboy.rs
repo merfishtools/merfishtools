@@ -15,8 +15,8 @@ use merfishtools::model::la::common::NUM_BITS;
 
 #[derive(StructOpt)]
 #[structopt(
-name = "barnacleboy",
-raw(global_settings = "&[ColoredHelp, DeriveDisplayOrder]")
+    name = "barnacleboy",
+    raw(global_settings = "&[ColoredHelp, DeriveDisplayOrder]")
 )]
 struct Opt {
     /// Level of verbosity. Can be specified multiple times.
@@ -31,8 +31,8 @@ struct Opt {
 #[structopt(rename_all = "kebab-case")]
 enum Command {
     #[structopt(
-    name = "exp",
-    about = "Estimate expressions for each feature (e.g. gene or transcript) in each cell.",
+        name = "exp",
+        about = "Estimate expressions for each feature (e.g. gene or transcript) in each cell."
     )]
     Expression {
         /// Path to codebook definition consisting of tab separated columns: feature, codeword.
@@ -78,9 +78,13 @@ enum Command {
         omega: f32,
 
         /// Mode of operation: Estimate errors or expression first?
-        #[structopt(long, short = "m", default_value = "ErrorsThenExpression",
-        raw(possible_values = "&merfishtools::model::la::expression::Mode::variants()"),
-        case_insensitive = true)]
+        #[structopt(
+            long,
+            short = "m",
+            default_value = "ErrorsThenExpression",
+            raw(possible_values = "&merfishtools::model::la::expression::Mode::variants()"),
+            case_insensitive = true
+        )]
         mode: merfishtools::model::la::expression::Mode,
 
         /// Path to write expected value of expression to.
@@ -97,25 +101,21 @@ enum Command {
     },
 }
 
-
 #[allow(non_snake_case)]
 fn main() -> Result<(), Error> {
     let opt = Opt::from_args(); // .version(env!("CARGO_PKG_VERSION"));
 
     fern::Dispatch::new()
-        .format(|out, msg, record|
-            match record.level() {
-                log::Level::Debug => out.finish(format_args!("DEBUG: {}", msg)),
-                _ => out.finish(msg.to_owned()),
-            }
-        )
+        .format(|out, msg, record| match record.level() {
+            log::Level::Debug => out.finish(format_args!("DEBUG: {}", msg)),
+            _ => out.finish(msg.to_owned()),
+        })
         .level(match opt.verbosity {
             0 => log::LevelFilter::Info,
             _ => log::LevelFilter::Debug,
         })
         .chain(std::io::stderr())
         .apply()?;
-
 
     match opt.subcommand {
         // it is not yet possible to use `exp @ Command::Expression { .. } => { do stuff with exp }`
@@ -137,28 +137,36 @@ fn main() -> Result<(), Error> {
         } => {
             let convert_err_rates = |values: Vec<f64>| match values.len() {
                 1 => vec![values[0]; NUM_BITS * 2],
-                _ => values
+                _ => values,
             };
-            ThreadPoolBuilder::new().num_threads(threads).build_global()?;
-            let mut expression =
-                merfishtools::model::la::expression::ExpressionT::new(
-                    convert_err_rates(p0),
-                    convert_err_rates(p1),
-                    codebook.to_owned(),
-                    estimate.map(|v| v.to_owned()),
-                    errors.map(|v| v.to_owned()),
-                    Regex::new(&cells)?,
-                    max_hamming_distance,
-                    omega,
-                    mode,
-                    seed);
+            ThreadPoolBuilder::new()
+                .num_threads(threads)
+                .build_global()?;
+            let mut expression = merfishtools::model::la::expression::ExpressionT::new(
+                convert_err_rates(p0),
+                convert_err_rates(p1),
+                codebook.to_owned(),
+                estimate.map(|v| v.to_owned()),
+                errors.map(|v| v.to_owned()),
+                Regex::new(&cells)?,
+                max_hamming_distance,
+                omega,
+                mode,
+                seed,
+            );
             match merfishdata::Format::from_path(&raw_data) {
-                merfishdata::Format::Binary => expression
-                    .load_counts(&mut merfishdata::binary::Reader::from_file(&raw_data)?, merfishdata::Format::Binary)?,
-                merfishdata::Format::TSV => expression
-                    .load_counts(&mut merfishdata::tsv::Reader::from_file(&raw_data)?, merfishdata::Format::TSV)?,
-                merfishdata::Format::Simulation => expression
-                    .load_counts(&mut merfishdata::sim::Reader::from_file(&raw_data)?, merfishdata::Format::Simulation)?,
+                merfishdata::Format::Binary => expression.load_counts(
+                    &mut merfishdata::binary::Reader::from_file(&raw_data)?,
+                    merfishdata::Format::Binary,
+                )?,
+                merfishdata::Format::TSV => expression.load_counts(
+                    &mut merfishdata::tsv::Reader::from_file(&raw_data)?,
+                    merfishdata::Format::TSV,
+                )?,
+                merfishdata::Format::Simulation => expression.load_counts(
+                    &mut merfishdata::sim::Reader::from_file(&raw_data)?,
+                    merfishdata::Format::Simulation,
+                )?,
             }
             expression.infer()
         }

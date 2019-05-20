@@ -8,14 +8,14 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-use bio::stats::LogProb;
 use bio::stats::probs::cdf;
+use bio::stats::LogProb;
 use csv;
 use failure::Error;
 use itertools::Itertools;
 use ordered_float::NotNan;
 
-use crate::model::bayes::expression::{CDF, NormalizedCDF};
+use crate::model::bayes::expression::{NormalizedCDF, CDF};
 
 const HEADER: &[&str] = &["cell", "feat", "expr", "prob"];
 
