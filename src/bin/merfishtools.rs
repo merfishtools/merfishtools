@@ -278,26 +278,20 @@ codeword"
 fn main() -> Result<(), Error> {
     let opt = Opt::from_args(); // .version(env!("CARGO_PKG_VERSION"));
 
-    let logger_config = fern::DispatchConfig {
-        format: Box::new(
-            |msg: &str, level: &log::LogLevel, _: &log::LogLocation| match *level {
-                log::LogLevel::Debug => format!("DEBUG: {}", msg),
-                _ => msg.to_owned(),
-            },
-        ),
-        output: vec![fern::OutputConfig::stderr()],
-        level: log::LogLevelFilter::Debug,
-    };
-
-    if let Err(e) = fern::init_global_logger(
-        logger_config,
-        match opt.verbosity {
-            0 => log::LogLevelFilter::Info,
-            _ => log::LogLevelFilter::Debug,
-        },
-    ) {
-        panic!("Failed to initialize logger: {}", e);
-    }
+    fern::Dispatch::new()
+        .format(|out, msg, record|
+            match record.level() {
+                log::Level::Debug => out.finish(format_args!("DEBUG: {}", msg)),
+                _ => out.finish(msg.to_owned()),
+            }
+        )
+        .level(match opt.verbosity {
+            0 => log::LevelFilter::Info,
+            _ => log::LevelFilter::Debug,
+        })
+        .chain(std::io::stderr())
+        .apply()?;
+    
     match opt.subcommand {
         // it is not yet possible to use `exp @ Command::Expression { .. } => { do stuff with exp }`
         // see https://github.com/rust-lang/rfcs/pull/2593

@@ -8,9 +8,3 @@ pub mod codebook;
 pub mod simple_codebook;
 pub mod estimation;
 pub mod merfishdata;
-
-#[derive(RustcEncodable, RustcDecodable, PartialEq, Eq, Clone, Copy, Hash)]
-pub struct Cell {
-    pub experiment: u32,
-    pub cell: u32,
-}
