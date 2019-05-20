@@ -60,7 +60,6 @@ pub mod sim {
 
     use crate::io::codebook::Codebook;
     use crate::io::merfishdata::MerfishRecord;
-    use crate::model::la::hamming::_NBITS16;
     use crate::simulation::binary;
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -93,7 +92,7 @@ pub mod sim {
         }
 
         fn hamming_dist(&self) -> u8 {
-            let d = _NBITS16[self.barcode as usize] as isize - 4;
+            let d = self.barcode.count_ones() as isize - 4;
             if d < 0 {
                 (-d) as u8
             } else {

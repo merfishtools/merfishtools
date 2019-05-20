@@ -17,20 +17,20 @@ fn main() -> std::io::Result<()> {
         return Ok(());
     }
     let mut f = fs::File::create("src/model/la/hamming.rs")?;
-    f.write_all(b"pub const _NBITS16: [usize; 65536] = [")?;
-    f.write(b"    ")?;
-    for (i, n) in nbits.iter().enumerate() {
-        if i % 16 == 0 {
-            f.write(b"\n    ")?;
-        }
-        f.write_fmt(format_args!("{}, ", n))?;
-    }
-    f.write(b"];\n")?;
+//    f.write_all(b"pub const _NBITS16: [usize; 65536] = [")?;
+//    f.write(b"    ")?;
+//    for (i, n) in nbits.iter().enumerate() {
+//        if i % 16 == 0 {
+//            f.write(b"\n    ")?;
+//        }
+//        f.write_fmt(format_args!("{}, ", n))?;
+//    }
+//    f.write(b"];\n")?;
     f.write(
         b"
 pub fn hamming_distance16(a: usize, b: usize) -> usize {
     let x = a ^ b;
-    _NBITS16[x]
+    x.count_ones()
  }",
     )?;
     f.sync_all()?;

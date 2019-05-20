@@ -1,5 +1,9 @@
 use ndarray::prelude::{ArrayView1, Array1, ArrayViewMut1};
 
+#[cfg(feature = "14bits")]
+pub const NUM_BITS: usize = 14;
+
+#[cfg(not(feature = "14bits"))]
 pub const NUM_BITS: usize = 16;
 pub const NUM_CODES: usize = 2 << (NUM_BITS - 1);
 

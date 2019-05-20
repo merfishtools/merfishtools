@@ -10,8 +10,6 @@ use rand::{Rng, SeedableRng};
 use rand::prelude::*;
 use serde::Serialize;
 
-use crate::model::la::hamming::_NBITS16;
-
 type Barcode = u16;
 
 #[rustfmt::skip]
@@ -233,7 +231,7 @@ pub fn simulate_raw_counts(
         barcodes
             .iter()
             .cloned()
-            .filter(|b| _NBITS16[*b as usize] == s as usize)
+            .filter(|b| (*b).count_ones() as usize == s as usize)
             .collect()
     } else {
         barcodes
@@ -321,7 +319,7 @@ pub fn simulate_observed_counts(
             for (barcode, errcount) in derived_counts.into_iter().sorted_by_key(|v| v.0) {
                 for (flip, count) in errcount {
                     let original_barcode = barcode ^ flip;
-                    let errs = _NBITS16[flip as usize];
+                    let errs = flip.count_ones() as usize;
                     let record = RecordObserved::new(cell, barcode, count, original_barcode, errs);
                     ecc_writer.serialize(record)?;
                 }
