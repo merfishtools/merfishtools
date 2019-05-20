@@ -1,4 +1,4 @@
-use ordered_float::NotNaN;
+use ordered_float::NotNan;
 
 use bio::stats::probs::cdf;
 use bio::stats::probs::cdf::CDF;
@@ -6,8 +6,8 @@ use itertools::Itertools;
 
 #[derive(Debug, Clone, PartialOrd, PartialEq)]
 pub struct MeanVar {
-    pub mean: NotNaN<f64>,
-    pub var: NotNaN<f64>,
+    pub mean: NotNan<f64>,
+    pub var: NotNan<f64>,
 }
 
 impl MeanVar {
@@ -20,8 +20,8 @@ impl MeanVar {
     }
 }
 
-pub fn cdf<T: Ord, F: Fn(NotNaN<f64>, NotNaN<f64>) -> T>(
-    cdfs: &[CDF<NotNaN<f64>>],
+pub fn cdf<T: Ord, F: Fn(NotNan<f64>, NotNan<f64>) -> T>(
+    cdfs: &[CDF<NotNan<f64>>],
     value: F,
 ) -> CDF<T> {
     assert!(
@@ -34,7 +34,7 @@ pub fn cdf<T: Ord, F: Fn(NotNaN<f64>, NotNaN<f64>) -> T>(
         let mut pmf = Vec::new();
         for e in cdfs[0].iter_pmf() {
             pmf.push(cdf::Entry {
-                value: (*e.value, NotNaN::new(0.0).unwrap()),
+                value: (*e.value, NotNan::new(0.0).unwrap()),
                 prob: e.prob,
             });
         }
@@ -82,31 +82,31 @@ mod tests {
     fn test_cdf() {
         let cdf1 = CDF::from_pmf(vec![
             cdf::Entry {
-                value: NotNaN::new(6.0).unwrap(),
+                value: NotNan::new(6.0).unwrap(),
                 prob: LogProb(-1.0),
             },
             cdf::Entry {
-                value: NotNaN::new(70.0).unwrap(),
+                value: NotNan::new(70.0).unwrap(),
                 prob: LogProb(-0.45867514538708193),
             },
         ]);
         let cdf2 = CDF::from_pmf(vec![
             cdf::Entry {
-                value: NotNaN::new(3.0).unwrap(),
+                value: NotNan::new(3.0).unwrap(),
                 prob: LogProb(-1.0),
             },
             cdf::Entry {
-                value: NotNaN::new(70.0).unwrap(),
+                value: NotNan::new(70.0).unwrap(),
                 prob: LogProb(-0.45867514538708193),
             },
         ]);
         let cdf3 = CDF::from_pmf(vec![
             cdf::Entry {
-                value: NotNaN::new(3.0).unwrap(),
+                value: NotNan::new(3.0).unwrap(),
                 prob: LogProb(-1.0),
             },
             cdf::Entry {
-                value: NotNaN::new(70.0).unwrap(),
+                value: NotNan::new(70.0).unwrap(),
                 prob: LogProb(-0.45867514538708193),
             },
         ]);

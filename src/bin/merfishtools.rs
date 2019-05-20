@@ -7,7 +7,7 @@ use bio::stats::Prob;
 use clap::AppSettings::{ColoredHelp, DeriveDisplayOrder};
 use failure::Error;
 use itertools::Itertools;
-use ordered_float::NotNaN;
+use ordered_float::NotNan;
 use regex::Regex;
 use structopt::StructOpt;
 
@@ -347,7 +347,7 @@ fn main() -> Result<(), Error> {
             threads,
         } => {
             let max_fc =
-                NotNaN::new(max_null_log2fc).expect("NaN not allowed for --max-null-log2fc.");
+                NotNan::new(max_null_log2fc).expect("NaN not allowed for --max-null-log2fc.");
             let pmf_path = cdf.as_ref().map(String::as_str);
             cli::differential_expression(&group1, &group2, pmf_path, max_fc, pseudocounts, threads)
         }
@@ -359,7 +359,7 @@ fn main() -> Result<(), Error> {
             cdf,
             threads,
         } => {
-            let max_cv = NotNaN::new(max_null_cv).expect("NaN not allowed for --max-null-cv.");
+            let max_cv = NotNan::new(max_null_cv).expect("NaN not allowed for --max-null-cv.");
             let group_paths = &groups.iter().map(String::as_ref).collect_vec();
             let cdf_path = cdf.as_ref().map(String::as_str);
             cli::multi_differential_expression(group_paths, cdf_path, max_cv, pseudocounts, threads)

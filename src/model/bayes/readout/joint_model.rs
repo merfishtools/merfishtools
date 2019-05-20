@@ -1,16 +1,14 @@
 use std::collections::HashMap;
 
+use bio::stats::{LogProb, Prob};
 use itertools::Itertools;
 use ndarray::prelude::*;
-use ordered_float::NotNaN;
+use ordered_float::NotNan;
 use rand::prelude::*;
 
-use bio::stats::{LogProb, Prob};
-
 use crate::io::codebook::{Codebook, FeatureID};
-
-use crate::model::bayes::readout::feature_model::AbstractFeatureModel;
 use crate::model::bayes::readout::{Counts, Expressions, FeatureModel, Miscalls, NoiseModel, Xi};
+use crate::model::bayes::readout::feature_model::AbstractFeatureModel;
 
 pub struct JointModel {
     feature_models: HashMap<FeatureID, FeatureModel>,
@@ -146,7 +144,7 @@ impl JointModel {
             debug!("mean changes={:?}", mean_changes);
             let convergence = *mean_changes
                 .iter()
-                .map(|&c| NotNaN::new(c.abs()).unwrap())
+                .map(|&c| NotNan::new(c.abs()).unwrap())
                 .max()
                 .unwrap() <= 1.0;
 
