@@ -47,8 +47,8 @@ pub struct ExpressionT {
     cells: Regex,
     bits: usize,
     max_hamming_distance: usize,
+    omega: f32,
     mode: Mode,
-    absolute: bool,
     seed: u64,
     #[builder(setter(skip))]
     corrected_counts: HashMap<String, HashMap<u16, usize>>,
@@ -112,14 +112,12 @@ impl Expression for ExpressionT {
         let magnitude_x = x_est.sum();
         fix(&mut x_est, &non_codewords);
         let magnitude_y = y.sum();
-//        dbg!(magnitude_x);
-//        dbg!(magnitude_y);
-        if !self.absolute {
-            y /= magnitude_y;
-        }
+        y /= magnitude_y;
 
         let yv = y.view();
         let mut x: Expr = x_est;
+
+        let w = self.omega;
 
         match mode {
             Mode::ErrorsThenExpression => {
@@ -138,7 +136,7 @@ impl Expression for ExpressionT {
                         let mat = csr_error_matrix(&e, hamming_dist.max(2));
 
                         println!("Estimating true expression via SOR");
-                        x = estimate_expression(&mat, x.view(), yv, hamming_dist, false).expect("Failed estimating expression");
+                        x = estimate_expression(&mat, x.view(), yv, hamming_dist, w, false).expect("Failed estimating expression");
                     }
                 }
             }
@@ -152,7 +150,7 @@ impl Expression for ExpressionT {
 
                         println!("Estimating true expression via SOR");
                         fix(&mut x, &non_codewords);
-                        x = estimate_expression(&mat, x.view(), yv, hamming_dist, false).expect("Failed estimating expression");
+                        x = estimate_expression(&mat, x.view(), yv, hamming_dist, w, false).expect("Failed estimating expression");
                         fix(&mut x, &non_codewords);
 
                         println!("Estimating positional error probabilities via GD");
@@ -187,10 +185,8 @@ impl Expression for ExpressionT {
                 let magnitude_y = y.sum();
 //                dbg!(magnitude_x);
 //                dbg!(magnitude_y);
-                if !self.absolute {
-                    y /= magnitude_y;
-                }
-                x = estimate_expression(&mat, x.view(), y.view(), max_hamming_distance, false).expect("Failed estimating expression");
+                y /= magnitude_y;
+                x = estimate_expression(&mat, x.view(), y.view(), max_hamming_distance, w, false).expect("Failed estimating expression");
                 fix(&mut x, &non_codewords);
                 x *= magnitude_x;
                 x.iter().enumerate().filter(|(_, &v)| v > 0.).map(|(i, &v)| RecordEstimate::new(cell.to_owned(), i as u16, v)).collect::<Vec<RecordEstimate>>()
@@ -419,8 +415,8 @@ pub fn estimate_errors(x: ExprV, y: ExprV, y_ind: &[usize], e: &Errors, max_hamm
     }
 }
 
-pub fn estimate_expression(mat: &CSR, x_est: ExprV, y: ExprV, max_hamming_distance: usize, keep_zeros: bool) -> Result<Expr, ()> {
-    if let Ok((x, _it, _err)) = csr_successive_overrelaxation(mat, y, x_est, 1.25, 1e-7, 256, keep_zeros) {
+pub fn estimate_expression(mat: &CSR, x_est: ExprV, y: ExprV, max_hamming_distance: usize, w: f32, keep_zeros: bool) -> Result<Expr, ()> {
+    if let Ok((x, _it, _err)) = csr_successive_overrelaxation(mat, y, x_est, w, 1e-7, 256, keep_zeros) {
         Ok(x)
     } else {
         Err(())

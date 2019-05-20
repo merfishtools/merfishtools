@@ -295,10 +295,13 @@ enum ExpressionMode {
         #[structopt(long, short = "d", value_name = "INT", default_value = "3")]
         max_hamming_distance: usize,
 
+        #[structopt(long, short = "w", value_name = "FLOAT", default_value = "1.25")]
+        omega: f32,
+
         /// bla
-        #[structopt(long, short = "m", default_value="ErrorsThenExpression",
-            raw(possible_values = "&merfishtools::model::la::expression::Mode::variants()"),
-            case_insensitive = true)]
+        #[structopt(long, short = "m", default_value = "ErrorsThenExpression",
+        raw(possible_values = "&merfishtools::model::la::expression::Mode::variants()"),
+        case_insensitive = true)]
         mode: merfishtools::model::la::expression::Mode,
 
         /// Path to write expected value of expression to.
@@ -311,9 +314,6 @@ enum ExpressionMode {
         #[structopt(long, short = "e", value_name = "TSV-FILE")]
         errors: Option<String>,
 
-        /// Whether to use absolute counts or relative frequencies
-        #[structopt(long, short = "a")]
-        absolute: bool
     },
 }
 
@@ -360,7 +360,7 @@ enum SimulationMode {
 
         /// TODO whether to group or split by readout
         #[structopt(long, short = "g")]
-        group: bool
+        group: bool,
     },
 }
 
@@ -448,9 +448,9 @@ fn main() -> Result<(), Error> {
                 ExpressionMode::LA {
                     max_hamming_distance,
                     estimate,
+                    omega,
                     errors,
                     mode,
-                    absolute,
                 } => {
                     let mut expression =
                         merfishtools::model::la::expression::ExpressionTBuilder::default()
@@ -464,7 +464,7 @@ fn main() -> Result<(), Error> {
                             .max_hamming_distance(max_hamming_distance) // TODO introduce mhd option
                             .bits(16)
                             .mode(mode)
-                            .absolute(absolute)
+                            .omega(omega)
                             .seed(seed)
                             .build()
                             .unwrap();
