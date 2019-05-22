@@ -1,11 +1,11 @@
 use rayon::prelude::*;
 
-use crate::model::la::common::{hamming_distance, Errors, ExprV, NUM_BITS};
+use crate::model::la::common::{hamming_distance, Errors, ExprV};
 
 fn _prob(i: usize, j: usize, k: usize, e: &Errors) -> f32 {
     let i_k = (i >> k) & 1; // kth bit in barcode i
     let j_k = (j >> k) & 1; // kth bit in barcode j
-    let mut p = e[i_k][k]; // select relevant positional error probability
+    let mut p = e[[i_k, k]]; // select relevant positional error probability
     let xor = i_k ^ j_k; // a_ijk can be written as (sign * e[i(k), k] + add) where sign in {-1, +1} and add in {0, 1}
     let add = ((!xor) & 1) as f32;
     let sign = (xor << 1) as f32 - 1.;
@@ -14,8 +14,8 @@ fn _prob(i: usize, j: usize, k: usize, e: &Errors) -> f32 {
     p
 }
 
-pub fn prob(i: usize, j: usize, e: &Errors) -> f32 {
-    (0..NUM_BITS).map(|k| _prob(i, j, k, e)).product()
+pub fn prob(i: usize, j: usize, e: &Errors, num_bits: usize) -> f32 {
+    (0..num_bits).map(|k| _prob(i, j, k, e)).product()
 }
 
 fn dprob_inf(i: usize, j: usize, e: &Errors, pos: usize, kind: usize) -> f32 {
@@ -38,6 +38,7 @@ pub fn objective(
     max_hamming_distance: usize,
     x_ind: &[usize],
     y_ind: &[usize],
+    num_bits: usize
 ) -> f32 {
     let r: f32 = y_ind
         .into_par_iter()
@@ -47,7 +48,7 @@ pub fn objective(
                 .iter()
                 .cloned()
                 .filter(|&j| hamming_distance(j, k) <= max_hamming_distance)
-                .map(|j| prob(j, k, e) * x[j])
+                .map(|j| prob(j, k, e, num_bits) * x[j])
                 .sum();
             (y[k] - s).powi(2)
         })
@@ -64,6 +65,7 @@ pub fn partial_objective(
     max_hamming_distance: usize,
     x_ind: &[usize],
     y_ind: &[usize],
+    num_bits: usize,
 ) -> f32 {
     let r: f32 = y_ind
         .into_par_iter()
@@ -74,7 +76,7 @@ pub fn partial_objective(
                 .cloned()
                 .filter(|&j| hamming_distance(j, k) <= max_hamming_distance)
                 .map(|j| {
-                    let p = prob(j, k, e);
+                    let p = prob(j, k, e, num_bits);
                     let dp = dprob_inf(j, k, e, pos, kind);
                     (p * x[j], p / dp * x[j])
                 })

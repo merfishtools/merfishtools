@@ -5,7 +5,7 @@ use ndarray::{Array1, ArrayView1, Axis};
 use ndarray_parallel::*;
 use rayon::prelude::*;
 
-use crate::model::la::common::{hamming_distance, Errors, Expr, ExprV, NUM_BITS, NUM_CODES};
+use crate::model::la::common::{hamming_distance, Errors, Expr, ExprV};
 use crate::model::la::problem::prob;
 
 // NNZ = {i: num_entries(i) for i in range(2, 16 + 1)}
@@ -143,24 +143,25 @@ impl_mul_arr!(&CSR, &ArrayView1<'a, f32>, f32);
 impl_mul_arr!(CSR, &mut ArrayViewMut1<'a, f32>, f32);
 impl_mul_arr!(&CSR, &mut ArrayViewMut1<'a, f32>, f32);
 
-pub fn csr_error_matrix(e: &Errors, max_hamming_distance: usize) -> CSR {
+pub fn csr_error_matrix(e: &Errors, max_hamming_distance: usize, num_bits: usize) -> CSR {
     // Build a sparse representation of the transition matrix in CSR format. Since no element is actually nonzero,
     // a threshold at which to consider an entry small enough to be negligible needs to be specified. This is achieved
     // by setting `max_hamming_distance` to an appropriate value , since matrix entries with large hamming_distance
     // correspond to small probabilities.
-    let hamming_dist_count = NNZ[NUM_BITS]; // [count_entries_where(hamming_dist == i) for i in range(0, NUM_BITS + 1)]
+    let num_codes = 1 << num_bits;
+    let hamming_dist_count = NNZ[num_bits]; // [count_entries_where(hamming_dist == i) for i in range(0, NUM_BITS + 1)]
     let nnz: usize = hamming_dist_count[..max_hamming_distance + 1].iter().sum(); // number of nonzero entries
     let mut data = vec![0.; nnz];
     let mut indices = vec![0; nnz];
-    let mut indptr = vec![0; NUM_CODES + 1];
+    let mut indptr = vec![0; num_codes + 1];
     indptr[0] = 0;
     let mut global_inc = 0;
-    (0..NUM_CODES).for_each(|i| {
+    (0..num_codes).for_each(|i| {
         let mut col_inc = 0;
-        (0..NUM_CODES)
+        (0..num_codes)
             .filter(|&j| hamming_distance(i, j) <= max_hamming_distance)
             .for_each(|j| {
-                data[global_inc] = prob(j, i, e);
+                data[global_inc] = prob(j, i, e, num_bits);
                 indices[global_inc] = j;
                 col_inc += 1;
                 global_inc += 1;
@@ -170,16 +171,17 @@ pub fn csr_error_matrix(e: &Errors, max_hamming_distance: usize) -> CSR {
     CSR::from(data, indices, indptr)
 }
 
-pub fn error_dot(e: &Errors, y: ArrayView1<f32>, max_hamming_distance: usize) -> Array1<f32> {
-    let mut data = Array1::zeros((y.len(),));
+pub fn error_dot(e: &Errors, y: ArrayView1<f32>, max_hamming_distance: usize, num_bits: usize) -> Array1<f32> {
+    let num_codes = 1 << num_bits;
+    let mut data = Array1::zeros((y.len(), ));
     data.axis_iter_mut(Axis(0))
         .into_par_iter()
         .enumerate()
         .for_each(|(i, mut v)| {
-            (0..NUM_CODES)
+            (0..num_codes)
                 .filter(|j| hamming_distance(i, *j) <= max_hamming_distance)
                 .for_each(|j| {
-                    v.mapv_inplace(|_| prob(j, i, e) * y[j]);
+                    v.mapv_inplace(|_| prob(j, i, e, num_bits) * y[j]);
                 });
         });
     data
@@ -270,27 +272,29 @@ pub fn error_successive_overrelaxation(
     w: f32,
     eps: f32,
     max_iter: usize,
+    num_bits: usize,
 ) -> Result<(Array1<f32>, usize, f32), (usize, f32)> {
     assert!(w > 0.);
     assert!(w < 2.);
-    assert_eq!(y.len(), NUM_CODES);
+    let num_codes = 1 << num_bits;
+    assert_eq!(y.len(), num_codes);
     let mut x = y.to_owned();
     let mut error = rmse(
-        error_dot(e, x.view(), max_hamming_distance).view(),
+        error_dot(e, x.view(), max_hamming_distance, num_bits).view(),
         y.view(),
     );
     let nrows = y.len();
     for it in 0..max_iter {
         for row in 0..nrows {
-            let sigma: f32 = (0..NUM_CODES)
+            let sigma: f32 = (0..num_codes)
                 .filter(|&k| row != k && hamming_distance(row, k) <= max_hamming_distance)
-                .map(|col| prob(row, col, e) * x[col])
+                .map(|col| prob(row, col, e, num_bits) * x[col])
                 .sum();
-            let diag = prob(row, row, e);
+            let diag = prob(row, row, e, num_bits);
             x[row] = (1. - w) * x[row] + (w / diag) * (y[row] - sigma);
         }
         error = rmse(
-            error_dot(e, x.view(), max_hamming_distance).view(),
+            error_dot(e, x.view(), max_hamming_distance, num_bits).view(),
             y.view(),
         );
         if error < eps {

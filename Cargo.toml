@@ -41,14 +41,6 @@ maplit = "1.0"
 derive-new = "0.5"
 num-traits = "0.2"
 
-[features]
-14bit = []
-
-[[bin]]
-name="barnacleboy14"
-path="src/bin/barnacleboy.rs"
-required-features = ["14bit"]
-
 [[bin]]
 name="barnacleboy"
 path="src/bin/barnacleboy.rs"

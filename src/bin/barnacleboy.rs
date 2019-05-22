@@ -11,12 +11,11 @@ use structopt::StructOpt;
 
 use merfishtools::cli::Expression;
 use merfishtools::io::merfishdata;
-use merfishtools::model::la::common::NUM_BITS;
 
 #[derive(StructOpt)]
 #[structopt(
-    name = "barnacleboy",
-    raw(global_settings = "&[ColoredHelp, DeriveDisplayOrder]")
+name = "barnacleboy",
+raw(global_settings = "&[ColoredHelp, DeriveDisplayOrder]")
 )]
 struct Opt {
     /// Level of verbosity. Can be specified multiple times.
@@ -31,8 +30,8 @@ struct Opt {
 #[structopt(rename_all = "kebab-case")]
 enum Command {
     #[structopt(
-        name = "exp",
-        about = "Estimate expressions for each feature (e.g. gene or transcript) in each cell."
+    name = "exp",
+    about = "Estimate expressions for each feature (e.g. gene or transcript) in each cell."
     )]
     Expression {
         /// Path to codebook definition consisting of tab separated columns: feature, codeword.
@@ -52,6 +51,10 @@ enum Command {
         /// Seed for shuffling that occurs in EM algorithm.
         #[structopt(long, value_name = "INT")]
         seed: u64,
+
+        /// Number of bits used for barcodes.
+        #[structopt(long, value_name = "INT", default_value = "16")]
+        num_bits: usize,
 
         /// Prior probability of 1 ← 0 error
         #[structopt(long, default_value = "0.04", value_name = "FLOAT", multiple = true)]
@@ -79,11 +82,11 @@ enum Command {
 
         /// Mode of operation: Estimate errors or expression first?
         #[structopt(
-            long,
-            short = "m",
-            default_value = "ErrorsThenExpression",
-            raw(possible_values = "&merfishtools::model::la::expression::Mode::variants()"),
-            case_insensitive = true
+        long,
+        short = "m",
+        default_value = "ErrorsThenExpression",
+        raw(possible_values = "&merfishtools::model::la::expression::Mode::variants()"),
+        case_insensitive = true
         )]
         mode: merfishtools::model::la::expression::Mode,
 
@@ -125,6 +128,7 @@ fn main() -> Result<(), Error> {
             codebook,
             raw_data,
             seed,
+            num_bits,
             p0,
             p1,
             cells,
@@ -136,7 +140,7 @@ fn main() -> Result<(), Error> {
             errors,
         } => {
             let convert_err_rates = |values: Vec<f64>| match values.len() {
-                1 => vec![values[0]; NUM_BITS * 2],
+                1 => vec![values[0]; num_bits],
                 _ => values,
             };
             ThreadPoolBuilder::new()
@@ -153,6 +157,7 @@ fn main() -> Result<(), Error> {
                 omega,
                 mode,
                 seed,
+                num_bits,
             );
             match merfishdata::Format::from_path(&raw_data) {
                 merfishdata::Format::Binary => expression.load_counts(
