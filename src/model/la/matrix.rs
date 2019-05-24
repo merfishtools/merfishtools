@@ -1,11 +1,12 @@
 use std::ops::Mul;
 
-use ndarray::prelude::*;
+use itertools::repeat_n;
 use ndarray::{Array1, ArrayView1, Axis};
+use ndarray::prelude::*;
 use ndarray_parallel::*;
 use rayon::prelude::*;
 
-use crate::model::la::common::{hamming_distance, Errors, Expr, ExprV};
+use crate::model::la::common::{Errors, Expr, ExprV, hamming_distance};
 use crate::model::la::problem::prob;
 
 // NNZ = {i: num_entries(i) for i in range(2, 16 + 1)}
@@ -62,6 +63,35 @@ const NNZ: [[usize; 17]; 17] = [
     ],
 ];
 
+
+pub struct COO {
+    row_idx: Array1<usize>,
+    col_idx: Array1<usize>,
+    values: Array1<f32>,
+}
+
+pub fn coo_error_matrix(e: &Errors, max_hamming_distance: usize, num_bits: usize) -> COO {
+    let num_codes = 1 << num_bits;
+    let hamming_dist_count = NNZ[num_bits]; // [count_entries_where(hamming_dist == i) for i in range(0, NUM_BITS + 1)]
+    let nnz: usize = hamming_dist_count[..max_hamming_distance + 1].iter().sum(); // number of nonzero entries
+
+    let idxs: Vec<(usize, Vec<usize>)> = (0usize..num_codes)
+        .into_par_iter()
+        .map(|i| (i, self::indices(i, num_bits, max_hamming_distance)))
+        .collect();
+    let expanded_idxs: Vec<(usize, usize)> = idxs.iter().flat_map(|(c, rs)| repeat_n(c, nnz).cloned().zip(rs.iter().cloned())).collect();
+    let data: Vec<(usize, usize, f32)> = expanded_idxs.into_par_iter().map(|(c, r)| (c, r, prob(c, r, e, num_bits))).collect();
+    let values = Array1::from_iter(data.iter().map(|(_, _, v)| *v));
+    let row_idx = Array1::from_iter(data.iter().map(|(r, _, _)| *r));
+    let col_idx = Array1::from_iter(data.iter().map(|(_, c, _)| *c));
+
+    COO {
+        row_idx,
+        col_idx,
+        values,
+    }
+}
+
 pub struct CSR {
     data: Array1<f32>,
     columns: Array1<usize>,
@@ -69,19 +99,88 @@ pub struct CSR {
 }
 
 impl CSR {
-    //    fn with_capacity(nnz: usize, n: usize) -> CSR {
-    //        CSR {
-    //            data: Array1::zeros(nnz),
-    //            columns: Array1::zeros(nnz),
-    //            indptr: Array1::zeros(n + 1),
-    //        }
-    //    }
+    pub fn from_coo(coo: &COO, num_bits: usize) -> Self {
+        let num_codes = 1 << num_bits;
+        let a_rows = &coo.row_idx;
+        let a_cols = &coo.col_idx;
+        let a_vals = &coo.values;
+        let n_row = num_codes + 1;
+        let n_col = coo.col_idx.len();
+        let nnz = coo.values.len();
+        let mut indptr = Array1::zeros((n_row + 1, ));
+        let mut column_indices = unsafe { Array1::uninitialized((n_col, )) };
+        let mut values = unsafe { Array1::uninitialized((nnz, )) };
 
-    fn from(data: Vec<f32>, columns: Vec<usize>, indptr: Vec<usize>) -> CSR {
+        for n in 0..nnz {
+            indptr[a_rows[n]] += 1;
+        }
+
+        let mut cumsum = 0;
+        for i in 0..n_row {
+            let temp = indptr[i];
+            indptr[i] = cumsum;
+            cumsum += temp;
+        }
+        indptr[n_row] = nnz;
+
+        for n in 0..nnz {
+            let row = a_rows[n];
+            let dest = indptr[row];
+            column_indices[dest] = a_cols[n];
+            values[dest] = a_vals[n];
+            indptr[row] += 1;
+        }
+
+        let mut last = 0;
+        for i in 0..=n_row {
+            let temp = indptr[i];
+            indptr[i] = last;
+            last = temp;
+        }
         CSR {
-            data: Array1::from(data),
-            columns: Array1::from(columns),
-            indptr: Array1::from(indptr),
+            data: values,
+            columns: column_indices,
+            indptr,
+        }
+    }
+}
+
+pub fn csr_error_matrix(e: &Errors, max_hamming_distance: usize, num_bits: usize) -> CSR {
+    let coo = coo_error_matrix(e, max_hamming_distance, num_bits);
+    CSR::from_coo(&coo, num_bits)
+}
+
+pub fn csr_error_matrix_old(e: &Errors, max_hamming_distance: usize, num_bits: usize) -> CSR {
+    // Build a sparse representation of the transition matrix in CSR format. Since no element is actually nonzero,
+    // a threshold at which to consider an entry small enough to be negligible needs to be specified. This is achieved
+    // by setting `max_hamming_distance` to an appropriate value , since matrix entries with large hamming_distance
+    // correspond to small probabilities.
+    let num_codes = 1 << num_bits;
+    let hamming_dist_count = NNZ[num_bits]; // [count_entries_where(hamming_dist == i) for i in range(0, NUM_BITS + 1)]
+    let nnz: usize = hamming_dist_count[..max_hamming_distance + 1].iter().sum(); // number of nonzero entries
+    unsafe {
+        let mut data = Array1::uninitialized((nnz, ));
+        let mut indices = Array1::uninitialized((nnz, ));
+        let mut indptr = Array1::uninitialized((num_codes + 1, ));
+        indptr[0] = 0;
+        let mut global_inc = 0;
+        (0..num_codes).for_each(|i| {
+            let mut col_inc = 0;
+            let idxs = self::indices(i, num_bits, max_hamming_distance);
+            idxs.iter()
+                .cloned()
+                .for_each(|j| {
+                    data[global_inc] = prob(j, i, e, num_bits);
+                    indices[global_inc] = j;
+                    col_inc += 1;
+                    global_inc += 1;
+                });
+            indptr[i + 1] = indptr[i] + col_inc
+        });
+        CSR {
+            data,
+            columns: indices,
+            indptr,
         }
     }
 }
@@ -132,6 +231,7 @@ macro_rules! impl_mul_arr {
     };
 }
 
+
 impl_mul_vec!(CSR, &[f32], f32);
 impl_mul_vec!(&CSR, &[f32], f32);
 impl_mul_arr!(CSR, ArrayView1<'a, f32>, f32);
@@ -142,34 +242,6 @@ impl_mul_arr!(CSR, &ArrayView1<'a, f32>, f32);
 impl_mul_arr!(&CSR, &ArrayView1<'a, f32>, f32);
 impl_mul_arr!(CSR, &mut ArrayViewMut1<'a, f32>, f32);
 impl_mul_arr!(&CSR, &mut ArrayViewMut1<'a, f32>, f32);
-
-pub fn csr_error_matrix(e: &Errors, max_hamming_distance: usize, num_bits: usize) -> CSR {
-    // Build a sparse representation of the transition matrix in CSR format. Since no element is actually nonzero,
-    // a threshold at which to consider an entry small enough to be negligible needs to be specified. This is achieved
-    // by setting `max_hamming_distance` to an appropriate value , since matrix entries with large hamming_distance
-    // correspond to small probabilities.
-    let num_codes = 1 << num_bits;
-    let hamming_dist_count = NNZ[num_bits]; // [count_entries_where(hamming_dist == i) for i in range(0, NUM_BITS + 1)]
-    let nnz: usize = hamming_dist_count[..max_hamming_distance + 1].iter().sum(); // number of nonzero entries
-    let mut data = vec![0.; nnz];
-    let mut indices = vec![0; nnz];
-    let mut indptr = vec![0; num_codes + 1];
-    indptr[0] = 0;
-    let mut global_inc = 0;
-    (0..num_codes).for_each(|i| {
-        let mut col_inc = 0;
-        (0..num_codes)
-            .filter(|&j| hamming_distance(i, j) <= max_hamming_distance)
-            .for_each(|j| {
-                data[global_inc] = prob(j, i, e, num_bits);
-                indices[global_inc] = j;
-                col_inc += 1;
-                global_inc += 1;
-            });
-        indptr[i + 1] = indptr[i] + col_inc
-    });
-    CSR::from(data, indices, indptr)
-}
 
 pub fn error_dot(e: &Errors, y: ArrayView1<f32>, max_hamming_distance: usize, num_bits: usize) -> Array1<f32> {
     let num_codes = 1 << num_bits;
@@ -302,4 +374,28 @@ pub fn error_successive_overrelaxation(
         }
     }
     Err((max_iter, error))
+}
+
+fn swap(mut arr: ArrayViewMut1<u32>, blocksize: usize, num_bits: usize) {
+    for i in (0..num_bits).step_by(blocksize << 1) {
+        for j in 0..blocksize {
+            arr.swap(i + j, i + j + blocksize);
+        }
+    }
+}
+
+pub fn indices(j: usize, num_bits: usize, d: usize) -> Vec<usize> {
+    let mut nonzero_mask = Array1::from_vec(crate::model::la::mask::_DIFFZERO_MASK_16[d].to_vec());
+    for k in 0..num_bits {
+        let bit = (j >> k) & 1;
+        if bit == 1 {
+            swap(nonzero_mask.view_mut(), bit << k, num_bits);
+        }
+    }
+    nonzero_mask
+        .iter()
+        .enumerate()
+        .filter(|(_, &v)| v > 0)
+        .map(|(i, _)| i)
+        .collect()
 }

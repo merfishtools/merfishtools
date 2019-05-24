@@ -40,6 +40,15 @@ rayon = "1.0"
 maplit = "1.0"
 derive-new = "0.5"
 num-traits = "0.2"
+#faster = { git = "https://github.com/AdamNiederer/faster" }
+#packed_simd = "0.3"
+
+[dev-dependencies]
+criterion = "0.2"
+
+[[bench]]
+name = "sparse"
+harness = false
 
 [[bin]]
 name="barnacleboy"

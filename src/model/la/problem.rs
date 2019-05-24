@@ -1,14 +1,14 @@
 use rayon::prelude::*;
 
-use crate::model::la::common::{hamming_distance, Errors, ExprV};
+use crate::model::la::common::{Errors, ExprV, hamming_distance};
 
 fn _prob(i: usize, j: usize, k: usize, e: &Errors) -> f32 {
     let i_k = (i >> k) & 1; // kth bit in barcode i
     let j_k = (j >> k) & 1; // kth bit in barcode j
-    let mut p = e[[i_k, k]]; // select relevant positional error probability
     let xor = i_k ^ j_k; // a_ijk can be written as (sign * e[i(k), k] + add) where sign in {-1, +1} and add in {0, 1}
     let add = ((!xor) & 1) as f32;
     let sign = (xor << 1) as f32 - 1.;
+    let mut p = e[[i_k, k]]; // select relevant positional error probability
     p *= sign;
     p += add;
     p
@@ -38,7 +38,7 @@ pub fn objective(
     max_hamming_distance: usize,
     x_ind: &[usize],
     y_ind: &[usize],
-    num_bits: usize
+    num_bits: usize,
 ) -> f32 {
     let r: f32 = y_ind
         .into_par_iter()
