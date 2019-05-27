@@ -1,24 +1,24 @@
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
+use std::time::Instant;
 
 use clap::arg_enum;
+use derive_new::new;
 use failure::Error;
 use ndarray::prelude::*;
+use num_traits::float::Float;
 use rand;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use rayon::prelude::*;
 use regex::Regex;
 
-use derive_new::new;
-use num_traits::float::Float;
-
 use crate::cli::Expression;
 use crate::io::merfishdata;
 use crate::io::merfishdata::MerfishRecord;
 use crate::io::simple_codebook::SimpleCodebook;
-use crate::model::la::common::{hamming_distance, Errors, Expr, ExprV};
-use crate::model::la::matrix::{csr_error_matrix, csr_successive_overrelaxation, CSR};
+use crate::model::la::common::{Errors, Expr, ExprV, hamming_distance};
+use crate::model::la::matrix::{CSR, csr_error_matrix, csr_successive_overrelaxation};
 use crate::model::la::problem::{objective, partial_objective};
 use crate::simulation::binary;
 
@@ -141,19 +141,26 @@ impl Expression for ExpressionT {
                     };
                     for _ in 0..num_repeat_iters {
                         // set < 0. to 0., set non_codewords to 0., normalize to 1
+                        info!("Adjusting x (x[x < 0] := 0, x[Blanks] := 0, ||x|| := 1)\n");
                         adjust(&mut x, &non_codewords);
 
-                        println!("Estimating positional error probabilities via GD");
+                        info!("Estimating positional error probabilities via GD");
+                        let mut now = Instant::now();
                         e = estimate_errors(x.view(), yv, &y_ind[..], &e, hamming_dist, num_bits)
                             .expect("Failed estimating errors");
                         dbg!(&e);
+                        info!("Finished estimating errors in {:#?}.\n", now.elapsed());
 
-                        println!("Constructing CSR transition matrix");
+                        info!("Constructing CSR transition matrix");
+                        now = Instant::now();
                         let mat = csr_error_matrix(&e, hamming_dist.max(2), num_bits);
+                        info!("Finished constructing CSR matrix in {:#?}.\n", now.elapsed());
 
                         println!("Estimating true expression via SOR");
+                        now = Instant::now();
                         x = estimate_expression(&mat, x.view(), yv, w, false)
                             .expect("Failed estimating expression");
+                        info!("Finished estimating expression in {:#?}.\n", now.elapsed());
                     }
                 }
             }
@@ -235,6 +242,18 @@ impl Expression for ExpressionT {
 }
 
 fn adjust(x: &mut Expr, non_codewords: &[usize]) {
+//    let sorted_x: Vec<(f32, usize)> = x.iter().cloned().zip(0..x.len())
+//        .sorted_by(|(v1, _), (v2, _)| (-v1).partial_cmp(&-v2).unwrap()).collect();
+//    let mut sum = 0.;
+//    for (v, i) in sorted_x {
+//        if sum >= 1. {
+//            dbg!((v, i));
+//            x[i] = 0.;
+//        } else {
+//            sum += v;
+//        }
+//    }
+
     x.iter_mut().filter(|&&mut v| v < 0.).for_each(|v| *v = 0.);
     for &cw in non_codewords {
         x[cw] = 0.;
@@ -469,7 +488,7 @@ pub fn estimate_errors(
         1e-9,
         5e5,
         max_hamming_distance,
-        4,
+        2,
         max_iter,
         &x_ind[..],
         &y_ind[..],
