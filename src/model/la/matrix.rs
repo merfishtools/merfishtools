@@ -376,28 +376,8 @@ pub fn error_successive_overrelaxation(
     Err((max_iter, error))
 }
 
-fn swap(mut arr: ArrayViewMut1<u32>, blocksize: usize, num_bits: usize) {
-    for i in (0..1 << num_bits).step_by(blocksize << 1) {
-        for j in 0..blocksize {
-            arr.swap(i + j, i + j + blocksize);
-        }
-    }
-}
-
 pub fn indices(j: usize, num_bits: usize, d: usize) -> Vec<usize> {
-    let mut nonzero_mask = Array1::from_vec(crate::model::la::mask::_DIFFZERO_MASK_16[d].to_vec());
-    for k in 0..num_bits {
-        let bit = (j >> k) & 1;
-        if bit == 1 {
-            swap(nonzero_mask.view_mut(), 1 << k, num_bits);
-        }
-    }
-    nonzero_mask
-        .iter()
-        .enumerate()
-        .filter(|(i, &v)| v > 0 || *i == j)
-        .map(|(i, _)| i)
-        .collect()
+    (0usize..1 << num_bits).filter(|&v| hamming_distance(j, v) <= d).collect()
 }
 
 #[cfg(test)]
