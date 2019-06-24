@@ -1,12 +1,12 @@
 use std::ops::Mul;
 
 use itertools::repeat_n;
-use ndarray::{Array1, ArrayView1, Axis};
 use ndarray::prelude::*;
+use ndarray::{Array1, ArrayView1, Axis};
 use ndarray_parallel::*;
 use rayon::prelude::*;
 
-use crate::model::la::common::{Errors, Expr, ExprV, hamming_distance};
+use crate::model::la::common::{hamming_distance, Errors, Expr, ExprV};
 use crate::model::la::problem::prob;
 
 // NNZ = {i: num_entries(i) for i in range(2, 16 + 1)}
@@ -63,7 +63,6 @@ const NNZ: [[usize; 17]; 17] = [
     ],
 ];
 
-
 pub struct COO {
     row_idx: Array1<usize>,
     col_idx: Array1<usize>,
@@ -79,8 +78,14 @@ pub fn coo_error_matrix(e: &Errors, max_hamming_distance: usize, num_bits: usize
         .into_par_iter()
         .map(|i| (i, self::indices(i, num_bits, max_hamming_distance)))
         .collect();
-    let expanded_idxs: Vec<(usize, usize)> = idxs.iter().flat_map(|(c, rs)| repeat_n(c, nnz).cloned().zip(rs.iter().cloned())).collect();
-    let data: Vec<(usize, usize, f32)> = expanded_idxs.into_par_iter().map(|(c, r)| (c, r, prob(c, r, e, num_bits))).collect();
+    let expanded_idxs: Vec<(usize, usize)> = idxs
+        .iter()
+        .flat_map(|(c, rs)| repeat_n(c, nnz).cloned().zip(rs.iter().cloned()))
+        .collect();
+    let data: Vec<(usize, usize, f32)> = expanded_idxs
+        .into_par_iter()
+        .map(|(c, r)| (c, r, prob(c, r, e, num_bits)))
+        .collect();
     let values = Array1::from_iter(data.iter().map(|(_, _, v)| *v));
     let row_idx = Array1::from_iter(data.iter().map(|(r, _, _)| *r));
     let col_idx = Array1::from_iter(data.iter().map(|(_, c, _)| *c));
@@ -107,9 +112,9 @@ impl CSR {
         let n_row = num_codes + 1;
         let n_col = coo.col_idx.len();
         let nnz = coo.values.len();
-        let mut indptr = Array1::zeros((n_row + 1, ));
-        let mut column_indices = unsafe { Array1::uninitialized((n_col, )) };
-        let mut values = unsafe { Array1::uninitialized((nnz, )) };
+        let mut indptr = Array1::zeros((n_row + 1,));
+        let mut column_indices = unsafe { Array1::uninitialized((n_col,)) };
+        let mut values = unsafe { Array1::uninitialized((nnz,)) };
 
         for n in 0..nnz {
             indptr[a_rows[n]] += 1;
@@ -159,22 +164,20 @@ pub fn csr_error_matrix_old(e: &Errors, max_hamming_distance: usize, num_bits: u
     let hamming_dist_count = NNZ[num_bits]; // [count_entries_where(hamming_dist == i) for i in range(0, NUM_BITS + 1)]
     let nnz: usize = hamming_dist_count[..max_hamming_distance + 1].iter().sum(); // number of nonzero entries
     unsafe {
-        let mut data = Array1::uninitialized((nnz, ));
-        let mut indices = Array1::uninitialized((nnz, ));
-        let mut indptr = Array1::uninitialized((num_codes + 1, ));
+        let mut data = Array1::uninitialized((nnz,));
+        let mut indices = Array1::uninitialized((nnz,));
+        let mut indptr = Array1::uninitialized((num_codes + 1,));
         indptr[0] = 0;
         let mut global_inc = 0;
         (0..num_codes).for_each(|i| {
             let mut col_inc = 0;
             let idxs = self::indices(i, num_bits, max_hamming_distance);
-            idxs.iter()
-                .cloned()
-                .for_each(|j| {
-                    data[global_inc] = prob(j, i, e, num_bits);
-                    indices[global_inc] = j;
-                    col_inc += 1;
-                    global_inc += 1;
-                });
+            idxs.iter().cloned().for_each(|j| {
+                data[global_inc] = prob(j, i, e, num_bits);
+                indices[global_inc] = j;
+                col_inc += 1;
+                global_inc += 1;
+            });
             indptr[i + 1] = indptr[i] + col_inc
         });
         CSR {
@@ -231,7 +234,6 @@ macro_rules! impl_mul_arr {
     };
 }
 
-
 impl_mul_vec!(CSR, &[f32], f32);
 impl_mul_vec!(&CSR, &[f32], f32);
 impl_mul_arr!(CSR, ArrayView1<'a, f32>, f32);
@@ -243,9 +245,14 @@ impl_mul_arr!(&CSR, &ArrayView1<'a, f32>, f32);
 impl_mul_arr!(CSR, &mut ArrayViewMut1<'a, f32>, f32);
 impl_mul_arr!(&CSR, &mut ArrayViewMut1<'a, f32>, f32);
 
-pub fn error_dot(e: &Errors, y: ArrayView1<f32>, max_hamming_distance: usize, num_bits: usize) -> Array1<f32> {
+pub fn error_dot(
+    e: &Errors,
+    y: ArrayView1<f32>,
+    max_hamming_distance: usize,
+    num_bits: usize,
+) -> Array1<f32> {
     let num_codes = 1 << num_bits;
-    let mut data = Array1::zeros((y.len(), ));
+    let mut data = Array1::zeros((y.len(),));
     data.axis_iter_mut(Axis(0))
         .into_par_iter()
         .enumerate()
@@ -377,7 +384,9 @@ pub fn error_successive_overrelaxation(
 }
 
 pub fn indices(j: usize, num_bits: usize, d: usize) -> Vec<usize> {
-    (0usize..1 << num_bits).filter(|&v| hamming_distance(j, v) <= d).collect()
+    (0usize..1 << num_bits)
+        .filter(|&v| hamming_distance(j, v) <= d)
+        .collect()
 }
 
 #[cfg(test)]
@@ -389,7 +398,9 @@ mod tests {
         let num_bits = 16;
         for j in 0..17 {
             for d in 0..num_bits / 2 {
-                let expected_indices: Vec<usize> = (0usize..1 << num_bits).filter(|&v| hamming_distance(j, v) <= d).collect();
+                let expected_indices: Vec<usize> = (0usize..1 << num_bits)
+                    .filter(|&v| hamming_distance(j, v) <= d)
+                    .collect();
                 let indices: Vec<usize> = super::indices(j, num_bits, d);
                 assert_eq!(indices, expected_indices);
             }

@@ -14,8 +14,8 @@ use merfishtools::io::merfishdata;
 
 #[derive(StructOpt)]
 #[structopt(
-name = "barnacleboy",
-raw(global_settings = "&[ColoredHelp, DeriveDisplayOrder]")
+    name = "barnacleboy",
+    raw(global_settings = "&[ColoredHelp, DeriveDisplayOrder]")
 )]
 struct Opt {
     /// Level of verbosity. Can be specified multiple times.
@@ -30,8 +30,8 @@ struct Opt {
 #[structopt(rename_all = "kebab-case")]
 enum Command {
     #[structopt(
-    name = "exp",
-    about = "Estimate expressions for each feature (e.g. gene or transcript) in each cell."
+        name = "exp",
+        about = "Estimate expressions for each feature (e.g. gene or transcript) in each cell."
     )]
     Expression {
         /// Path to codebook definition consisting of tab separated columns: feature, codeword.
@@ -82,11 +82,11 @@ enum Command {
 
         /// Mode of operation: Estimate errors or expression first?
         #[structopt(
-        long,
-        short = "m",
-        default_value = "ErrorsThenExpression",
-        raw(possible_values = "&merfishtools::model::la::expression::Mode::variants()"),
-        case_insensitive = true
+            long,
+            short = "m",
+            default_value = "ErrorsThenExpression",
+            raw(possible_values = "&merfishtools::model::la::expression::Mode::variants()"),
+            case_insensitive = true
         )]
         mode: merfishtools::model::la::expression::Mode,
 
