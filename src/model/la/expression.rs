@@ -17,8 +17,8 @@ use crate::cli::Expression;
 use crate::io::merfishdata;
 use crate::io::merfishdata::MerfishRecord;
 use crate::io::simple_codebook::SimpleCodebook;
-use crate::model::la::common::{Errors, Expr, ExprV, hamming_distance};
-use crate::model::la::matrix::{CSR, csr_error_matrix, csr_successive_overrelaxation};
+use crate::model::la::common::{hamming_distance, Errors, Expr, ExprV};
+use crate::model::la::matrix::{csr_error_matrix, csr_successive_overrelaxation, CSR};
 use crate::model::la::problem::{objective, partial_objective};
 use crate::simulation::binary;
 
@@ -97,12 +97,10 @@ impl Expression for ExpressionT {
         let max_hamming_distance = self.max_hamming_distance;
         let mode = &self.mode;
 
-        let mut e: Errors = Array2::from_shape_fn((2, num_bits), |(kind, pos)| {
-            match kind {
-                0 => self.p0[pos] as f32,
-                1 => self.p1[pos] as f32,
-                _ => panic!(),
-            }
+        let mut e: Errors = Array2::from_shape_fn((2, num_bits), |(kind, pos)| match kind {
+            0 => self.p0[pos] as f32,
+            1 => self.p1[pos] as f32,
+            _ => panic!(),
         });
 
         let mut x_est: Expr = Array1::<f32>::zeros(num_codes);
@@ -154,7 +152,10 @@ impl Expression for ExpressionT {
                         info!("Constructing CSR transition matrix");
                         now = Instant::now();
                         let mat = csr_error_matrix(&e, hamming_dist.max(2), num_bits);
-                        info!("Finished constructing CSR matrix in {:#?}.\n", now.elapsed());
+                        info!(
+                            "Finished constructing CSR matrix in {:#?}.\n",
+                            now.elapsed()
+                        );
 
                         println!("Estimating true expression via SOR");
                         now = Instant::now();
@@ -202,11 +203,11 @@ impl Expression for ExpressionT {
             .par_iter()
             .flat_map(|(cell, raw_countmap)| {
                 let corrected_countmap = self.corrected_counts.get(cell).unwrap();
-                let mut y: Expr = Expr::zeros((num_codes, ));
+                let mut y: Expr = Expr::zeros((num_codes,));
                 raw_countmap.iter().for_each(|(&barcode, &count)| {
                     y[barcode as usize] += count as f32;
                 });
-                let mut x: Expr = Expr::zeros((num_codes, ));
+                let mut x: Expr = Expr::zeros((num_codes,));
                 corrected_countmap.iter().for_each(|(&barcode, &count)| {
                     x[barcode as usize] += count as f32;
                 });
@@ -241,18 +242,41 @@ impl Expression for ExpressionT {
     }
 }
 
+/// Adjusts expression `x` such that:
+///   1. `x[(x < 0) | non_codewords] == 0`
+///   2. `||x|| == 1`
+///
+/// # Examples
+/// ```
+/// # extern crate ndarray;
+/// # use ndarray::{array, Array1};
+/// # fn main() {
+/// let mut x: Array1<f32> = array![0., -1., 2., 4., 2.];
+/// let b = [3usize];
+/// adjust(&mut x, &b);
+/// assert_eq!(x, array![0., 0., 0.5, 0., 0.5]);
+/// # }
+/// # fn adjust(x: &mut Array1<f32>, non_codewords: &[usize]) {
+/// #   x.iter_mut().filter(|&&mut v| v < 0.).for_each(|v| *v = 0.);
+/// #   for &cw in non_codewords {
+/// #       x[cw] = 0.;
+/// #   }
+/// #   *x /= x.sum();
+///# }
+/// ```
+///
 fn adjust(x: &mut Expr, non_codewords: &[usize]) {
-//    let sorted_x: Vec<(f32, usize)> = x.iter().cloned().zip(0..x.len())
-//        .sorted_by(|(v1, _), (v2, _)| (-v1).partial_cmp(&-v2).unwrap()).collect();
-//    let mut sum = 0.;
-//    for (v, i) in sorted_x {
-//        if sum >= 1. {
-//            dbg!((v, i));
-//            x[i] = 0.;
-//        } else {
-//            sum += v;
-//        }
-//    }
+    //    let sorted_x: Vec<(f32, usize)> = x.iter().cloned().zip(0..x.len())
+    //        .sorted_by(|(v1, _), (v2, _)| (-v1).partial_cmp(&-v2).unwrap()).collect();
+    //    let mut sum = 0.;
+    //    for (v, i) in sorted_x {
+    //        if sum >= 1. {
+    //            dbg!((v, i));
+    //            x[i] = 0.;
+    //        } else {
+    //            sum += v;
+    //        }
+    //    }
 
     x.iter_mut().filter(|&&mut v| v < 0.).for_each(|v| *v = 0.);
     for &cw in non_codewords {
@@ -267,8 +291,8 @@ impl ExpressionT {
         reader: &'a mut R,
         format: merfishdata::Format,
     ) -> Result<(), Error>
-        where
-            R: crate::io::merfishdata::Reader<'a>,
+    where
+        R: crate::io::merfishdata::Reader<'a>,
     {
         let codebook =
             &crate::io::simple_codebook::SimpleCodebook::from_file(&self.codebook_path())?;
@@ -396,7 +420,17 @@ fn _gradient_descent_hardcoded(
     for i in 0..max_iter {
         //        println!("Calculating gradient...");
         gradient = Array2::from_shape_fn((2, num_bits), |(kind, pos)| {
-            partial_objective(x, y, &e0, pos, kind, max_hamming_distance, x_ind, y_ind, num_bits)
+            partial_objective(
+                x,
+                y,
+                &e0,
+                pos,
+                kind,
+                max_hamming_distance,
+                x_ind,
+                y_ind,
+                num_bits,
+            )
         });
         //        dbg!(&gradient);
         //        println!("Estimating stepsize...");
@@ -423,26 +457,6 @@ fn _gradient_descent_hardcoded(
         }
         e0 = e0 - alpha * &gradient;
 
-        //        let magnitudes: Vec<f32> = e0[0].iter().map(|v| v.log10().ceil()).collect();
-        //        let large_magnitudes: Vec<f32> = e0[0].iter().zip(magnitudes.iter()).filter(|(_, &m)| m > -2.).map(|(&p, _)| p).collect();
-        //        let median_e0 = median(&large_magnitudes[..]).unwrap();
-        //        for p0 in e0[0].iter_mut() {
-        //            let m = p0.log10().ceil();
-        //            if m <= -2. {
-        //                *p0 = median_e0;
-        //            }
-        //        }
-        //
-        //        let magnitudes: Vec<f32> = e0[1].iter().map(|v| v.log10().ceil()).collect();
-        //        let large_magnitudes: Vec<f32> = e0[1].iter().zip(magnitudes.iter()).filter(|(_, &m)| m > -2.).map(|(&p, _)| p).collect();
-        //        let median_e0 = median(&large_magnitudes[..]).unwrap();
-        //        for p0 in e0[1].iter_mut() {
-        //            let m = p0.log10().ceil();
-        //            if m <= -2. {
-        //                *p0 = median_e0;
-        //            }
-        //        }
-
         e0.mapv_inplace(|v| v.abs());
         e0.mapv_inplace(|v| if v > 0.5 { 0.5 } else { v });
 
@@ -465,6 +479,10 @@ fn _gradient_descent_hardcoded(
     return (e0.to_owned(), std::f32::INFINITY, max_iter);
 }
 
+/// Estimate transitional error probabilities given observation y and (estimated) true expression x.
+///
+/// Note that, during computation, all indices where `x == 0` may be skipped and only
+/// those indices where `y` is *supposed* to be non-zero (→ `y_ind`) need to be considered.
 pub fn estimate_errors(
     x: ExprV,
     y: ExprV,
@@ -509,7 +527,7 @@ pub fn estimate_expression(
     keep_zeros: bool,
 ) -> Result<Expr, ()> {
     if let Ok((x, _it, _err)) =
-    csr_successive_overrelaxation(mat, y, x_est, w, 1e-7, 256, keep_zeros)
+        csr_successive_overrelaxation(mat, y, x_est, w, 1e-7, 256, keep_zeros)
     {
         Ok(x)
     } else {
