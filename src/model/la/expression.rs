@@ -278,6 +278,7 @@ impl ExpressionT {
     {
         let codebook =
             &crate::io::simple_codebook::SimpleCodebook::from_file(&self.codebook_path())?;
+        self.num_bits = self.num_bits.max(codebook.num_bits() as usize);
 
         let mut corrected_counts: HashMap<String, HashMap<u16, usize>> = HashMap::new();
         let mut raw_counts: HashMap<String, HashMap<u16, usize>> = HashMap::new();
