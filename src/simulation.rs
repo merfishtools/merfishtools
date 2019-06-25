@@ -261,7 +261,7 @@ pub fn simulate_raw_counts(
 }
 
 fn _writer(sink: Option<String>) -> impl std::io::Write {
-    let outlet: Box<std::io::Write> = match sink {
+    let outlet: Box<dyn std::io::Write> = match sink {
         None => Box::new(std::io::stdout()),
         Some(sink_path) => {
             let sink_path = Path::new(&sink_path);
@@ -276,7 +276,7 @@ fn _writer(sink: Option<String>) -> impl std::io::Write {
 }
 
 fn _reader(source: Option<String>) -> impl std::io::Read {
-    let inlet: Box<std::io::Read> = match source {
+    let inlet: Box<dyn std::io::Read> = match source {
         None => Box::new(std::io::stdin()),
         Some(source_path) => {
             let source_path = Path::new(&source_path);

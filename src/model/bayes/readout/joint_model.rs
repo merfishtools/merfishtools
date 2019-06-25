@@ -94,10 +94,10 @@ impl JointModel {
     ///
     /// * ID of cell that is investigated (for debugging purposes).
     pub fn expectation_maximization(&mut self, cell: &str) {
-        let mut feature_models: Vec<Box<&AbstractFeatureModel>> = self
+        let mut feature_models: Vec<Box<&dyn AbstractFeatureModel>> = self
             .feature_models
             .values()
-            .map(|m| Box::new(m as &AbstractFeatureModel))
+            .map(|m| Box::new(m as &dyn AbstractFeatureModel))
             .collect_vec();
         feature_models.push(Box::new(&self.noise_model));
 
