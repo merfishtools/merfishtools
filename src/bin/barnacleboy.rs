@@ -53,7 +53,7 @@ enum Command {
         seed: u64,
 
         /// Number of bits used for barcodes.
-        #[structopt(long, value_name = "INT", default_value = "16")]
+        #[structopt(long, value_name = "INT", default_value = "0")]
         num_bits: usize,
 
         /// Prior probability of 1 ← 0 error

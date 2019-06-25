@@ -61,6 +61,12 @@ impl Expression for ExpressionT {
 
     fn infer(&mut self) -> Result<(), Error> {
         let codebook = SimpleCodebook::from_file(&self.codebook_path()).unwrap();
+        if self.num_bits == 0 {
+            self.num_bits = codebook.num_bits() as usize;
+            info!("Guessed number of bits from codebook: {}", self.num_bits);
+        } else if codebook.num_bits() != (self.num_bits as u16) {
+            warn!("Codebook uses a different number of bits ({}) than --num-bits ({}) suggests.", codebook.num_bits(), self.num_bits);
+        }
         let num_bits = self.num_bits;
         let num_codes = 1 << num_bits;
         let mut unexpressed_codewords: HashSet<u16> = codebook
