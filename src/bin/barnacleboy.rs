@@ -145,7 +145,7 @@ fn main() -> Result<(), Error> {
             let num_bits =
                 if num_bits == 0 {
                     let n = cb.num_bits() as usize;
-                    info!("Guessed number of bits from codebook: {}", num_bits);
+                    info!("Guessed number of bits from codebook: {}", n);
                     n
                 } else if cb.num_bits() != (num_bits as u16) {
                     warn!("Codebook uses a different number of bits ({}) than --num-bits ({}) suggests.", cb.num_bits(), num_bits);
