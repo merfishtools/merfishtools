@@ -11,6 +11,8 @@ use structopt::StructOpt;
 
 use merfishtools::cli::Expression;
 use merfishtools::io::merfishdata;
+use merfishtools::io::simple_codebook::SimpleCodebook;
+use log::{info, warn};
 
 #[derive(StructOpt)]
 #[structopt(
@@ -139,15 +141,16 @@ fn main() -> Result<(), Error> {
             estimate,
             errors,
         } => {
-            let codebook =
-                &crate::io::simple_codebook::SimpleCodebook::from_file(&codebook)?;
+            let cb = SimpleCodebook::from_file(&codebook)?;
             let num_bits =
                 if num_bits == 0 {
-                    let n = codebook.num_bits() as usize;
+                    let n = cb.num_bits() as usize;
                     info!("Guessed number of bits from codebook: {}", num_bits);
                     n
-                } else if codebook.num_bits() != (num_bits as u16) {
-                    warn!("Codebook uses a different number of bits ({}) than --num-bits ({}) suggests.", codebook.num_bits(), num_bits);
+                } else if cb.num_bits() != (num_bits as u16) {
+                    warn!("Codebook uses a different number of bits ({}) than --num-bits ({}) suggests.", cb.num_bits(), num_bits);
+                    num_bits
+                } else {
                     num_bits
                 };
             let convert_err_rates = |values: Vec<f64>| match values.len() {
