@@ -3,3 +3,5 @@ Cargo.lock
 build
 tests/results/*
 .idea/*
+src/model/la/hamming.rs
+data
