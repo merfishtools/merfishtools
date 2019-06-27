@@ -11,6 +11,8 @@ use structopt::StructOpt;
 
 use merfishtools::cli::Expression;
 use merfishtools::io::merfishdata;
+use merfishtools::io::simple_codebook::SimpleCodebook;
+use log::{info, warn};
 
 #[derive(StructOpt)]
 #[structopt(
@@ -53,7 +55,7 @@ enum Command {
         seed: u64,
 
         /// Number of bits used for barcodes.
-        #[structopt(long, value_name = "INT", default_value = "16")]
+        #[structopt(long, value_name = "INT", default_value = "0")]
         num_bits: usize,
 
         /// Prior probability of 1 ← 0 error
@@ -139,6 +141,18 @@ fn main() -> Result<(), Error> {
             estimate,
             errors,
         } => {
+            let cb = SimpleCodebook::from_file(&codebook)?;
+            let num_bits =
+                if num_bits == 0 {
+                    let n = cb.num_bits() as usize;
+                    info!("Guessed number of bits from codebook: {}", n);
+                    n
+                } else if cb.num_bits() != (num_bits as u16) {
+                    warn!("Codebook uses a different number of bits ({}) than --num-bits ({}) suggests.", cb.num_bits(), num_bits);
+                    num_bits
+                } else {
+                    num_bits
+                };
             let convert_err_rates = |values: Vec<f64>| match values.len() {
                 1 => vec![values[0]; num_bits],
                 _ => values,

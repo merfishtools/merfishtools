@@ -342,7 +342,6 @@ impl ExpressionT {
                                 .map(|(cw, _)| cw)
                                 .collect();
                             if closest.len() == 1 {
-                                dbg!("FOUND ONE!");
                                 raw_barcode = closest[0];
                                 break;
                             }

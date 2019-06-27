@@ -9,8 +9,8 @@ use crate::simulation::binary;
 
 /// Deserialize bool from String with custom value mapping
 fn bool_from_string<'de, D>(deserializer: D) -> Result<bool, D::Error>
-where
-    D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
 {
     match String::deserialize(deserializer)?.as_ref() {
         "1" => Ok(true),
@@ -63,5 +63,23 @@ impl SimpleCodebook {
 
     pub fn contains(&self, name: &str) -> bool {
         self.records.iter().any(|r| r.name() == name)
+    }
+
+    pub fn num_bits(&self) -> u16 {
+        let max_cw = self.records.iter().map(|r| r.codeword).max();
+        if let Some(bits) = max_cw {
+            (bits as f64).log2().ceil() as u16
+        } else {
+            16
+        }
+    }
+
+    pub fn num_bits_set(&self) -> u16 {
+        let max_bits_set = self.records.iter().map(|r| r.codeword.count_ones()).max();
+        if let Some(bits) = max_bits_set {
+            bits as u16
+        } else {
+            4
+        }
     }
 }
