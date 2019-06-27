@@ -112,9 +112,9 @@ impl CSR {
         let n_row = num_codes + 1;
         let n_col = coo.col_idx.len();
         let nnz = coo.values.len();
-        let mut indptr = Array1::zeros((n_row + 1,));
-        let mut column_indices = unsafe { Array1::uninitialized((n_col,)) };
-        let mut values = unsafe { Array1::uninitialized((nnz,)) };
+        let mut indptr = Array1::zeros((n_row + 1, ));
+        let mut column_indices = unsafe { Array1::uninitialized((n_col, )) };
+        let mut values = unsafe { Array1::uninitialized((nnz, )) };
 
         for n in 0..nnz {
             indptr[a_rows[n]] += 1;
@@ -163,28 +163,26 @@ pub fn csr_error_matrix_old(e: &Errors, max_hamming_distance: usize, num_bits: u
     let num_codes = 1 << num_bits;
     let hamming_dist_count = NNZ[num_bits]; // [count_entries_where(hamming_dist == i) for i in range(0, NUM_BITS + 1)]
     let nnz: usize = hamming_dist_count[..max_hamming_distance + 1].iter().sum(); // number of nonzero entries
-    unsafe {
-        let mut data = Array1::uninitialized((nnz,));
-        let mut indices = Array1::uninitialized((nnz,));
-        let mut indptr = Array1::uninitialized((num_codes + 1,));
-        indptr[0] = 0;
-        let mut global_inc = 0;
-        (0..num_codes).for_each(|i| {
-            let mut col_inc = 0;
-            let idxs = self::indices(i, num_bits, max_hamming_distance);
-            idxs.iter().cloned().for_each(|j| {
-                data[global_inc] = prob(j, i, e, num_bits);
-                indices[global_inc] = j;
-                col_inc += 1;
-                global_inc += 1;
-            });
-            indptr[i + 1] = indptr[i] + col_inc
+    let mut data = unsafe { Array1::uninitialized((nnz, )) };
+    let mut indices = unsafe { Array1::uninitialized((nnz, )) };
+    let mut indptr = unsafe { Array1::uninitialized((num_codes + 1, )) };
+    indptr[0] = 0;
+    let mut global_inc = 0;
+    (0..num_codes).for_each(|i| {
+        let mut col_inc = 0;
+        let idxs = self::indices(i, num_bits, max_hamming_distance);
+        idxs.iter().cloned().for_each(|j| {
+            data[global_inc] = prob(j, i, e, num_bits);
+            indices[global_inc] = j;
+            col_inc += 1;
+            global_inc += 1;
         });
-        CSR {
-            data,
-            columns: indices,
-            indptr,
-        }
+        indptr[i + 1] = indptr[i] + col_inc
+    });
+    CSR {
+        data,
+        columns: indices,
+        indptr,
     }
 }
 
@@ -252,7 +250,7 @@ pub fn error_dot(
     num_bits: usize,
 ) -> Array1<f32> {
     let num_codes = 1 << num_bits;
-    let mut data = Array1::zeros((y.len(),));
+    let mut data = Array1::zeros((y.len(), ));
     data.axis_iter_mut(Axis(0))
         .into_par_iter()
         .enumerate()
