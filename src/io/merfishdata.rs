@@ -39,6 +39,7 @@ pub trait MerfishRecord {
     fn hamming_dist(&self) -> u8;
     fn error_bit(&self) -> Option<u8>;
     fn barcode(&self, codebook: Option<&Codebook>) -> u16;
+    fn readout(&self) -> Readout;
     fn count(&self) -> usize;
 }
 
@@ -56,7 +57,7 @@ pub mod sim {
     use std::path::Path;
 
     use crate::io::codebook::Codebook;
-    use crate::io::merfishdata::MerfishRecord;
+    use crate::io::merfishdata::{MerfishRecord, Readout};
     use crate::simulation::binary;
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -105,6 +106,10 @@ pub mod sim {
             self.barcode
         }
 
+        fn readout(&self) -> Readout {
+            unimplemented!()
+        }
+
         fn count(&self) -> usize {
             self.count
         }
@@ -149,7 +154,7 @@ pub mod tsv {
     use csv;
 
     use crate::io::codebook::Codebook;
-    use crate::io::merfishdata::MerfishRecord;
+    use crate::io::merfishdata::{MerfishRecord, Readout};
 
     /// A 2D position in the microscope.
     #[derive(Serialize, Deserialize, Debug)]
@@ -220,6 +225,10 @@ pub mod tsv {
                 }
                 None => panic!("Codebook must not be None"),
             }
+        }
+
+        fn readout(&self) -> Readout {
+            unimplemented!()
         }
 
         fn count(&self) -> usize {
@@ -347,24 +356,6 @@ pub mod binary {
         pub dist_periphery: f64,
     }
 
-    impl Record {
-        pub fn readout(&self) -> Readout {
-            let mut buf = [0; 8];
-            NativeEndian::write_u64(&mut buf, self.barcode);
-            let mut readout = BitVec::with_capacity(16);
-            (0..16).for_each(|i| readout.push(((self.barcode >> i) & 1) == 1));
-            readout.truncate(16);
-            if self.error_bit > 0 {
-                // error_bit == 0 <=> there is no error.
-                // i.e. the actually erroneous bit is `error_bit - 1`
-                let bit = self.error_bit as usize - 1;
-                let value = !readout.get(bit).unwrap();
-                readout.set(bit, value);
-            }
-            readout
-        }
-    }
-
     impl MerfishRecord for Record {
         fn cell_id(&self) -> u32 {
             self.cell_id
@@ -405,6 +396,22 @@ pub mod binary {
 
         fn barcode(&self, _codebook: Option<&Codebook>) -> u16 {
             self.barcode as u16
+        }
+
+        fn readout(&self) -> Readout {
+            let mut buf = [0; 8];
+            NativeEndian::write_u64(&mut buf, self.barcode);
+            let mut readout = BitVec::with_capacity(16);
+            (0..16).for_each(|i| readout.push(((self.barcode >> i) & 1) == 1));
+            readout.truncate(16);
+            if self.error_bit > 0 {
+                // error_bit == 0 <=> there is no error.
+                // i.e. the actually erroneous bit is `error_bit - 1`
+                let bit = self.error_bit as usize - 1;
+                let value = !readout.get(bit).unwrap();
+                readout.set(bit, value);
+            }
+            readout
         }
 
         fn count(&self) -> usize {
