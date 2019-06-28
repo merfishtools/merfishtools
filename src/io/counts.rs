@@ -53,12 +53,23 @@ impl Counts {
              r.expressed())
         }).collect();
         let expressed = codewords.iter().filter(|(_, b)| *b).map(|(r, _)| *r).collect_vec();
-        for cw in expressed {
-            for (barcode, _) in observed {
-                let dist = hamming_distance(cw as usize, barcode as usize);
+        let corrected = observed.keys().map(|&raw_barcode| {
+            let dists = expressed
+                .iter()
+                .map(|&cw| {
+                    (cw, hamming_distance(cw as usize, raw_barcode as usize))
+                }).collect_vec();
+            for dist in 1..=4u8 {
+                let closest: Vec<u16> = dists.iter()
+                    .filter(|(_cw, d)| *d == dist as usize)
+                    .map(|(cw, _)| *cw)
+                    .collect();
+                if closest.len() == 1 {
+                    return (raw_barcode, Some(closest[0]));
+                }
             }
-        }
-
+            (raw_barcode, None)
+        });
         unimplemented!()
     }
 }
