@@ -54,7 +54,7 @@ impl Counts {
         }).collect();
         let expressed = codewords.iter().filter(|(_, b)| *b).map(|(r, _)| *r).collect_vec();
         for cw in expressed {
-            for (barcode, _) in observed {  
+            for (barcode, _) in observed {
                 let dist = hamming_distance(cw as usize, barcode as usize);
             }
         }
