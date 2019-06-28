@@ -203,11 +203,11 @@ impl Expression for ExpressionT {
             .par_iter()
             .flat_map(|(cell, raw_countmap)| {
                 let corrected_countmap = self.corrected_counts.get(cell).unwrap();
-                let mut y: Expr = Expr::zeros((num_codes,));
+                let mut y: Expr = Expr::zeros((num_codes, ));
                 raw_countmap.iter().for_each(|(&barcode, &count)| {
                     y[barcode as usize] += count as f32;
                 });
-                let mut x: Expr = Expr::zeros((num_codes,));
+                let mut x: Expr = Expr::zeros((num_codes, ));
                 corrected_countmap.iter().for_each(|(&barcode, &count)| {
                     x[barcode as usize] += count as f32;
                 });
@@ -291,8 +291,8 @@ impl ExpressionT {
         reader: &'a mut R,
         format: merfishdata::Format,
     ) -> Result<(), Error>
-    where
-        R: crate::io::merfishdata::Reader<'a>,
+        where
+            R: crate::io::merfishdata::Reader<'a>,
     {
         let codebook =
             &crate::io::simple_codebook::SimpleCodebook::from_file(&self.codebook_path())?;
@@ -361,12 +361,11 @@ impl ExpressionT {
                                 let weights: Vec<_> = (0..self.num_bits)
                                     .map(|i| {
                                         let bit = (barcode >> i) & 1;
-                                        let p = match bit {
+                                        match bit {
                                             0 => self.p0[i],
                                             1 => self.p1[i],
                                             _ => panic!("bug: bit can only be 0 or 1"),
-                                        };
-                                        p
+                                        }
                                     })
                                     .collect();
                                 let wc = WeightedIndex::new(weights).unwrap();
@@ -526,7 +525,7 @@ pub fn estimate_expression(
     keep_zeros: bool,
 ) -> Result<Expr, ()> {
     if let Ok((x, _it, _err)) =
-        csr_successive_overrelaxation(mat, y, x_est, w, 1e-7, 256, keep_zeros)
+    csr_successive_overrelaxation(mat, y, x_est, w, 1e-7, 256, keep_zeros)
     {
         Ok(x)
     } else {

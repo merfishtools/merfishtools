@@ -38,7 +38,7 @@ pub fn generate_barcodes(bits: usize, hamming_distance: usize) -> Vec<Barcode> {
                 let vec = (0..11).map(|j| ((i >> j) & 1) as u8).collect();
                 let vec = Array::from_shape_vec((1, 11), vec).unwrap();
                 let word = vec.dot(&gen_mat) % 2;
-                let word: u16 = word.iter().fold(0, |acc, v| (acc << 1) | (*v as u16));
+                let word: u16 = word.iter().fold(0, |acc, v| (acc << 1) | (u16::from(*v)));
                 word
             })
             .collect();
@@ -174,7 +174,6 @@ fn _read_raw_counts<R: std::io::Read>(
             (
                 cell,
                 records
-                    .into_iter()
                     .map(|r| (r.barcode, r.count))
                     .collect::<HashMap<Barcode, usize>>(),
             )

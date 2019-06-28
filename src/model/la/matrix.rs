@@ -206,6 +206,7 @@ macro_rules! impl_mul_vec {
     };
 }
 
+#[allow(clippy::suspicious_arithmetic_impl)]
 macro_rules! impl_mul_arr {
     ($base_type: ty, $in_type: ty, $out_type_inner: ty) => {
         impl<'a> Mul<$in_type> for $base_type {
