@@ -312,7 +312,7 @@ pub mod binary {
     }
 
     /// A `Record` represents a single entry of a merfish binary file.
-    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
     pub struct Record {
         /// An integer representation of the 16-bit barcode associated with each RNA.
         pub barcode: u64,

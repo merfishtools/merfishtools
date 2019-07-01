@@ -1,5 +1,6 @@
 use crate::io::codebook::Codebook;
 use crate::io::merfishdata;
+use crate::io::merfishdata::binary;
 use crate::io::merfishdata::{MerfishRecord, Reader, Readout};
 use crate::model::la::common::hamming_distance;
 use counter::Counter;
@@ -22,21 +23,24 @@ fn into_u16(readout: &Readout) -> u16 {
 }
 
 impl Counts {
-    pub fn from_records<I: Iterator<Item=impl MerfishRecord>>(
+    pub fn from_records<I: Iterator<Item = impl MerfishRecord>>(
         records: I,
         codebook: Codebook,
     ) -> Self {
         // gather counts per readout from records
         let observed_counts = records
-            .map(|r| r.barcode(Some(&codebook)))
+            .map(|r| (r.barcode(Some(&codebook)), r.count()))
             .collect::<Counter<_>>();
         let (expressed_codewords, _blank_codewords): (Vec<_>, Vec<_>) = codebook
             .records()
             .iter()
             .map(|&r| (into_u16(r.codeword()), r.expressed()))
-            .partition_map(|(r, expressed)| match expressed {
-                true => Either::Left(r),
-                false => Either::Right(r),
+            .partition_map(|(r, expressed)| {
+                if expressed {
+                    Either::Left(r)
+                } else {
+                    Either::Right(r)
+                }
             });
         let corrected_counts = Self::correct_counts(&observed_counts, &expressed_codewords);
         Self {
@@ -53,15 +57,24 @@ impl Counts {
                 merfishdata::binary::Reader::from_file(&path)
                     .unwrap()
                     .records()
-                    .into_iter()
-                    .filter_map(Result::ok),
+                    .filter_map(Result::ok)
+                    // the binary merfish format actually stores pre-corrected barcodes
+                    // so we un-correct those here.
+                    .map(|r: binary::Record| {
+                        let mut uncorrected = r.clone();
+                        uncorrected.barcode = if r.hamming_dist() == 1 {
+                            r.barcode ^ (1 << r.error_bit)
+                        } else {
+                            r.barcode
+                        };
+                        uncorrected
+                    }),
                 codebook,
             ),
             merfishdata::Format::TSV => Self::from_records(
                 merfishdata::tsv::Reader::from_file(&path)
                     .unwrap()
                     .records()
-                    .into_iter()
                     .filter_map(Result::ok),
                 codebook,
             ),
@@ -69,7 +82,6 @@ impl Counts {
                 merfishdata::sim::Reader::from_file(&path)
                     .unwrap()
                     .records()
-                    .into_iter()
                     .filter_map(Result::ok),
                 codebook,
             ),
@@ -114,15 +126,12 @@ impl Counts {
 
         let mut corrected_counts = observed_counts.clone();
         for (readout, codeword) in corrections {
-            match codeword {
-                Some(cw) => {
-                    corrected_counts
-                        .entry(readout)
-                        .and_modify(|count| *count -= 1);
-                    corrected_counts.entry(cw).and_modify(|count| *count += 1);
-                }
-                None => (),
-            }
+            if let Some(cw) = codeword {
+                corrected_counts
+                    .entry(readout)
+                    .and_modify(|count| *count -= 1);
+                corrected_counts.entry(cw).and_modify(|count| *count += 1);
+            };
         }
         corrected_counts
     }
