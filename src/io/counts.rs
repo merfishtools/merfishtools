@@ -1,75 +1,129 @@
 use crate::io::codebook::Codebook;
 use crate::io::merfishdata;
-use crate::io::merfishdata::{MerfishRecord, Reader};
+use crate::io::merfishdata::{MerfishRecord, Reader, Readout};
 use crate::model::la::common::hamming_distance;
-use itertools::Itertools;
-use std::collections::HashMap;
-use std::io;
+use counter::Counter;
+use itertools::{Either, Itertools};
 use std::path::Path;
 
+#[derive(Debug)]
 pub struct Counts {
-    observed: HashMap<u16, usize>,
-    corrected: HashMap<u16, usize>,
+    observed: Counter<u16, usize>,
+    corrected: Counter<u16, usize>,
+}
+
+fn into_u16(readout: &Readout) -> u16 {
+    readout
+        .iter()
+        .rev()
+        .enumerate()
+        .map(|(i, bit)| (bit as u16) << i)
+        .sum()
 }
 
 impl Counts {
+    pub fn from_records<I: Iterator<Item=impl MerfishRecord>>(
+        records: I,
+        codebook: Codebook,
+    ) -> Self {
+        // gather counts per readout from records
+        let observed_counts = records
+            .map(|r| r.barcode(Some(&codebook)))
+            .collect::<Counter<_>>();
+        let (expressed_codewords, _blank_codewords): (Vec<_>, Vec<_>) = codebook
+            .records()
+            .iter()
+            .map(|&r| (into_u16(r.codeword()), r.expressed()))
+            .partition_map(|(r, expressed)| match expressed {
+                true => Either::Left(r),
+                false => Either::Right(r),
+            });
+        let corrected_counts = Self::correct_counts(&observed_counts, &expressed_codewords);
+        Self {
+            observed: observed_counts,
+            corrected: corrected_counts,
+        }
+    }
+
     pub fn from_path<P: AsRef<Path>>(path: P, codebook: Codebook) -> Self {
         let format = merfishdata::Format::from_path(&path);
         // TODO: remove code duplication
-        let mut records: HashMap<u16, Vec<u8>> = match format {
-            merfishdata::Format::Binary => merfishdata::binary::Reader::from_file(&path)
-                .unwrap()
-                .records()
-                .into_iter()
-                .filter_map(Result::ok)
-                .map(|r| (r.barcode(Some(&codebook)), r.hamming_dist()))
-                .into_group_map(),
-            merfishdata::Format::TSV => merfishdata::tsv::Reader::from_file(&path)
-                .unwrap()
-                .records()
-                .into_iter()
-                .filter_map(Result::ok)
-                .map(|r| (r.barcode(Some(&codebook)), r.hamming_dist()))
-                .into_group_map(),
-            merfishdata::Format::Simulation => merfishdata::sim::Reader::from_file(&path)
-                .unwrap()
-                .records()
-                .into_iter()
-                .filter_map(Result::ok)
-                .map(|r| (r.barcode(Some(&codebook)), r.hamming_dist()))
-                .into_group_map(),
+        let counts = match format {
+            merfishdata::Format::Binary => Self::from_records(
+                merfishdata::binary::Reader::from_file(&path)
+                    .unwrap()
+                    .records()
+                    .into_iter()
+                    .filter_map(Result::ok),
+                codebook,
+            ),
+            merfishdata::Format::TSV => Self::from_records(
+                merfishdata::tsv::Reader::from_file(&path)
+                    .unwrap()
+                    .records()
+                    .into_iter()
+                    .filter_map(Result::ok),
+                codebook,
+            ),
+            merfishdata::Format::Simulation => Self::from_records(
+                merfishdata::sim::Reader::from_file(&path)
+                    .unwrap()
+                    .records()
+                    .into_iter()
+                    .filter_map(Result::ok),
+                codebook,
+            ),
         };
-        let observed: HashMap<u16, usize> = records
-            .iter()
-            .map(|(readout, dist)| (*readout, dist.len()))
-            .collect();
-        let codewords: Vec<(u16, bool)> = codebook.records().iter().map(|&r| {
-            (r.codeword()
-                 .iter()
-                 .rev()
-                 .enumerate()
-                 .map(|(i, bit)| (bit as u16) << i)
-                 .sum(),
-             r.expressed())
-        }).collect();
-        let expressed = codewords.iter().filter(|(_, b)| *b).map(|(r, _)| *r).collect_vec();
-        let corrected = observed.keys().map(|&raw_barcode| {
-            let dists = expressed
-                .iter()
-                .map(|&cw| {
-                    (cw, hamming_distance(cw as usize, raw_barcode as usize))
-                }).collect_vec();
-            for dist in 1..=4u8 {
-                let closest: Vec<u16> = dists.iter()
-                    .filter(|(_cw, d)| *d == dist as usize)
-                    .map(|(cw, _)| *cw)
-                    .collect();
-                if closest.len() == 1 {
-                    return (raw_barcode, Some(closest[0]));
+        counts
+    }
+
+    fn correct_counts(
+        observed_counts: &Counter<u16, usize>,
+        codewords: &[u16],
+    ) -> Counter<u16, usize> {
+        // simple, naïve readout correction
+        // If there's exactly one neighbour with hamming distance <= 4 in the codebook, use that.
+        let corrections = observed_counts
+            .keys()
+            .map(|&readout| {
+                // no correction necessary
+                if codewords.contains(&readout) {
+                    return (readout, None);
                 }
+                // distances between readout and known (and expressed) codewords
+                let dists = codewords
+                    .iter()
+                    .map(|&cw| (cw, hamming_distance(cw as usize, readout as usize)))
+                    .collect_vec();
+                // if there's exactly one expressed codeword with distance `dist`,
+                // "replace" readout with that codeword.
+                for dist in 1..=4 {
+                    let closest: Vec<u16> = dists
+                        .iter()
+                        .filter(|(_cw, d)| *d == dist)
+                        .map(|(cw, _)| *cw)
+                        .collect();
+                    if closest.len() == 1 {
+                        dbg!((&readout, &closest[0]));
+                        return (readout, Some(closest[0]));
+                    }
+                }
+                (readout, None)
+            })
+            .collect_vec();
+
+        let mut corrected_counts = observed_counts.clone();
+        for (readout, codeword) in corrections {
+            match codeword {
+                Some(cw) => {
+                    corrected_counts
+                        .entry(readout)
+                        .and_modify(|count| *count -= 1);
+                    corrected_counts.entry(cw).and_modify(|count| *count += 1);
+                }
+                None => (),
             }
-            (raw_barcode, None)
-        });
-        unimplemented!()
+        }
+        corrected_counts
     }
 }
