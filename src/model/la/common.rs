@@ -16,6 +16,11 @@ pub fn hamming_distance(a: usize, b: usize) -> usize {
     x.count_ones() as usize
 }
 
+pub fn hamming_distance16(a: u16, b: u16) -> u8 {
+    let x = a ^ b;
+    x.count_ones() as u8
+}
+
 pub fn median(x: &[f32]) -> Option<f32> {
     let mut x = x.to_owned();
     x.sort_by(|&a, &b| match a - b {

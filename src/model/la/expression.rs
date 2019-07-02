@@ -351,28 +351,25 @@ impl ExpressionT {
                 merfishdata::Format::TSV | merfishdata::Format::Binary => {
                     // if the readout has been corrected, reconstruct the/an un-corrected barcode
                     if record.hamming_dist() == 1 {
-                        let error_bit = match record.error_bit() {
-                            // the binary merfish format actually tells us at which position the error occurred
-                            Some(bit) => bit,
-
+                        let error_mask = if record.error_mask() == 0 {
                             // the tsv merfish format only states if a readout was bit-corrected or not
                             // we will hence un-correct the barcode at random (according to p0/p1 probabilities)
-                            None => {
-                                let weights: Vec<_> = (0..self.num_bits)
-                                    .map(|i| {
-                                        let bit = (barcode >> i) & 1;
-                                        match bit {
-                                            0 => self.p0[i],
-                                            1 => self.p1[i],
-                                            _ => panic!("bug: bit can only be 0 or 1"),
-                                        }
-                                    })
-                                    .collect();
-                                let wc = WeightedIndex::new(weights).unwrap();
-                                rng.sample(&wc) as u8
-                            }
+                            let weights: Vec<_> = (0..self.num_bits)
+                                .map(|i| {
+                                    let bit = (barcode >> i) & 1;
+                                    match bit {
+                                        0 => self.p0[i],
+                                        1 => self.p1[i],
+                                        _ => panic!("bug: bit can only be 0 or 1"),
+                                    }
+                                })
+                                .collect();
+                            let wc = WeightedIndex::new(weights).unwrap();
+                            1 << rng.sample(&wc) as u8
+                        } else {
+                            record.error_mask()
                         };
-                        uncorrected_barcode ^= 1 << error_bit;
+                        uncorrected_barcode ^= error_mask;
                     }
                 }
             }

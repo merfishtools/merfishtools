@@ -37,7 +37,7 @@ pub trait MerfishRecord {
     fn feature_id(&self) -> u16;
     fn feature_name(&self) -> String;
     fn hamming_dist(&self) -> u8;
-    fn error_bit(&self) -> Option<u8>;
+    fn error_mask(&self) -> u16;
     fn barcode(&self, codebook: Option<&Codebook>) -> u16;
     fn readout(&self) -> Readout;
     fn count(&self) -> usize;
@@ -98,8 +98,8 @@ pub mod sim {
             }
         }
 
-        fn error_bit(&self) -> Option<u8> {
-            None
+        fn error_mask(&self) -> u16 {
+            0b0000_0000_0000_0000
         }
 
         fn barcode(&self, _codebook: Option<&Codebook>) -> u16 {
@@ -157,7 +157,7 @@ pub mod tsv {
     use crate::io::merfishdata::{MerfishRecord, Readout};
 
     /// A 2D position in the microscope.
-    #[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct Position {
         pub x: f32,
         pub y: f32,
@@ -165,7 +165,7 @@ pub mod tsv {
 
     /// A MERFISH raw data record.
     /// // "Cell_ID	Gene_Name	Hamming_Distance	Cell_Position_X	Cell_Position_Y	RNA_Position_X	RNA_Position_Y
-    #[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct Record {
         #[serde(rename = "cell")]
         pub cell_id: String,
@@ -207,8 +207,8 @@ pub mod tsv {
             self.hamming_dist
         }
 
-        fn error_bit(&self) -> Option<u8> {
-            None
+        fn error_mask(&self) -> u16 {
+            0b0000000000000000
         }
 
         fn barcode(&self, codebook: Option<&Codebook>) -> u16 {
@@ -386,11 +386,11 @@ pub mod binary {
             1 - self.is_exact
         }
 
-        fn error_bit(&self) -> Option<u8> {
+        fn error_mask(&self) -> u16 {
             if self.error_bit > 0 {
-                Some(self.error_bit - 1)
+                1 << (self.error_bit as u16 - 1)
             } else {
-                None
+                0b0000_0000_0000_0000
             }
         }
 
