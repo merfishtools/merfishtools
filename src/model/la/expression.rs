@@ -323,9 +323,9 @@ impl ExpressionT {
             //            if !codebook.record(record.feature_id() as usize).expressed() {
             //                continue;
             //            }
-            let barcode = record.barcode(None);
-            let mut raw_barcode = barcode;
-            let mut uncorrected_barcode = barcode;
+            let readout = record.readout();
+            let mut raw_barcode = readout;
+            let mut uncorrected_barcode = readout;
             match format {
                 // simulated data is perturbed ground truth data,
                 // i.e. no error correction has been performed
@@ -356,7 +356,7 @@ impl ExpressionT {
                             // we will hence un-correct the barcode at random (according to p0/p1 probabilities)
                             let weights: Vec<_> = (0..self.num_bits)
                                 .map(|i| {
-                                    let bit = (barcode >> i) & 1;
+                                    let bit = (readout >> i) & 1;
                                     match bit {
                                         0 => self.p0[i],
                                         1 => self.p1[i],

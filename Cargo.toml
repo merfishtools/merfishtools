@@ -58,3 +58,6 @@ path="src/bin/barnacleboy.rs"
 [[bin]]
 name="merfishtools"
 path="src/bin/merfishtools.rs"
+
+[profile.dev]
+opt-level = 2
