@@ -110,22 +110,24 @@ impl Reader<fs::File> {
         records.iter_mut().for_each(|r| {
             let cb = codebook;
             r.codeword = into_u16(cb.record(cb.get_id(&r.feature_name())).codeword());
-            let weights: Vec<_> = (0..num_bits)
-                .map(|i| {
-                    let bit = (r.codeword >> i) & 1;
-                    match bit {
-                        0 => p0[i],
-                        1 => p1[i],
-                        _ => panic!("bug: bit can only be 0 or 1"),
-                    }
-                })
-                .collect();
-            if rng.sample(unif) > weights.iter().map(|p| 1. - p).product() {
-                let wc = WeightedIndex::new(weights).unwrap();
-                let error_bit = rng.sample(&wc) as u8;
-                r.readout = r.codeword ^ (1 << error_bit as u16);
-            } else {
-                r.readout = r.codeword;
+            r.readout = r.codeword;
+            if r.hamming_dist() == 1 {
+                let weights: Vec<_> = (0..num_bits)
+                    .map(|i| {
+                        let bit = (r.codeword >> i) & 1;
+                        match bit {
+                            0 => p0[i],
+                            1 => p1[i],
+                            _ => panic!("bug: bit can only be 0 or 1"),
+                        }
+                    })
+                    .collect();
+                // possibly introduce a one-bit error according to weights.
+                if rng.sample(unif) > weights.iter().map(|p| 1. - p).product() {
+                    let wc = WeightedIndex::new(weights).unwrap();
+                    let error_bit = rng.sample(&wc) as u8;
+                    r.readout = r.codeword ^ (1 << error_bit as u16);
+                }
             }
         });
     }
