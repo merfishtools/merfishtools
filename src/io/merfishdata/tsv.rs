@@ -106,6 +106,7 @@ impl Reader<fs::File> {
         p1: &[f32],
         rng: &mut StdRng,
     ) {
+        let unif = rand::distributions::Uniform::new(0f32, 1.);
         records.iter_mut().for_each(|r| {
             let cb = codebook;
             r.codeword = into_u16(cb.record(cb.get_id(&r.feature_name())).codeword());
@@ -119,9 +120,13 @@ impl Reader<fs::File> {
                     }
                 })
                 .collect();
-            let wc = WeightedIndex::new(weights).unwrap();
-            let error_bit = rng.sample(&wc) as u8;
-            r.readout = r.codeword ^ (1 << error_bit as u16);
+            if rng.sample(unif) > weights.iter().map(|p| 1. - p).product() {
+                let wc = WeightedIndex::new(weights).unwrap();
+                let error_bit = rng.sample(&wc) as u8;
+                r.readout = r.codeword ^ (1 << error_bit as u16);
+            } else {
+                r.readout = r.codeword;
+            }
         });
     }
 }

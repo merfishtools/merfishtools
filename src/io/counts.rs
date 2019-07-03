@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::iter::FromIterator;
 use std::path::Path;
 
 use byteorder::ByteOrder;
@@ -6,7 +7,6 @@ use byteorder::NativeEndian;
 use counter::Counter;
 use itertools::{Either, Itertools};
 use rand::prelude::StdRng;
-
 use rand::SeedableRng;
 
 use crate::io::codebook::Codebook;
@@ -112,11 +112,14 @@ impl MerfishRecord for CommonRecord {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Counts {
-    observed: Counter<u16, usize>,
-    corrected: Counter<u16, usize>,
+    observed: Counter<(u16, u16), usize>,
+    corrected: Counter<(u16, u16), usize>,
+    info: Info,
 }
+
+pub(crate) type Info = HashMap<u16, crate::model::bayes::readout::Counts>;
 
 pub(crate) fn into_u16(readout: &Readout) -> u16 {
     readout
@@ -128,13 +131,13 @@ pub(crate) fn into_u16(readout: &Readout) -> u16 {
 }
 
 impl Counts {
-    pub fn from_records<I: Iterator<Item = impl MerfishRecord>>(
+    pub fn from_records<I: Iterator<Item=impl MerfishRecord>>(
         records: I,
         codebook: &Codebook,
     ) -> Self {
         // gather counts per readout from records
         let observed_counts = records
-            .map(|r| (r.readout(), r.count()))
+            .map(|r| ((r.codeword(), r.readout()), r.count()))
             .collect::<Counter<_>>();
         let (expressed_codewords, _blank_codewords): (Vec<_>, Vec<_>) = codebook
             .records()
@@ -147,10 +150,13 @@ impl Counts {
                     Either::Right(r)
                 }
             });
-        let corrected_counts = Self::correct_counts(&observed_counts, &expressed_codewords);
+        let codewords = HashSet::from_iter(expressed_codewords.iter().cloned());
+        let corrections = Self::corrections(&observed_counts, &codewords);
+        let (corrected_counts, info) = Self::apply_corrections(&observed_counts, &corrections);
         Self {
             observed: observed_counts,
             corrected: corrected_counts,
+            info,
         }
     }
 
@@ -195,7 +201,10 @@ impl Counts {
                     &mut rng,
                 );
 
-                let grouped_records = records.into_iter().map(|r| (r.cell_name(), r)).into_group_map();
+                let grouped_records = records
+                    .into_iter()
+                    .map(|r| (r.cell_name(), r))
+                    .into_group_map();
                 grouped_records
                     .iter()
                     .map(|(cell, records)| (cell.to_owned(), counter(records.iter().cloned())))
@@ -229,13 +238,24 @@ impl Counts {
                     .filter_map(Result::ok),
                 &codebook,
             ),
-            merfishdata::Format::TSV => Self::from_records(
-                merfishdata::tsv::Reader::from_file(&path)
+            merfishdata::Format::TSV => {
+                let mut records: Vec<tsv::Record> = merfishdata::tsv::Reader::from_file(&path)
                     .unwrap()
                     .records()
-                    .filter_map(Result::ok),
-                &codebook,
-            ),
+                    .filter_map(Result::ok)
+                    .collect_vec();
+                let mut rng: StdRng = StdRng::seed_from_u64(42);
+
+                tsv::Reader::fill_in_missing_information(
+                    &mut records,
+                    codebook,
+                    16,
+                    &vec![0.04; 16],
+                    &vec![0.09; 16],
+                    &mut rng,
+                );
+                Self::from_records(records.iter().cloned(), &codebook)
+            }
             merfishdata::Format::Simulation => Self::from_records(
                 merfishdata::sim::Reader::from_file(&path)
                     .unwrap()
@@ -247,51 +267,89 @@ impl Counts {
         counts
     }
 
-    fn correct_counts(
-        observed_counts: &Counter<u16, usize>,
-        codewords: &[u16],
-    ) -> Counter<u16, usize> {
+    fn corrections(
+        observed_counts: &Counter<(u16, u16), usize>,
+        codewords: &HashSet<u16>,
+    ) -> Vec<(u16, u16)> {
         // simple, naïve readout correction
         // If there's exactly one neighbour with hamming distance <= 4 in the codebook, use that.
-        let corrections = observed_counts
-            .keys()
-            .map(|&readout| {
-                // no correction necessary
-                if codewords.contains(&readout) {
-                    return (readout, None);
+        observed_counts
+            .iter()
+            .flat_map(|(&(codeword, readout), &count)| {
+                if codeword != readout {
+                    return vec![(readout, codeword); count];
                 }
-                // distances between readout and known (and expressed) codewords
-                let dists = codewords
-                    .iter()
-                    .map(|&cw| (cw, hamming_distance16(cw, readout)))
-                    .collect_vec();
-                // if there's exactly one expressed codeword with distance `dist`,
-                // "replace" readout with that codeword.
-                for dist in 1..=2 {
-                    let closest: Vec<u16> = dists
+
+                // no correction necessary
+                if codewords.contains(&readout) && codeword != 0 {
+                    return vec![(readout, readout); count];
+                }
+                // if the codeword is unknown, try to find a codeword in the codebook
+                // which is the only 1-neighbour of the readout
+                if codeword == 0 {
+                    // TODO use Option instead of 0 as a special value
+                    // distances between readout and known (and expressed) codewords
+                    let dists = codewords
                         .iter()
-                        .filter(|(_cw, d)| *d == dist)
-                        .map(|(cw, _)| *cw)
-                        .collect();
-                    if closest.len() == 1 {
-                        dbg!((&readout, &closest[0]));
-                        return (readout, Some(closest[0]));
+                        .map(|&cw| (cw, hamming_distance16(cw, readout)))
+                        .collect_vec();
+                    // if there's exactly one expressed codeword with distance `dist`,
+                    // "replace" readout with that codeword.
+                    for dist in 1..=2 {
+                        let closest: Vec<u16> = dists
+                            .iter()
+                            .filter(|(_cw, d)| *d == dist)
+                            .map(|(cw, _)| *cw)
+                            .collect();
+                        if closest.len() == 1 {
+                            return vec![(readout, closest[0]); count];
+                        }
                     }
                 }
-                (readout, None)
+                vec![(readout, readout); count]
             })
-            .collect_vec();
+            .collect_vec()
+    }
 
+    fn apply_corrections(
+        observed_counts: &Counter<(u16, u16), usize>,
+        corrections: &Vec<(u16, u16)>,
+    ) -> (Counter<(u16, u16), usize>, Info) {
         let mut corrected_counts = observed_counts.clone();
-        for (readout, codeword) in corrections {
-            if let Some(cw) = codeword {
-                corrected_counts
-                    .entry(readout)
-                    .and_modify(|count| *count -= 1);
-                corrected_counts.entry(cw).and_modify(|count| *count += 1);
-            };
+        let mut info: Info = HashMap::new();
+        for (observed_readout, corrected_readout) in corrections {
+            // correct observed readout (to codeword [corrected readout]),
+            // i.e. readout count is decremented
+            // and codeword count incremented.
+            corrected_counts
+                .entry((*corrected_readout, *observed_readout))
+                .and_modify(|count| *count -= 1);
+            corrected_counts
+                .entry((*corrected_readout, *corrected_readout))
+                .and_modify(|count| *count += 1);
+
+            if observed_readout != corrected_readout {
+                // if a correction has been performed
+                // increment the mismatch count for the respective codeword
+                info.entry(*corrected_readout)
+                    .or_insert(crate::model::bayes::readout::Counts {
+                        exact: 0,
+                        mismatch: 0,
+                    })
+                    .mismatch += 1;
+            } else {
+                // if no correction has been performed
+                // increment the exact count for the respective codeword
+                // (which is identical to the readout)
+                info.entry(*observed_readout)
+                    .or_insert(crate::model::bayes::readout::Counts {
+                        exact: 0,
+                        mismatch: 0,
+                    })
+                    .exact += 1;
+            }
         }
-        corrected_counts
+        (corrected_counts, info)
     }
 }
 
@@ -304,23 +362,25 @@ mod tests {
 
     #[test]
     fn test_counts() -> Result<(), Error> {
-        let path_data = "/vol/tiny/merfish/raw/rep2/assigned_blist.bin";
-        let path_codebook = "/home/hartmann/projects/merfresh/codebook.tsv";
+//        let path_data = "/vol/tiny/merfish/raw/rep2/assigned_blist.bin";
+        let path_data = "/vol/tiny/merfish/merfishtools-evaluation/data/140genesData.1.all.txt";
+        let path_codebook = "/vol/tiny/merfish/merfishtools-evaluation/codebook/140genesData.1.txt";
         let codebook = Codebook::from_file(path_codebook)?;
         let counts = Counts::from_path(path_data, &codebook);
         dbg!(&counts);
-        assert!(false);
+//        assert!(false);
         Ok(())
     }
 
     #[test]
     fn test_grouped_counts() -> Result<(), Error> {
-        let path_data = "/vol/tiny/merfish/raw/rep2/assigned_blist.bin";
-        let path_codebook = "/home/hartmann/projects/merfresh/codebook.tsv";
+        // let path_data = "/vol/tiny/merfish/raw/rep2/assigned_blist.bin";
+        let path_data = "/vol/tiny/merfish/merfishtools-evaluation/data/140genesData.1.all.txt";
+        let path_codebook = "/vol/tiny/merfish/merfishtools-evaluation/codebook/140genesData.1.txt";
         let codebook = Codebook::from_file(path_codebook)?;
         let counts = Counts::from_path_grouped(path_data, &codebook);
         dbg!(&counts);
-        assert!(false);
+//        assert!(false);
         Ok(())
     }
 
