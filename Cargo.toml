@@ -41,6 +41,8 @@ maplit = "1.0"
 derive-new = "0.5"
 num-traits = "0.2"
 counter = "0.4"
+newtype_derive = "0.1"
+custom_derive = "0.1"
 #faster = { git = "https://github.com/AdamNiederer/faster" }
 #packed_simd = "0.3"
 

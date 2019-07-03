@@ -11,7 +11,7 @@ pub struct Record {
     #[serde(with = "binary", rename = "barcode")]
     pub readout: u16,
     pub count: usize,
-    #[serde(with = "binary", skip)]
+    #[serde(default, with = "binary",  skip)]
     pub codeword: u16,
 }
 
@@ -46,7 +46,7 @@ impl MerfishRecord for Record {
     }
 
     fn error_mask(&self) -> u16 {
-        0b0000_0000_0000_0000
+        self.codeword ^ self.readout
     }
 
     fn codeword(&self) -> u16 {
