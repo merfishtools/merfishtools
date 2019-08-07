@@ -14,6 +14,9 @@ use rayon::prelude::*;
 use regex::Regex;
 
 use crate::cli::Expression;
+use crate::io::common::Barcode;
+use crate::io::codebook::Codebook;
+use crate::io::counts::{Counts, Records};
 use crate::io::merfishdata;
 use crate::io::merfishdata::MerfishRecord;
 use crate::io::simple_codebook::SimpleCodebook;
@@ -21,6 +24,8 @@ use crate::model::la::common::{hamming_distance, Errors, Expr, ExprV};
 use crate::model::la::matrix::{csr_error_matrix, csr_successive_overrelaxation, CSR};
 use crate::model::la::problem::{objective, partial_objective};
 use crate::simulation::binary;
+use itertools::{Either, Itertools};
+use std::path::Path;
 
 #[derive(Serialize, Deserialize, new)]
 pub struct RecordEstimate {
@@ -45,9 +50,7 @@ pub struct ExpressionT {
     seed: u64,
     num_bits: usize,
     #[new(default)]
-    corrected_counts: HashMap<String, HashMap<u16, usize>>,
-    #[new(default)]
-    raw_counts: HashMap<String, HashMap<u16, usize>>,
+    counts: HashMap<String, Counts>,
 }
 
 impl Expression for ExpressionT {
@@ -92,8 +95,6 @@ impl Expression for ExpressionT {
         }
         let non_codewords = Vec::from_iter(unused_codewords.iter().cloned());
         //        let non_codewords = Vec::from_iter(unexpressed_codewords.iter().cloned());
-        let raw_counts = &self.raw_counts;
-        let corrected_counts = &self.corrected_counts;
         let max_hamming_distance = self.max_hamming_distance;
         let mode = &self.mode;
 
@@ -105,16 +106,12 @@ impl Expression for ExpressionT {
 
         let mut x_est: Expr = Array1::<f32>::zeros(num_codes);
         let mut y: Expr = Array1::<f32>::zeros(num_codes);
-        for (_cell, feature_counts) in corrected_counts {
-            for (&barcode, &count) in feature_counts {
-                x_est[barcode as usize] += count as f32;
+        for (_cell, counts) in &self.counts {
+            for (&(_codeword, readout), &count) in counts.corrected.iter() {
+                x_est[*readout as usize] = count as f32;
             }
-        }
-        //        let uniform = rand::distributions::Uniform::new(0f32, 1.);
-        //        let mut rng = StdRng::seed_from_u64(self.seed);
-        for (_cell, feature_counts) in raw_counts {
-            for (&barcode, &count) in feature_counts {
-                y[barcode as usize] += count as f32; // + rng.sample(&uniform);
+            for (&(_codeword, readout), &count) in counts.observed.iter() {
+                y[*readout as usize] = count as f32;
             }
         }
 
@@ -199,24 +196,21 @@ impl Expression for ExpressionT {
                 .unwrap()
         });
         let all_records: Vec<RecordEstimate> = self
-            .raw_counts
+            .counts
             .par_iter()
-            .flat_map(|(cell, raw_countmap)| {
-                let corrected_countmap = self.corrected_counts.get(cell).unwrap();
-                let mut y: Expr = Expr::zeros((num_codes, ));
-                raw_countmap.iter().for_each(|(&barcode, &count)| {
-                    y[barcode as usize] += count as f32;
-                });
+            .flat_map(|(cell, c): (&String, &Counts)| {
                 let mut x: Expr = Expr::zeros((num_codes, ));
-                corrected_countmap.iter().for_each(|(&barcode, &count)| {
-                    x[barcode as usize] += count as f32;
-                });
+                let mut y: Expr = Expr::zeros((num_codes, ));
+                for (&(_codeword, readout), &count) in c.corrected.iter() {
+                    x[*readout as usize] = count as f32;
+                }
+                for (&(_codeword, readout), &count) in c.observed.iter() {
+                    y[*readout as usize] = count as f32;
+                }
 
                 let magnitude_x = x.sum();
                 adjust(&mut x, &non_codewords);
                 let magnitude_y = y.sum();
-                //                dbg!(magnitude_x);
-                //                dbg!(magnitude_y);
                 y /= magnitude_y;
                 x = estimate_expression(&mat, x.view(), y.view(), w, false)
                     .expect("Failed estimating expression");
@@ -286,109 +280,25 @@ fn adjust(x: &mut Expr, non_codewords: &[usize]) {
 }
 
 impl ExpressionT {
-    pub fn load_counts<'a, R>(
-        &mut self,
-        reader: &'a mut R,
-        format: merfishdata::Format,
-    ) -> Result<(), Error>
-        where
-            R: crate::io::merfishdata::Reader<'a>,
-    {
+    pub fn load_counts<'a, P: AsRef<Path>>(&mut self, path: P) -> Result<(), Error> {
+        info!("Reading codebook");
         let codebook =
             &crate::io::simple_codebook::SimpleCodebook::from_file(&self.codebook_path())?;
-
-        let mut corrected_counts: HashMap<String, HashMap<u16, usize>> = HashMap::new();
-        let mut raw_counts: HashMap<String, HashMap<u16, usize>> = HashMap::new();
-
-        let mut rng = StdRng::seed_from_u64(self.seed);
-
-        let expressed_codewords: Vec<u16> = codebook
-            .records()
-            .iter()
-            .filter(|&r| r.expressed())
-            .map(|r| r.codeword())
-            .collect();
-        let _unexpressed_codewords: Vec<u16> = codebook
-            .records()
-            .iter()
-            .filter(|&r| !r.expressed())
-            .map(|r| r.codeword())
-            .collect();
-
-        for rec in reader.records() {
-            let record = rec?;
-            //            if !self.cells().is_match(&record.cell_name()) && codebook.contains(&record.feature_name()) {
-            //                continue;
-            //            }
-            //            if !codebook.record(record.feature_id() as usize).expressed() {
-            //                continue;
-            //            }
-            let readout = record.readout();
-            let mut raw_barcode = readout;
-            let mut uncorrected_barcode = readout;
-            match format {
-                // simulated data is perturbed ground truth data,
-                // i.e. no error correction has been performed
-                // ... so we do that now, if at all possible
-                merfishdata::Format::Simulation => {
-                    for dist in 1..=4u8 {
-                        if record.hamming_dist() == dist {
-                            let closest: Vec<u16> = expressed_codewords
-                                .iter()
-                                .map(|&cw| {
-                                    (cw, hamming_distance(cw as usize, raw_barcode as usize))
-                                })
-                                .filter(|(_cw, d)| *d == dist as usize)
-                                .map(|(cw, _)| cw)
-                                .collect();
-                            if closest.len() == 1 {
-                                raw_barcode = closest[0];
-                                break;
-                            }
-                        }
-                    }
+        info!("Read codebook.");
+        let (expressed_codewords, _unexpressed_codewords): (Vec<_>, Vec<_>) =
+            codebook.records().iter().partition_map(|r| {
+                if r.expressed() {
+                    Either::Left(Barcode(r.codeword()))
+                } else {
+                    Either::Right(Barcode(r.codeword()))
                 }
-                merfishdata::Format::TSV | merfishdata::Format::Binary => {
-                    // if the readout has been corrected, reconstruct the/an un-corrected barcode
-                    if record.hamming_dist() == 1 {
-                        let error_mask = if record.error_mask() == 0 {
-                            // the tsv merfish format only states if a readout was bit-corrected or not
-                            // we will hence un-correct the barcode at random (according to p0/p1 probabilities)
-                            let weights: Vec<_> = (0..self.num_bits)
-                                .map(|i| {
-                                    let bit = (readout >> i) & 1;
-                                    match bit {
-                                        0 => self.p0[i],
-                                        1 => self.p1[i],
-                                        _ => panic!("bug: bit can only be 0 or 1"),
-                                    }
-                                })
-                                .collect();
-                            let wc = WeightedIndex::new(weights).unwrap();
-                            1 << rng.sample(&wc) as u8
-                        } else {
-                            record.error_mask()
-                        };
-                        uncorrected_barcode ^= error_mask;
-                    }
-                }
-            }
-
-            let count = record.count();
-            let cell_counts_corrected = corrected_counts
-                .entry(record.cell_name())
-                .or_insert_with(HashMap::new);
-            let feature_counts_corrected = cell_counts_corrected.entry(raw_barcode).or_insert(0);
-            *feature_counts_corrected += count;
-
-            let cell_counts_raw = raw_counts
-                .entry(record.cell_name())
-                .or_insert_with(HashMap::new);
-            let feature_counts_raw = cell_counts_raw.entry(uncorrected_barcode).or_insert(0);
-            *feature_counts_raw += count;
-        }
-        self.corrected_counts = corrected_counts;
-        self.raw_counts = raw_counts;
+            });
+        info!("Reading records...");
+        let records = Records::from_path(path);
+        info!("Finished reading records.");
+        let counts = Counts::from_records(records.into_iter(), &expressed_codewords);
+        info!("Finished counting.");
+        self.counts = counts;
         Ok(())
     }
 }

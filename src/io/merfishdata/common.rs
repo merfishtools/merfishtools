@@ -3,8 +3,10 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use crate::io::merfishdata::{binary, sim, tsv};
 use bit_vec::BitVec;
 use failure::Fail;
+use std::io;
 use std::iter::Iterator;
 use std::path::Path;
 
@@ -36,10 +38,11 @@ pub trait MerfishRecord {
     fn feature_name(&self) -> String;
     fn hamming_dist(&self) -> u8;
     fn error_mask(&self) -> u16;
-    fn codeword(&self) -> u16;
+    fn codeword(&self) -> Option<u16>;
     fn readout(&self) -> u16;
     fn readout_bitvec(&self) -> Readout;
     fn count(&self) -> usize;
+    fn is_exact(&self) -> bool;
 }
 
 pub trait Reader<'a> {

@@ -1,10 +1,11 @@
 use std::path::Path;
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde::de::Error;
 use serde::de::Unexpected;
-use serde::{Deserialize, Deserializer, Serialize};
 
+use crate::io::common::Barcode;
 use crate::simulation::binary;
 
 /// Deserialize bool from String with custom value mapping
@@ -57,6 +58,17 @@ impl SimpleCodebook {
             .collect_vec();
         Ok(SimpleCodebook { records })
     }
+
+    pub fn codewords(&self) -> (Vec<Barcode>, Vec<Barcode>) {
+        self.records().iter().partition_map(|r| {
+            if r.expressed() {
+                Either::Left(Barcode(r.codeword()))
+            } else {
+                Either::Right(Barcode(r.codeword()))
+            }
+        })
+    }
+
     pub fn records(&self) -> &Vec<Record> {
         &self.records
     }

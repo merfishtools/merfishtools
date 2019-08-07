@@ -5,14 +5,14 @@
 
 use clap::AppSettings::{ColoredHelp, DeriveDisplayOrder};
 use failure::Error;
+use log::{info, warn};
 use rayon::ThreadPoolBuilder;
 use regex::Regex;
 use structopt::StructOpt;
 
 use merfishtools::cli::Expression;
-use merfishtools::io::merfishdata;
 use merfishtools::io::simple_codebook::SimpleCodebook;
-use log::{info, warn};
+use merfishtools::model::la::expression::ExpressionT;
 
 #[derive(StructOpt)]
 #[structopt(
@@ -157,10 +157,12 @@ fn main() -> Result<(), Error> {
                 1 => vec![values[0]; num_bits],
                 _ => values,
             };
+            info!("FOO1");
             ThreadPoolBuilder::new()
                 .num_threads(threads)
                 .build_global()?;
-            let mut expression = merfishtools::model::la::expression::ExpressionT::new(
+            info!("FOO2");
+            let mut expression: ExpressionT = ExpressionT::new(
                 convert_err_rates(p0),
                 convert_err_rates(p1),
                 codebook.to_owned(),
@@ -173,20 +175,9 @@ fn main() -> Result<(), Error> {
                 seed,
                 num_bits,
             );
-            match merfishdata::Format::from_path(&raw_data) {
-                merfishdata::Format::Binary => expression.load_counts(
-                    &mut merfishdata::binary::Reader::from_file(&raw_data)?,
-                    merfishdata::Format::Binary,
-                )?,
-                merfishdata::Format::TSV => expression.load_counts(
-                    &mut merfishdata::tsv::Reader::from_file(&raw_data)?,
-                    merfishdata::Format::TSV,
-                )?,
-                merfishdata::Format::Simulation => expression.load_counts(
-                    &mut merfishdata::sim::Reader::from_file(&raw_data)?,
-                    merfishdata::Format::Simulation,
-                )?,
-            }
+            info!("FOO3");
+            expression.load_counts(&raw_data)?;
+            info!("FOO4");
             expression.infer()
         }
     }

@@ -6,22 +6,168 @@ use counter::Counter;
 use itertools::{Either, Itertools};
 use rand::prelude::StdRng;
 use rand::SeedableRng;
+use rayon::iter::ParallelIterator;
+use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator};
 
 use crate::io::codebook::Codebook;
+use crate::io::common::Barcode;
 use crate::io::merfishdata;
+use crate::io::merfishdata::tsv::modify_record;
 use crate::io::merfishdata::{binary, tsv};
 use crate::io::merfishdata::{MerfishRecord, Reader, Readout};
-use crate::io::common::Barcode;
+use crate::model::bayes::readout::Counts as MismatchCounts;
 use crate::model::la::common::hamming_distance16;
+use failure::Fail;
+use std::io;
 
-#[derive(Debug, Clone)]
-pub(crate) struct Counts {
-    observed: Counter<(Barcode, Barcode), usize>,
-    corrected: Counter<(Barcode, Barcode), usize>,
-    info: Info,
+pub struct ImageInfo {
+    /// The id associated with the field-of-view in which this RNA was imaged.
+    fov_id: u16,
+    /// The sum of the normalized intensity associated with each pixel assigned to a given RNA.
+    total_magnitude: f32,
+    /// The center of the pixels associated with a given RNA in the coordinate system of each field-of-view in units of pixels.
+    pixel_centroid: [u16; 2],
+    /// The center of an RNA, weighted by the intensity of each pixel, in the coordinate system of each field-of-view in units of pixels.
+    weighted_pixel_centroid: [f32; 2],
+    /// The center of an RNA in the absolute coordinate system of the sample in microns. This quantity is calculated from the weighted_pixel_centroid.
+    abs_position: [f32; 2],
+    /// The number of pixels associated with an RNA.
+    area: u16,
+    /// The normalized intensity of each pixel for each bit in the barcode, average across all pixels assigned to an RNA.
+    pixel_trace_mean: [f32; 16],
+    /// The standard deviation of the normalized intensity for each bit in the barcode taken across all pixels assigned to an RNA.
+    pixel_trace_std: [f32; 16],
+    /// The bit at which error correction was applied. (0 if it was not applied).
+    error_bit: u8,
+    /// A boolean representing the type of error (0 corresponds to a '0' to '1' error; 1 corresponds to a '1' to '0' error).
+    error_dir: u8,
+    /// The average Euclidean distance between the pixel trace for a given RNA and the barcode to which it was matched.
+    av_distance: f32,
+    /// A boolean flag representing whether or not (TRUE/FALSE) an RNA was found within the nucleus of the cell.
+    in_nucleus: u8,
+    /// The distance (in microns) from the RNA to the closest edge of the nucleus.
+    dist_nucleus: f64,
+    /// The distance (in microns) from the RNA to the closest boundary of the cell.
+    dist_periphery: f64,
 }
 
-pub(crate) type Info = HashMap<Barcode, crate::model::bayes::readout::Counts>;
+pub struct CommonRecord {
+    cell_name: String,
+    feature_name: String,
+    readout: Barcode,
+    codeword: Option<Barcode>,
+    count: usize,
+    is_exact: bool,
+    image_info: Option<ImageInfo>,
+}
+
+pub trait FromRecord<T> {
+    fn from_record(other: T) -> Self;
+}
+
+// TODO impl FromRecords<BinaryRecord> for CommonRecord { ... }
+impl<M: MerfishRecord> FromRecord<M> for CommonRecord {
+    fn from_record(other: M) -> Self {
+        CommonRecord {
+            cell_name: other.cell_name(),
+            feature_name: other.feature_name(),
+            readout: Barcode(other.readout()),
+            codeword: other.codeword().map(Barcode),
+            count: other.count(),
+            is_exact: other.is_exact(),
+            image_info: None,
+        }
+    }
+}
+
+impl MerfishRecord for CommonRecord {
+    fn cell_id(&self) -> u32 {
+        unimplemented!()
+    }
+
+    fn cell_name(&self) -> String {
+        self.cell_name.to_owned()
+    }
+
+    fn cell_pos(&self) -> (f32, f32) {
+        unimplemented!()
+    }
+
+    fn feature_id(&self) -> u16 {
+        unimplemented!()
+    }
+
+    fn feature_name(&self) -> String {
+        self.feature_name.to_owned()
+    }
+
+    fn hamming_dist(&self) -> u8 {
+        assert!(self.codeword().is_some());
+        hamming_distance16(self.codeword().unwrap(), self.readout())
+    }
+
+    fn error_mask(&self) -> u16 {
+        assert!(self.codeword().is_some());
+        self.codeword().unwrap() ^ self.readout()
+    }
+
+    fn codeword(&self) -> Option<u16> {
+        self.codeword.map(u16::from)
+    }
+
+    fn readout(&self) -> u16 {
+        *self.readout
+    }
+
+    fn readout_bitvec(&self) -> Readout {
+        unimplemented!()
+    }
+
+    fn count(&self) -> usize {
+        self.count
+    }
+
+    fn is_exact(&self) -> bool {
+        self.is_exact
+    }
+}
+
+pub struct Records {}
+
+impl Records {
+    pub fn from_path<'a, P: AsRef<Path> + 'a>(path: P) -> Box<dyn Iterator<Item=CommonRecord> + 'a> {
+        let format = merfishdata::Format::from_path(&path);
+        match format {
+            merfishdata::Format::Binary => Box::new(
+                merfishdata::binary::Reader::from_file(&path)
+                    .unwrap()
+                    .records()
+                    .filter_map(Result::ok)
+            ),
+            merfishdata::Format::TSV => Box::new(
+                merfishdata::tsv::Reader::from_file(&path)
+                    .unwrap()
+                    .records()
+                    .filter_map(Result::ok)
+            ),
+            merfishdata::Format::Simulation => Box::new(
+                merfishdata::sim::Reader::from_file(&path)
+                    .unwrap()
+                    .records()
+                    .filter_map(Result::ok)
+            ),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct Counts {
+    pub observed: Counter<(Option<Barcode>, Barcode), usize>,
+    pub corrected: Counter<(Option<Barcode>, Barcode), usize>,
+    pub info: Info,
+}
+
+pub(crate) type Info = HashMap<Barcode, MismatchCounts>;
 
 pub(crate) fn into_u16(readout: &Readout) -> u16 {
     readout
@@ -33,258 +179,143 @@ pub(crate) fn into_u16(readout: &Readout) -> u16 {
 }
 
 impl Counts {
-    pub(crate) fn from_records<I: Iterator<Item=impl MerfishRecord>>(
+    pub(crate) fn from_records<I: Iterator<Item=C>, C: MerfishRecord>(
         records: I,
-        codebook: &Codebook,
-    ) -> Self {
-        // gather counts per readout from records
-        let observed_counts = records
-            .map(|r| ((Barcode(r.codeword()), Barcode(r.readout())), r.count()))
-            .collect::<Counter<_>>();
-        let (expressed_codewords, _blank_codewords): (Vec<_>, Vec<_>) = codebook
-            .records()
-            .iter()
-            .map(|&r| (Barcode(into_u16(r.codeword())), r.expressed()))
-            .partition_map(|(r, expressed)| {
-                if expressed {
-                    Either::Left(r)
-                } else {
-                    Either::Right(r)
-                }
-            });
-        let codewords = HashSet::from_iter(expressed_codewords.iter().cloned());
-        let corrections = Self::corrections(&observed_counts, &codewords);
-        let (corrected_counts, info) = Self::apply_corrections(&observed_counts, &corrections);
-        Self {
-            observed: observed_counts,
-            corrected: corrected_counts,
-            info,
-        }
-    }
-
-    pub(crate) fn from_path_grouped<P: AsRef<Path>>(
-        path: P,
-        codebook: &Codebook,
+        expressed_codewords: &[Barcode],
     ) -> HashMap<String, Self> {
-        let format = merfishdata::Format::from_path(&path);
-        // TODO: remove code duplication
-        match format {
-            merfishdata::Format::Binary => {
-                let counter = |records| Self::from_records(records, codebook);
-                let grouped_records: HashMap<String, Vec<binary::Record>> =
-                    merfishdata::binary::Reader::from_file(&path)
-                        .unwrap()
-                        .records()
-                        .filter_map(Result::ok)
-                        // the binary merfish format actually stores pre-corrected barcodes
-                        // so we un-correct those here.
-                        .map(|r| (r.cell_name(), r))
-                        .into_group_map();
-                grouped_records
-                    .iter()
-                    .map(|(cell, records)| (cell.to_owned(), counter(records.iter().cloned())))
-                    .collect()
-            }
-            merfishdata::Format::TSV => {
-                let counter = |records| Self::from_records(records, codebook);
-                let mut records: Vec<tsv::Record> = merfishdata::tsv::Reader::from_file(&path)
-                    .unwrap()
-                    .records()
-                    .filter_map(Result::ok)
-                    .collect_vec();
-                let mut rng: StdRng = StdRng::seed_from_u64(42);
-
-                tsv::Reader::fill_in_missing_information(
-                    &mut records,
-                    codebook,
-                    16,
-                    &vec![0.04; 16],
-                    &vec![0.09; 16],
-                    &mut rng,
-                );
-
-                let grouped_records = records
-                    .into_iter()
-                    .map(|r| (r.cell_name(), r))
-                    .into_group_map();
-                grouped_records
-                    .iter()
-                    .map(|(cell, records)| (cell.to_owned(), counter(records.iter().cloned())))
-                    .collect()
-            }
-            merfishdata::Format::Simulation => {
-                let counter = |records| Self::from_records(records, codebook);
-                // simulated data has not been bit corrected at all, so do nothing.
-                let grouped_records = merfishdata::sim::Reader::from_file(&path)
-                    .unwrap()
-                    .records()
-                    .filter_map(Result::ok)
-                    .map(|r| (r.cell_name(), r))
-                    .into_group_map();
-                grouped_records
-                    .iter()
-                    .map(|(cell, records)| (cell.to_owned(), counter(records.iter().cloned())))
-                    .collect()
-            }
+        let mut cell_counts = HashMap::new();
+        let mut corrections: HashMap<(Option<Barcode>, Barcode), Option<Barcode>> = HashMap::new();
+        for r in records {
+            let counts_in_cell = cell_counts
+                .entry(r.cell_name())
+                .or_insert(Counts::default());
+            let (codeword, readout) = (r.codeword().map(Barcode), Barcode(r.readout()));
+            *counts_in_cell
+                .observed
+                .entry((codeword, readout))
+                .or_insert(0) += r.count();
+            corrections
+                .entry((codeword, readout))
+                .or_insert(Self::correct_readout(
+                    codeword,
+                    readout,
+                    &expressed_codewords,
+                ));
         }
-    }
-
-    pub(crate) fn from_path<P: AsRef<Path>>(path: P, codebook: &Codebook) -> Self {
-        let format = merfishdata::Format::from_path(&path);
-        // TODO: remove code duplication
-        let counts = match format {
-            merfishdata::Format::Binary => Self::from_records(
-                merfishdata::binary::Reader::from_file(&path)
-                    .unwrap()
-                    .records()
-                    .filter_map(Result::ok),
-                &codebook,
-            ),
-            merfishdata::Format::TSV => {
-                let mut records: Vec<tsv::Record> = merfishdata::tsv::Reader::from_file(&path)
-                    .unwrap()
-                    .records()
-                    .filter_map(Result::ok)
-                    .collect_vec();
-                let mut rng: StdRng = StdRng::seed_from_u64(42);
-
-                tsv::Reader::fill_in_missing_information(
-                    &mut records,
-                    codebook,
-                    16,
-                    &vec![0.04; 16],
-                    &vec![0.09; 16],
-                    &mut rng,
-                );
-                Self::from_records(records.iter().cloned(), &codebook)
-            }
-            merfishdata::Format::Simulation => Self::from_records(
-                merfishdata::sim::Reader::from_file(&path)
-                    .unwrap()
-                    .records()
-                    .filter_map(Result::ok),
-                &codebook,
-            ),
-        };
-        counts
-    }
-
-    fn corrections(
-        observed_counts: &Counter<(Barcode, Barcode), usize>,
-        codewords: &HashSet<Barcode>,
-    ) -> Vec<(Barcode, Barcode)> {
-        // simple, naïve readout correction
-        // If there's exactly one neighbour with hamming distance <= 4 in the codebook, use that.
-        observed_counts
-            .iter()
-            .flat_map(|(&(codeword, readout), &count)| {
-                if codeword != Barcode(0) {
-                    // TODO use Option instead of 0 as a special value
-                    if codeword != readout {
-                        return vec![(readout, codeword); count];
+        for ((codeword, observed), corrected) in corrections {
+            for (_cell, counts) in cell_counts.iter_mut() {
+                let count = counts
+                    .observed
+                    .entry((codeword, observed))
+                    .or_insert(0)
+                    .clone();
+                if let Some(corrected) = corrected {
+                    *counts.corrected.entry((codeword, corrected)).or_insert(0) += count;
+                    // The observed readout could be corrected to a codeword from the codebook
+                    if observed != corrected {
+                        counts
+                            .info
+                            .entry(corrected)
+                            .or_insert(MismatchCounts {
+                                exact: 0,
+                                corrected: 0,
+                                uncorrected: 0,
+                            })
+                            .corrected += count as u32;
+                    } else {
+                        // The observed readout is already correct
+                        // (i.e. a codeword from the codebook)
+                        counts
+                            .info
+                            .entry(observed)
+                            .or_insert(MismatchCounts {
+                                exact: 0,
+                                corrected: 0,
+                                uncorrected: 0,
+                            })
+                            .exact += count as u32;
                     }
-
-                    // no correction necessary
-                    if codewords.contains(&readout) {
-                        return vec![(readout, readout); count];
-                    }
-                    // if the codeword is unknown, try to find a codeword in the codebook
-                    // which is the only 1-neighbour of the readout
                 } else {
-                    // distances between readout and known (and expressed) codewords
-                    let dists = codewords
-                        .iter()
-                        .map(|&cw| (cw, hamming_distance16(*cw, *readout)))
-                        .collect_vec();
-                    // if there's exactly one expressed codeword with distance `dist`,
-                    // "replace" readout with that codeword.
-                    for dist in 1..=4 {
-                        let closest: Vec<Barcode> = dists
-                            .iter()
-                            .filter(|(_cw, d)| *d == dist)
-                            .map(|(cw, _)| *cw)
-                            .collect();
-                        if closest.len() == 1 {
-                            return vec![(readout, closest[0]); count];
-                        }
-                    }
+                    // The observed readout could not be corrected
+                    counts
+                        .info
+                        .entry(observed)
+                        .or_insert(MismatchCounts {
+                            exact: 0,
+                            corrected: 0,
+                            uncorrected: 0,
+                        })
+                        .uncorrected += count as u32;
                 }
-                vec![(readout, Barcode(0)); count]
-            })
-            .collect_vec()
-    }
-
-    fn apply_corrections(
-        observed_counts: &Counter<(Barcode, Barcode), usize>,
-        corrections: &Vec<(Barcode, Barcode)>,
-    ) -> (Counter<(Barcode, Barcode), usize>, Info) {
-        let mut corrected_counts = observed_counts.clone();
-        let mut info: Info = HashMap::new();
-        for (observed_readout, corrected_readout) in corrections {
-            if *corrected_readout != Barcode(0) {
-                // correct observed readout (to codeword [corrected readout]),
-                // i.e. readout count is decremented
-                // and codeword count incremented.
-                corrected_counts
-                    .entry((*corrected_readout, *observed_readout))
-                    .and_modify(|count| *count -= 1);
-                corrected_counts
-                    .entry((*corrected_readout, *corrected_readout))
-                    .and_modify(|count| *count += 1);
-            }
-            if observed_readout != corrected_readout {
-                // if a correction has been performed
-                // increment the mismatch count for the respective codeword
-                info.entry(*corrected_readout)
-                    .or_insert(crate::model::bayes::readout::Counts {
-                        exact: 0,
-                        mismatch: 0,
-                    })
-                    .mismatch += 1;
-            } else {
-                // if no correction has been performed
-                // increment the exact count for the respective codeword
-                // (which is identical to the readout)
-                info.entry(*observed_readout)
-                    .or_insert(crate::model::bayes::readout::Counts {
-                        exact: 0,
-                        mismatch: 0,
-                    })
-                    .exact += 1;
             }
         }
-        (corrected_counts, info)
+        cell_counts
+    }
+
+    fn correct_readout(
+        codeword: Option<Barcode>,
+        readout: Barcode,
+        codewords: &[Barcode],
+    ) -> Option<Barcode> {
+        // no correction necessary
+        if codewords.contains(&readout) {
+            return Some(readout);
+        }
+
+        if let Some(codeword) = codeword {
+            // if codeword and readout are different (which is the case in records obtained from
+            // pre-corrected sources, e.g. tsv merfish format), we already know that readout
+            // should be corrected to codeword
+            if codeword != readout {
+                return Some(codeword);
+            }
+        } else {
+            // if the codeword is unknown, try to find a codeword in the codebook
+            // which is the only 1-neighbour of the readout
+
+            // distances between readout and known (and expressed) codewords
+            let dists = codewords
+                .iter()
+                .map(|&cw| (cw, hamming_distance16(*cw, *readout)))
+                .collect_vec();
+            // if there's exactly one expressed codeword with distance `dist`,
+            // "replace" readout with that codeword.
+            for dist in 1..=4 {
+                let closest: Vec<Barcode> = dists
+                    .iter()
+                    .filter(|(_cw, d)| *d == dist)
+                    .map(|(cw, _)| *cw)
+                    .collect();
+                if closest.len() == 1 {
+                    return Some(closest[0]);
+                }
+            }
+        }
+        None
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::io::Error;
+    use std::io::{Error, Write};
 
     use super::*;
+    use crate::io::simple_codebook::SimpleCodebook;
 
     #[test]
     fn test_counts() -> Result<(), Error> {
-        //let path_data = "/vol/tiny/merfish/raw/rep2/assigned_blist.bin";
-        let path_data = "/vol/nano/merfish/la/results/obssim_A1_17_0.01_0.02.sim";
-//        let path_data = "/vol/tiny/merfish/merfishtools-evaluation/data/140genesData.1.all.txt";
+        let path_data = "/vol/tiny/merfish/raw/rep2/assigned_blist.bin";
+        //        let path_data = "/vol/nano/merfish/la/results/obssim_A1_17_0.01_0.02.sim";
+        //        let path_data = "/vol/tiny/merfish/merfishtools-evaluation/data/140genesData.1.all.txt";
         let path_codebook = "/vol/tiny/merfish/merfishtools-evaluation/codebook/140genesData.1.txt";
-        let codebook = Codebook::from_file(path_codebook)?;
-        let counts = Counts::from_path(path_data, &codebook);
-        dbg!(&counts);
-        assert!(false);
-        Ok(())
-    }
-
-    #[test]
-    fn test_grouped_counts() -> Result<(), Error> {
-        //let path_data = "/vol/tiny/merfish/raw/rep2/assigned_blist.bin";
-        let path_data = "/vol/tiny/merfish/merfishtools-evaluation/data/140genesData.1.all.txt";
-        let path_codebook = "/vol/tiny/merfish/merfishtools-evaluation/codebook/140genesData.1.txt";
-        let codebook = Codebook::from_file(path_codebook)?;
-        let counts = Counts::from_path_grouped(path_data, &codebook);
-        dbg!(&counts);
-        //assert!(false);
+        let codebook = SimpleCodebook::from_file(path_codebook)?;
+        let (expressed_codewords, _unexpressed_codewords) = codebook.codewords();
+        let records = Records::from_path(path_data);
+        let counts = Counts::from_records(records.into_iter(), &expressed_codewords);
+        //        let mut file = std::fs::File::create("foo.txt")?;
+        //        file.write_all(format!("{:?}", counts["0"].info).replace("}, ", "},\n").as_bytes())?;
+        //        assert!(false);
+        // TODO create small sim-file and codebook with known counts
         Ok(())
     }
 

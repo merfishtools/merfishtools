@@ -1,21 +1,25 @@
 use std::fs;
 use std::io;
+use std::iter::Map;
 use std::path::Path;
 
+use crate::io::counts::{CommonRecord, FromRecord};
 use crate::io::merfishdata::{MerfishRecord, Readout};
+use crate::model::la::common::hamming_distance16;
 use crate::simulation::binary;
+use csv::DeserializeRecordsIter;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Record {
+pub struct SimRecord {
     pub cell: usize,
     #[serde(with = "binary", rename = "barcode")]
     pub readout: u16,
     pub count: usize,
-    #[serde(default, with = "binary",  skip)]
-    pub codeword: u16,
+    #[serde(default, skip)]
+    pub codeword: Option<u16>,
 }
 
-impl MerfishRecord for Record {
+impl MerfishRecord for SimRecord {
     fn cell_id(&self) -> u32 {
         self.cell as u32
     }
@@ -37,19 +41,28 @@ impl MerfishRecord for Record {
     }
 
     fn hamming_dist(&self) -> u8 {
-        let d = self.readout.count_ones() as isize - 4;
-        if d < 0 {
-            (-d) as u8
+        // FIXME
+        if let Some(codeword) = self.codeword {
+            hamming_distance16(codeword, self.readout)
         } else {
-            d as u8
+            let d = self.readout.count_ones() as isize - 4;
+            if d < 0 {
+                (-d) as u8
+            } else {
+                d as u8
+            }
         }
     }
 
     fn error_mask(&self) -> u16 {
-        self.codeword ^ self.readout
+        if let Some(codeword) = self.codeword {
+            codeword ^ self.readout
+        } else {
+            unimplemented!()
+        }
     }
 
-    fn codeword(&self) -> u16 {
+    fn codeword(&self) -> Option<u16> {
         self.codeword
     }
 
@@ -63,6 +76,14 @@ impl MerfishRecord for Record {
 
     fn count(&self) -> usize {
         self.count
+    }
+
+    fn is_exact(&self) -> bool {
+        if self.codeword.is_some() {
+            self.error_mask() == 0
+        } else {
+            false
+        }
     }
 }
 
@@ -87,11 +108,14 @@ impl<R: io::Read> Reader<R> {
 }
 
 impl<'a, R: io::Read + 'a> super::Reader<'a> for Reader<R> {
-    type Record = Record;
+    type Record = CommonRecord;
     type Error = csv::Error;
-    type Iterator = csv::DeserializeRecordsIter<'a, R, Record>;
+    type Iterator = Map<DeserializeRecordsIter<'a, R, SimRecord>, fn(Result<SimRecord, csv::Error>) -> Result<CommonRecord, csv::Error>>;
 
-    fn records(&'a mut self) -> csv::DeserializeRecordsIter<'a, R, Record> {
-        self.inner.deserialize()
+    fn records(&'a mut self) -> Self::Iterator {
+        self.inner.deserialize().into_iter().map(|r| match r {
+            Ok(r) => Ok(CommonRecord::from_record(r)),
+            Err(e) => Err(e),
+        })
     }
 }

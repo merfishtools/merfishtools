@@ -8,6 +8,7 @@ use bit_vec::BitVec;
 use byteorder::{ByteOrder, NativeEndian};
 use failure::Error;
 
+use crate::io::counts::{CommonRecord, FromRecord};
 use crate::io::merfishdata::{MerfishRecord, Readout};
 
 /// Header of a binary merfish file.
@@ -40,7 +41,7 @@ impl Header {
 
 /// A `Record` represents a single entry of a merfish binary file.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct Record {
+pub struct BinaryRecord {
     /// An integer representation of the 16-bit barcode associated with each RNA.
     pub barcode: u64,
     /// The specific codebook entry to which this barcode corresponds, e.g. '1' corresponds to the first RNA listed in the codebook ('Blank-1'), '2' corresponds to the second ('Blank-10'), etc.
@@ -83,7 +84,7 @@ pub struct Record {
     pub dist_periphery: f64,
 }
 
-impl MerfishRecord for Record {
+impl MerfishRecord for BinaryRecord {
     fn cell_id(&self) -> u32 {
         self.cell_id
     }
@@ -121,8 +122,8 @@ impl MerfishRecord for Record {
         }
     }
 
-    fn codeword(&self) -> u16 {
-        self.barcode as u16 ^ self.error_mask()
+    fn codeword(&self) -> Option<u16> {
+        Some(self.barcode as u16 ^ self.error_mask())
     }
 
     fn readout(&self) -> u16 {
@@ -148,6 +149,8 @@ impl MerfishRecord for Record {
     fn count(&self) -> usize {
         1
     }
+
+    fn is_exact(&self) -> bool { self.is_exact != 0 }
 }
 
 #[derive(Debug, Fail)]
@@ -191,18 +194,18 @@ impl<R: io::Read> Reader<R> {
         &self.header
     }
 
-    pub fn read(&mut self) -> Result<Record, bincode::Error> {
-        bincode::deserialize_from::<_, Record>(&mut self.reader)
+    pub fn read(&mut self) -> Result<BinaryRecord, bincode::Error> {
+        bincode::deserialize_from::<_, BinaryRecord>(&mut self.reader)
     }
 }
 
 impl<'a, R: io::Read + 'a> super::Reader<'a> for Reader<R> {
-    type Record = Record;
+    type Record = CommonRecord;
     type Error = bincode::Error;
-    type Iterator = RecordIterator<'a, R>;
+    type Iterator = BinaryRecordIterator<'a, R>;
 
-    fn records(&'a mut self) -> RecordIterator<'a, R> {
-        RecordIterator { reader: self, i: 0 }
+    fn records(&'a mut self) -> BinaryRecordIterator<'a, R> {
+        BinaryRecordIterator { reader: self, i: 0 }
     }
 }
 
@@ -215,28 +218,33 @@ impl Reader<fs::File> {
     }
 }
 
-pub struct RecordIterator<'a, R: io::Read + 'a> {
+pub struct BinaryRecordIterator<'a, R: io::Read + 'a> {
     reader: &'a mut Reader<R>,
     i: u32,
 }
 
-impl<'a, R: io::Read> Iterator for RecordIterator<'a, R> {
-    type Item = Result<Record, bincode::Error>;
+impl<'a, R: io::Read> Iterator for BinaryRecordIterator<'a, R> {
+    type Item = Result<CommonRecord, bincode::Error>;
 
-    fn next(&mut self) -> Option<Result<Record, bincode::Error>> {
+    fn next(&mut self) -> Option<Result<CommonRecord, bincode::Error>> {
         if self.i >= self.reader.header.num_entries {
             None
         } else {
             self.i += 1;
-            Some(self.reader.read())
+            let r = self.reader.read();
+            match r {
+                Ok(r) => Some(Ok(CommonRecord::from_record(r))),
+                Err(e) => Some(Err(e)),
+            }
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::super::*;
     use std::io;
+
+    use super::super::*;
 
     #[test]
     fn test_binary_records() {
@@ -250,7 +258,7 @@ mod tests {
         \x1c\x10\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\xdb\x1e\xb4A\xae\x00\xe9\x05\x14\x87.C\xe2\x17\xbdD\x9b\xe7\xaf\xc4\x10*8\xc5\x03\x00\xdf>\x1b;\x943\x06><\xee\xeb>\x8b\x97\x95>z\x05C?j\x9c\xe6;lw]=\x1fWp;\xa5\xbfz8\x00\x00\x00\x00 _@<\x87\xff\x8f<\x0c\x11\x88>3\xb1\xdc=_\x03\x8c<\xcd\xee\x99=\xe8\x8c[;AN2=v\x0b\x1d=#S\xd5<\xed\x8a<;\xcf\x81<;wYL=\xf3\xb8;;YN\xb18\x00\x00\x00\x00\x89\x03\xa1;Xh\xc7<zwD=u\xfa:=L\xe9O<\xb7\xe3\x1a=\x01\x00\x00\xcc&\xef>\x02\x00\x00\x00\x01\x00\x00\x00\x80a\xaf\x08@\x00\x00\x00\x809\xfc(@";
 
         let mut reader = binary::Reader::new(io::Cursor::new(&data[..])).unwrap();
-        let expected_record = binary::Record {
+        let expected_record = binary::BinaryRecord {
             barcode: 4124,
             barcode_id: 1,
             fov_id: 0,

@@ -4,7 +4,7 @@ use newtype_derive::*;
 custom_derive! {
     #[derive(Copy, Clone, PartialEq, PartialOrd, Eq, Ord, Hash,
         NewtypeFrom, NewtypeAdd, NewtypeBinary,
-        NewtypeDeref, NewtypeDerefMut)]
+        NewtypeDeref, NewtypeDerefMut, Default)]
     pub struct Barcode(pub u16);
 }
 

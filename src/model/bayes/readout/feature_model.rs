@@ -211,10 +211,10 @@ impl FeatureModel {
         if self.counts.exact < count_exact_miscalled {
             panic!("bug: likelihood cannot be calculated if exact miscalls exceed counts: counts={}, miscalls={}", self.counts.exact, count_exact_miscalled);
         }
-        if self.counts.mismatch < count_mismatch_miscalled {
-            panic!("bug: likelihood cannot be calculated if mismatch miscalls exceed counts: counts={}, miscalls={}", self.counts.mismatch, count_mismatch_miscalled);
+        if self.counts.corrected < count_mismatch_miscalled {
+            panic!("bug: likelihood cannot be calculated if mismatch miscalls exceed counts: counts={}, miscalls={}", self.counts.corrected, count_mismatch_miscalled);
         }
-        let total_count = self.counts.exact - count_exact_miscalled + self.counts.mismatch
+        let total_count = self.counts.exact - count_exact_miscalled + self.counts.corrected
             - count_mismatch_miscalled;
         if total_count > x {
             panic!(
@@ -224,7 +224,7 @@ impl FeatureModel {
         }
 
         let calls_exact = self.counts.exact - count_exact_miscalled;
-        let calls_mismatch = self.counts.mismatch - count_mismatch_miscalled;
+        let calls_mismatch = self.counts.corrected - count_mismatch_miscalled;
 
         // setup event counts
         {
@@ -281,7 +281,7 @@ impl FeatureModel {
             .saturating_sub(miscalls_exact.total_to(self.feature_id))
             + self
                 .counts
-                .mismatch
+                .corrected
                 .saturating_sub(miscalls_mismatch.total_to(self.feature_id))
             + miscalls_exact.total_from(self.feature_id)
             + miscalls_mismatch.total_from(self.feature_id)
@@ -312,7 +312,7 @@ impl AbstractFeatureModel for FeatureModel {
             .saturating_sub(miscalls_exact.total_to(self.feature_id));
         let calls_mismatch = self
             .counts
-            .mismatch
+            .corrected
             .saturating_sub(miscalls_mismatch.total_to(self.feature_id));
 
         calls_exact
@@ -459,7 +459,7 @@ impl AbstractFeatureModel for NoiseModel {
         {
             calls_exact += counts.exact.saturating_sub(miscalls_exact.total_to(id));
             calls_mismatch += counts
-                .mismatch
+                .corrected
                 .saturating_sub(miscalls_mismatch.total_to(id));
         }
 

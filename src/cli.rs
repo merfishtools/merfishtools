@@ -183,13 +183,15 @@ impl ExpressionJ {
                 .or_insert_with(collections::HashMap::new);
             let feature_counts = cell_counts.entry(record.feature_name()).or_insert(Counts {
                 exact: 0,
-                mismatch: 0,
+                corrected: 0,
+                uncorrected: 0,
             });
             if record.hamming_dist() == 0 {
                 feature_counts.exact += 1;
             } else if record.hamming_dist() == 1 {
-                feature_counts.mismatch += 1;
+                feature_counts.corrected += 1;
             } else {
+                feature_counts.uncorrected += 1;
                 panic!("Hamming distance of greater than 1 is unsupported at the moment.")
             }
         }
@@ -198,7 +200,8 @@ impl ExpressionJ {
             for feature in codebook.features() {
                 cell_counts.entry(feature.clone()).or_insert(Counts {
                     exact: 0,
-                    mismatch: 0,
+                    corrected: 0,
+                    uncorrected: 0,
                 });
             }
         }

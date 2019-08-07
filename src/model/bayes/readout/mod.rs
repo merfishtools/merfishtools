@@ -18,12 +18,13 @@ pub type Expressions = Array1<u32>;
 #[derive(Debug, Clone)]
 pub struct Counts {
     pub exact: u32,
-    pub mismatch: u32,
+    pub corrected: u32,  // mismatch
+    pub uncorrected: u32,
 }
 
 impl Counts {
     pub fn total(&self) -> u32 {
-        self.exact + self.mismatch
+        self.exact + self.corrected + self.uncorrected
     }
 }
 
@@ -48,7 +49,7 @@ impl Miscalls {
             max_total_to[m.feature_id] = if exact {
                 m.counts.exact
             } else {
-                m.counts.mismatch
+                m.counts.corrected
             };
         }
         for (&feature_id, counts) in noise_model
@@ -56,7 +57,7 @@ impl Miscalls {
             .iter()
             .zip(&noise_model.not_expressed_counts)
         {
-            max_total_to[feature_id] = if exact { counts.exact } else { counts.mismatch };
+            max_total_to[feature_id] = if exact { counts.exact } else { counts.corrected };
         }
 
         Miscalls {

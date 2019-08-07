@@ -106,8 +106,6 @@ pub struct Codebook {
     pub min_dist: u8,
     // Number of bits in the codewords.
     pub N: u8,
-    // Number of 1-bits in the codewords.
-    pub m: u8,
     noise_record: Record,
 }
 
@@ -118,7 +116,6 @@ impl Codebook {
         let mut rdr = csv::ReaderBuilder::new().delimiter(b'\t').from_path(path)?;
 
         let mut N = None;
-        let mut m = None;
         let mut graph = Graph::default();
         let mut idmap = HashMap::new();
         let index = {
@@ -136,11 +133,6 @@ impl Codebook {
                     assert!(n == N, "unexpected codeword length: {} vs {}", n, N);
                 } else {
                     N = Some(n);
-                }
-                if let Some(m) = m {
-                    assert!(m == m_, "unexpected number of 1-bits: {} vs {}", m_, m);
-                } else {
-                    m = Some(m_);
                 }
 
                 let idx = graph.add_node(rec);
@@ -174,7 +166,6 @@ impl Codebook {
             graph,
             min_dist,
             N: N.unwrap() as u8,
-            m: m.unwrap() as u8,
             noise_record: Record::noise(N.unwrap()),
         })
     }

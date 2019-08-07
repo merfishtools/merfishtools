@@ -1,14 +1,17 @@
+use core::borrow::BorrowMut;
 use std::fs;
 use std::io;
+use std::iter::Map;
 use std::path::Path;
 
 use csv;
+use csv::DeserializeRecordsIter;
 use rand::distributions::WeightedIndex;
 use rand::prelude::StdRng;
 use rand::Rng;
 
 use crate::io::codebook::Codebook;
-use crate::io::counts::into_u16;
+use crate::io::counts::{CommonRecord, FromRecord, into_u16};
 use crate::io::merfishdata::{MerfishRecord, Readout};
 
 /// A 2D position in the microscope.
@@ -21,7 +24,7 @@ pub struct Position {
 /// A MERFISH raw data record.
 /// // "Cell_ID	Gene_Name	Hamming_Distance	Cell_Position_X	Cell_Position_Y	RNA_Position_X	RNA_Position_Y
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Record {
+pub struct TsvRecord {
     #[serde(rename = "cell")]
     pub cell_id: String,
     #[serde(rename = "feat")]
@@ -33,7 +36,7 @@ pub struct Record {
     #[serde(flatten, with = "prefix_none")]
     pub rna_position: Position,
     #[serde(skip)]
-    pub codeword: u16,
+    pub codeword: Option<u16>,
     #[serde(skip)]
     pub readout: u16,
 }
@@ -41,7 +44,7 @@ pub struct Record {
 with_prefix!(prefix_cell "cell_");
 with_prefix!(prefix_none "");
 
-impl MerfishRecord for Record {
+impl MerfishRecord for TsvRecord {
     fn cell_id(&self) -> u32 {
         self.cell_id.parse().expect("Failed parsing cell_id")
     }
@@ -67,10 +70,14 @@ impl MerfishRecord for Record {
     }
 
     fn error_mask(&self) -> u16 {
-        0b0000000000000000
+        if let Some(codeword) = self.codeword {
+            codeword ^ self.readout
+        } else {
+            unimplemented!()
+        }
     }
 
-    fn codeword(&self) -> u16 {
+    fn codeword(&self) -> Option<u16> {
         self.codeword
     }
 
@@ -85,6 +92,10 @@ impl MerfishRecord for Record {
     fn count(&self) -> usize {
         1
     }
+
+    fn is_exact(&self) -> bool {
+        self.hamming_dist == 0
+    }
 }
 
 /// A reader for MERFISH raw data.
@@ -92,44 +103,48 @@ pub struct Reader<R: io::Read> {
     inner: csv::Reader<R>,
 }
 
+pub(crate) fn modify_record(
+    r: &TsvRecord,
+    codebook: &Codebook,
+    num_bits: usize,
+    p0: &[f32],
+    p1: &[f32],
+    rng: &mut StdRng,
+) -> TsvRecord {
+    let unif = rand::distributions::Uniform::new(0f32, 1.);
+    let mut r = r.clone();
+    r.codeword = Some(into_u16(
+        codebook
+            .record(codebook.get_id(&r.feature_name()))
+            .codeword(),
+    ));
+    let codeword = r.codeword.unwrap();
+    r.readout = codeword;
+    if r.hamming_dist() == 1 {
+        let weights: Vec<_> = (0..num_bits)
+            .map(|i| {
+                let bit = (codeword >> i) & 1;
+                match bit {
+                    0 => p0[i],
+                    1 => p1[i],
+                    _ => panic!("bug: bit can only be 0 or 1"),
+                }
+            })
+            .collect();
+        // possibly introduce a one-bit error according to weights.
+        if rng.sample(unif) > weights.iter().map(|p| 1. - p).product() {
+            let wc = WeightedIndex::new(weights).unwrap();
+            let error_bit = rng.sample(&wc) as u8;
+            r.readout = codeword ^ (1 << error_bit as u16);
+        }
+    }
+    r
+}
+
 impl Reader<fs::File> {
     /// Read from a given file path.
     pub fn from_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         fs::File::open(path).map(Reader::new)
-    }
-
-    pub fn fill_in_missing_information(
-        records: &mut Vec<Record>,
-        codebook: &Codebook,
-        num_bits: usize,
-        p0: &[f32],
-        p1: &[f32],
-        rng: &mut StdRng,
-    ) {
-        let unif = rand::distributions::Uniform::new(0f32, 1.);
-        records.iter_mut().for_each(|r| {
-            let cb = codebook;
-            r.codeword = into_u16(cb.record(cb.get_id(&r.feature_name())).codeword());
-            r.readout = r.codeword;
-            if r.hamming_dist() == 1 {
-                let weights: Vec<_> = (0..num_bits)
-                    .map(|i| {
-                        let bit = (r.codeword >> i) & 1;
-                        match bit {
-                            0 => p0[i],
-                            1 => p1[i],
-                            _ => panic!("bug: bit can only be 0 or 1"),
-                        }
-                    })
-                    .collect();
-                // possibly introduce a one-bit error according to weights.
-                if rng.sample(unif) > weights.iter().map(|p| 1. - p).product() {
-                    let wc = WeightedIndex::new(weights).unwrap();
-                    let error_bit = rng.sample(&wc) as u8;
-                    r.readout = r.codeword ^ (1 << error_bit as u16);
-                }
-            }
-        });
     }
 }
 
@@ -142,12 +157,15 @@ impl<R: io::Read> Reader<R> {
 }
 
 impl<'a, R: io::Read + 'a> super::Reader<'a> for Reader<R> {
-    type Record = Record;
+    type Record = CommonRecord;
     type Error = csv::Error;
-    type Iterator = csv::DeserializeRecordsIter<'a, R, Record>;
+    type Iterator = Map<DeserializeRecordsIter<'a, R, TsvRecord>, fn(Result<TsvRecord, csv::Error>) -> Result<CommonRecord, csv::Error>>;
 
-    fn records(&'a mut self) -> csv::DeserializeRecordsIter<'a, R, Record> {
-        self.inner.deserialize()
+    fn records(&'a mut self) -> Self::Iterator {
+        self.inner.deserialize().into_iter().map(|r| match r {
+            Ok(r) => Ok(CommonRecord::from_record(r)),
+            Err(e) => Err(e),
+        })
     }
 }
 
