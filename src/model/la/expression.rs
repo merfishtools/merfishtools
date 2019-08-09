@@ -1,10 +1,12 @@
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
+use std::path::Path;
 use std::time::Instant;
 
 use clap::arg_enum;
 use derive_new::new;
 use failure::Error;
+use itertools::{Either, Itertools};
 use ndarray::prelude::*;
 use num_traits::float::Float;
 use rand;
@@ -16,7 +18,7 @@ use regex::Regex;
 use crate::cli::Expression;
 use crate::io::codebook::Codebook;
 use crate::io::common::Barcode;
-use crate::io::counts::{Counts, RecordIterator};
+use crate::io::counts::Counts;
 use crate::io::merfishdata;
 use crate::io::merfishdata::common::RecordReader;
 use crate::io::merfishdata::MerfishRecord;
@@ -25,8 +27,6 @@ use crate::model::la::common::{hamming_distance, Errors, Expr, ExprV};
 use crate::model::la::matrix::{csr_error_matrix, csr_successive_overrelaxation, CSR};
 use crate::model::la::problem::{objective, partial_objective};
 use crate::simulation::binary;
-use itertools::{Either, Itertools};
-use std::path::Path;
 
 #[derive(Serialize, Deserialize, new)]
 pub struct RecordEstimate {

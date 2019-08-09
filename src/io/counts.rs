@@ -23,12 +23,6 @@ use crate::io::merfishdata::{MerfishRecord, Reader, Readout};
 use crate::model::bayes::readout::Counts as MismatchCounts;
 use crate::model::la::common::hamming_distance16;
 
-pub enum RecordIterator<R: io::Read> {
-    TsvIterator { reader: tsv::TsvReader<R> },
-    SimIterator { reader: sim::SimReader<R> },
-    BinaryIterator { reader: binary::BinaryReader<R> },
-}
-
 impl RecordReader<std::fs::File> {
     pub fn from_path<P: AsRef<Path>>(path: P) -> Self {
         let format = Format::from_path(&path);
