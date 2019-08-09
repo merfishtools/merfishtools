@@ -1,6 +1,6 @@
-pub mod tsv;
 pub mod binary;
-pub mod sim;
 pub mod common;
+pub mod sim;
+pub mod tsv;
 
-pub use common::{MerfishRecord, Reader, Readout, Format};
+pub use common::{Format, MerfishRecord, Reader, Readout};

@@ -14,10 +14,11 @@ use rayon::prelude::*;
 use regex::Regex;
 
 use crate::cli::Expression;
-use crate::io::common::Barcode;
 use crate::io::codebook::Codebook;
+use crate::io::common::Barcode;
 use crate::io::counts::{Counts, RecordIterator};
 use crate::io::merfishdata;
+use crate::io::merfishdata::common::RecordReader;
 use crate::io::merfishdata::MerfishRecord;
 use crate::io::simple_codebook::SimpleCodebook;
 use crate::model::la::common::{hamming_distance, Errors, Expr, ExprV};
@@ -26,7 +27,6 @@ use crate::model::la::problem::{objective, partial_objective};
 use crate::simulation::binary;
 use itertools::{Either, Itertools};
 use std::path::Path;
-use crate::io::merfishdata::common::RecordReader;
 
 #[derive(Serialize, Deserialize, new)]
 pub struct RecordEstimate {
@@ -200,8 +200,8 @@ impl Expression for ExpressionT {
             .counts
             .par_iter()
             .flat_map(|(cell, c): (&String, &Counts)| {
-                let mut x: Expr = Expr::zeros((num_codes, ));
-                let mut y: Expr = Expr::zeros((num_codes, ));
+                let mut x: Expr = Expr::zeros((num_codes,));
+                let mut y: Expr = Expr::zeros((num_codes,));
                 for (&(_codeword, readout), &count) in c.corrected.iter() {
                     x[*readout as usize] = count as f32;
                 }
@@ -433,7 +433,7 @@ pub fn estimate_expression(
     keep_zeros: bool,
 ) -> Result<Expr, ()> {
     if let Ok((x, _it, _err)) =
-    csr_successive_overrelaxation(mat, y, x_est, w, 1e-7, 256, keep_zeros)
+        csr_successive_overrelaxation(mat, y, x_est, w, 1e-7, 256, keep_zeros)
     {
         Ok(x)
     } else {

@@ -3,16 +3,19 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::io::merfishdata::{binary, sim, tsv};
-use binary::BinaryRecord;
-use bit_vec::BitVec;
-use enum_dispatch::enum_dispatch;
-use failure::Fail;
-use sim::SimRecord;
 use std::io;
 use std::iter::Iterator;
 use std::path::Path;
+
+use bit_vec::BitVec;
+use failure::Fail;
+
+use binary::BinaryRecord;
+use enum_dispatch::enum_dispatch;
+use sim::SimRecord;
 use tsv::TsvRecord;
+
+use crate::io::merfishdata::{binary, sim, tsv};
 
 pub type Readout = BitVec;
 
@@ -61,7 +64,7 @@ pub enum Record {
 pub trait Reader<'a> {
     type Record: MerfishRecord;
     type Error: Fail;
-    type Iterator: Iterator<Item=Result<Self::Record, Self::Error>> + 'a;
+    type Iterator: Iterator<Item = Result<Self::Record, Self::Error>> + 'a;
 
     fn records(&'a mut self) -> Self::Iterator;
 }

@@ -18,7 +18,7 @@ pub type Expressions = Array1<u32>;
 #[derive(Debug, Clone)]
 pub struct Counts {
     pub exact: u32,
-    pub corrected: u32,  // mismatch
+    pub corrected: u32, // mismatch
     pub uncorrected: u32,
 }
 
@@ -57,7 +57,11 @@ impl Miscalls {
             .iter()
             .zip(&noise_model.not_expressed_counts)
         {
-            max_total_to[feature_id] = if exact { counts.exact } else { counts.corrected };
+            max_total_to[feature_id] = if exact {
+                counts.exact
+            } else {
+                counts.corrected
+            };
         }
 
         Miscalls {

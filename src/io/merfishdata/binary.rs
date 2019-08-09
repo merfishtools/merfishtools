@@ -8,7 +8,6 @@ use bit_vec::BitVec;
 use byteorder::{ByteOrder, NativeEndian};
 use failure::Error;
 
-use crate::io::counts::{CommonRecord, FromRecord};
 use crate::io::merfishdata::{MerfishRecord, Readout};
 
 /// Header of a binary merfish file.
@@ -150,7 +149,9 @@ impl MerfishRecord for BinaryRecord {
         1
     }
 
-    fn is_exact(&self) -> bool { self.is_exact != 0 }
+    fn is_exact(&self) -> bool {
+        self.is_exact != 0
+    }
 }
 
 #[derive(Debug, Fail)]
@@ -158,7 +159,7 @@ pub enum ReaderError {
     #[fail(display = "unsupported version: {}", version)]
     UnsupportedVersion { version: u8 },
     #[fail(
-    display = "header is corrupt, i.e. might not have been written properly (while in append mode)"
+        display = "header is corrupt, i.e. might not have been written properly (while in append mode)"
     )]
     Corrupt,
 }
@@ -235,7 +236,6 @@ impl<'a, R: io::Read> Iterator for BinaryRecordIterator<'a, R> {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {

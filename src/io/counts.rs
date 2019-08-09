@@ -1,8 +1,10 @@
 use std::collections::{HashMap, HashSet};
 use std::io;
 use std::iter::FromIterator;
+use std::marker::PhantomData;
 use std::path::Path;
 
+use bit_vec::BitVec;
 use counter::Counter;
 use failure::Fail;
 use itertools::{Either, Itertools};
@@ -20,120 +22,6 @@ use crate::io::merfishdata::{binary, sim, tsv, Format};
 use crate::io::merfishdata::{MerfishRecord, Reader, Readout};
 use crate::model::bayes::readout::Counts as MismatchCounts;
 use crate::model::la::common::hamming_distance16;
-use bit_vec::BitVec;
-use std::marker::PhantomData;
-
-pub struct ImageInfo {
-    /// The id associated with the field-of-view in which this RNA was imaged.
-    fov_id: u16,
-    /// The sum of the normalized intensity associated with each pixel assigned to a given RNA.
-    total_magnitude: f32,
-    /// The center of the pixels associated with a given RNA in the coordinate system of each field-of-view in units of pixels.
-    pixel_centroid: [u16; 2],
-    /// The center of an RNA, weighted by the intensity of each pixel, in the coordinate system of each field-of-view in units of pixels.
-    weighted_pixel_centroid: [f32; 2],
-    /// The center of an RNA in the absolute coordinate system of the sample in microns. This quantity is calculated from the weighted_pixel_centroid.
-    abs_position: [f32; 2],
-    /// The number of pixels associated with an RNA.
-    area: u16,
-    /// The normalized intensity of each pixel for each bit in the barcode, average across all pixels assigned to an RNA.
-    pixel_trace_mean: [f32; 16],
-    /// The standard deviation of the normalized intensity for each bit in the barcode taken across all pixels assigned to an RNA.
-    pixel_trace_std: [f32; 16],
-    /// The bit at which error correction was applied. (0 if it was not applied).
-    error_bit: u8,
-    /// A boolean representing the type of error (0 corresponds to a '0' to '1' error; 1 corresponds to a '1' to '0' error).
-    error_dir: u8,
-    /// The average Euclidean distance between the pixel trace for a given RNA and the barcode to which it was matched.
-    av_distance: f32,
-    /// A boolean flag representing whether or not (TRUE/FALSE) an RNA was found within the nucleus of the cell.
-    in_nucleus: u8,
-    /// The distance (in microns) from the RNA to the closest edge of the nucleus.
-    dist_nucleus: f64,
-    /// The distance (in microns) from the RNA to the closest boundary of the cell.
-    dist_periphery: f64,
-}
-
-pub struct CommonRecord {
-    cell_name: String,
-    feature_name: String,
-    readout: Barcode,
-    codeword: Option<Barcode>,
-    count: usize,
-    is_exact: bool,
-    image_info: Option<ImageInfo>,
-}
-
-pub trait FromRecord<T> {
-    fn from_record(other: T) -> Self;
-}
-
-// TODO impl FromRecords<BinaryRecord> for CommonRecord { ... }
-impl<M: MerfishRecord> FromRecord<M> for CommonRecord {
-    fn from_record(other: M) -> Self {
-        CommonRecord {
-            cell_name: other.cell_name(),
-            feature_name: other.feature_name(),
-            readout: Barcode(other.readout()),
-            codeword: other.codeword().map(Barcode),
-            count: other.count(),
-            is_exact: other.is_exact(),
-            image_info: None,
-        }
-    }
-}
-
-impl MerfishRecord for CommonRecord {
-    fn cell_id(&self) -> u32 {
-        unimplemented!()
-    }
-
-    fn cell_name(&self) -> String {
-        self.cell_name.to_owned()
-    }
-
-    fn cell_pos(&self) -> (f32, f32) {
-        unimplemented!()
-    }
-
-    fn feature_id(&self) -> u16 {
-        unimplemented!()
-    }
-
-    fn feature_name(&self) -> String {
-        self.feature_name.to_owned()
-    }
-
-    fn hamming_dist(&self) -> u8 {
-        assert!(self.codeword().is_some());
-        hamming_distance16(self.codeword().unwrap(), self.readout())
-    }
-
-    fn error_mask(&self) -> u16 {
-        assert!(self.codeword().is_some());
-        self.codeword().unwrap() ^ self.readout()
-    }
-
-    fn codeword(&self) -> Option<u16> {
-        self.codeword.map(u16::from)
-    }
-
-    fn readout(&self) -> u16 {
-        *self.readout
-    }
-
-    fn readout_bitvec(&self) -> Readout {
-        unimplemented!()
-    }
-
-    fn count(&self) -> usize {
-        self.count
-    }
-
-    fn is_exact(&self) -> bool {
-        self.is_exact
-    }
-}
 
 pub enum RecordIterator<R: io::Read> {
     TsvIterator { reader: tsv::TsvReader<R> },

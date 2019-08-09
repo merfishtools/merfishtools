@@ -11,7 +11,7 @@ use rand::prelude::StdRng;
 use rand::Rng;
 
 use crate::io::codebook::Codebook;
-use crate::io::counts::{CommonRecord, FromRecord, into_u16};
+use crate::io::counts::into_u16;
 use crate::io::merfishdata::{MerfishRecord, Readout};
 
 /// A 2D position in the microscope.

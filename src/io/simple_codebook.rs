@@ -1,17 +1,17 @@
 use std::path::Path;
 
 use itertools::{Either, Itertools};
-use serde::{Deserialize, Deserializer, Serialize};
 use serde::de::Error;
 use serde::de::Unexpected;
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::io::common::Barcode;
 use crate::simulation::binary;
 
 /// Deserialize bool from String with custom value mapping
 fn bool_from_string<'de, D>(deserializer: D) -> Result<bool, D::Error>
-    where
-        D: Deserializer<'de>,
+where
+    D: Deserializer<'de>,
 {
     match String::deserialize(deserializer)?.as_ref() {
         "1" => Ok(true),

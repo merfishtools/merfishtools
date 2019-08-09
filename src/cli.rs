@@ -446,7 +446,10 @@ pub fn estimate_error_rates(raw_data: &str, codebook: &str) -> Result<(), Error>
             &codebook,
             reader.records().map(|rec| {
                 let rec = rec.unwrap();
-                (codebook.get_name(rec.feature_id()).unwrap(), rec.readout_bitvec())
+                (
+                    codebook.get_name(rec.feature_id()).unwrap(),
+                    rec.readout_bitvec(),
+                )
             }),
         )
     } else {

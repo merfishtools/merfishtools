@@ -142,17 +142,20 @@ fn main() -> Result<(), Error> {
             errors,
         } => {
             let cb = SimpleCodebook::from_file(&codebook)?;
-            let num_bits =
-                if num_bits == 0 {
-                    let n = cb.num_bits() as usize;
-                    info!("Guessed number of bits from codebook: {}", n);
-                    n
-                } else if cb.num_bits() != (num_bits as u16) {
-                    warn!("Codebook uses a different number of bits ({}) than --num-bits ({}) suggests.", cb.num_bits(), num_bits);
+            let num_bits = if num_bits == 0 {
+                let n = cb.num_bits() as usize;
+                info!("Guessed number of bits from codebook: {}", n);
+                n
+            } else if cb.num_bits() != (num_bits as u16) {
+                warn!(
+                    "Codebook uses a different number of bits ({}) than --num-bits ({}) suggests.",
+                    cb.num_bits(),
                     num_bits
-                } else {
-                    num_bits
-                };
+                );
+                num_bits
+            } else {
+                num_bits
+            };
             let convert_err_rates = |values: Vec<f64>| match values.len() {
                 1 => vec![values[0]; num_bits],
                 _ => values,

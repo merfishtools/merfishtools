@@ -3,11 +3,11 @@ use std::io;
 use std::iter::Map;
 use std::path::Path;
 
-use crate::io::counts::{CommonRecord, FromRecord};
+use csv::DeserializeRecordsIter;
+
 use crate::io::merfishdata::{MerfishRecord, Readout};
 use crate::model::la::common::hamming_distance16;
 use crate::simulation::binary;
-use csv::DeserializeRecordsIter;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SimRecord {
