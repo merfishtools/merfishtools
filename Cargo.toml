@@ -43,6 +43,7 @@ num-traits = "0.2"
 counter = "0.4"
 newtype_derive = "0.1"
 custom_derive = "0.1"
+enum_dispatch = "0.1"
 #faster = { git = "https://github.com/AdamNiederer/faster" }
 #packed_simd = "0.3"
 

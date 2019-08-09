@@ -441,7 +441,7 @@ pub fn estimate_error_rates(raw_data: &str, codebook: &str) -> Result<(), Error>
     let codebook = io::codebook::Codebook::from_file(codebook).unwrap();
 
     let (p0, p1) = if let merfishdata::Format::Binary = merfishdata::Format::from_path(raw_data) {
-        let mut reader = merfishdata::binary::Reader::from_file(raw_data)?;
+        let mut reader = merfishdata::binary::BinaryReader::from_file(raw_data)?;
         error_rates::estimate(
             &codebook,
             reader.records().map(|rec| {

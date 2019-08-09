@@ -163,12 +163,12 @@ pub enum ReaderError {
     Corrupt,
 }
 
-pub struct Reader<R: io::Read> {
+pub struct BinaryReader<R: io::Read> {
     reader: io::BufReader<R>,
     header: Header,
 }
 
-impl<R: io::Read> Reader<R> {
+impl<R: io::Read> BinaryReader<R> {
     /// Constructs a new `merfish::Reader<R>` where `R: io::Read`.
     ///
     /// This will read the header in order to check if the version matches.
@@ -184,7 +184,7 @@ impl<R: io::Read> Reader<R> {
                 // Read (discard) table header
                 let mut header_buf = vec![0u8; header.header_length as usize];
                 reader.read_exact(&mut header_buf)?;
-                Ok(Reader { reader, header })
+                Ok(BinaryReader { reader, header })
             }
             Err(e) => Err(e)?,
         }
@@ -199,7 +199,7 @@ impl<R: io::Read> Reader<R> {
     }
 }
 
-impl<'a, R: io::Read + 'a> super::Reader<'a> for Reader<R> {
+impl<'a, R: io::Read + 'a> super::Reader<'a> for BinaryReader<R> {
     type Record = BinaryRecord;
     type Error = bincode::Error;
     type Iterator = BinaryRecordIterator<'a, R>;
@@ -209,17 +209,17 @@ impl<'a, R: io::Read + 'a> super::Reader<'a> for Reader<R> {
     }
 }
 
-impl Reader<fs::File> {
+impl BinaryReader<fs::File> {
     /// Constructs a new `merfish::Reader<fs::File>` from given file.
     ///
     /// This delegates work to `merfish::Reader::new`.
     pub fn from_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {
-        fs::File::open(path).map(|r| Reader::new(r).unwrap())
+        fs::File::open(path).map(|r| BinaryReader::new(r).unwrap())
     }
 }
 
 pub struct BinaryRecordIterator<'a, R: io::Read + 'a> {
-    reader: &'a mut Reader<R>,
+    reader: &'a mut BinaryReader<R>,
     i: u32,
 }
 
@@ -254,7 +254,7 @@ mod tests {
         distNucleus,1  1,double,distPeriphery,1  1,double\
         \x1c\x10\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\xdb\x1e\xb4A\xae\x00\xe9\x05\x14\x87.C\xe2\x17\xbdD\x9b\xe7\xaf\xc4\x10*8\xc5\x03\x00\xdf>\x1b;\x943\x06><\xee\xeb>\x8b\x97\x95>z\x05C?j\x9c\xe6;lw]=\x1fWp;\xa5\xbfz8\x00\x00\x00\x00 _@<\x87\xff\x8f<\x0c\x11\x88>3\xb1\xdc=_\x03\x8c<\xcd\xee\x99=\xe8\x8c[;AN2=v\x0b\x1d=#S\xd5<\xed\x8a<;\xcf\x81<;wYL=\xf3\xb8;;YN\xb18\x00\x00\x00\x00\x89\x03\xa1;Xh\xc7<zwD=u\xfa:=L\xe9O<\xb7\xe3\x1a=\x01\x00\x00\xcc&\xef>\x02\x00\x00\x00\x01\x00\x00\x00\x80a\xaf\x08@\x00\x00\x00\x809\xfc(@";
 
-        let mut reader = binary::Reader::new(io::Cursor::new(&data[..])).unwrap();
+        let mut reader = binary::BinaryReader::new(io::Cursor::new(&data[..])).unwrap();
         let expected_record = binary::BinaryRecord {
             barcode: 4124,
             barcode_id: 1,

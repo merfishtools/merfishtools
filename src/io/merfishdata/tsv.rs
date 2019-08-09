@@ -99,7 +99,7 @@ impl MerfishRecord for TsvRecord {
 }
 
 /// A reader for MERFISH raw data.
-pub struct Reader<R: io::Read> {
+pub struct TsvReader<R: io::Read> {
     inner: csv::Reader<R>,
 }
 
@@ -141,22 +141,22 @@ pub(crate) fn modify_record(
     r
 }
 
-impl Reader<fs::File> {
+impl TsvReader<fs::File> {
     /// Read from a given file path.
     pub fn from_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {
-        fs::File::open(path).map(Reader::new)
+        fs::File::open(path).map(TsvReader::new)
     }
 }
 
-impl<R: io::Read> Reader<R> {
+impl<R: io::Read> TsvReader<R> {
     pub fn new(rdr: R) -> Self {
-        Reader {
+        TsvReader {
             inner: csv::ReaderBuilder::new().delimiter(b'\t').from_reader(rdr),
         }
     }
 }
 
-impl<'a, R: io::Read + 'a> super::Reader<'a> for Reader<R> {
+impl<'a, R: io::Read + 'a> super::Reader<'a> for TsvReader<R> {
     type Record = TsvRecord;
     type Error = csv::Error;
     type Iterator = DeserializeRecordsIter<'a, R, TsvRecord>;
@@ -178,7 +178,7 @@ mod tests {
 0	SCUBE3	1	475.5	630.6	13146.86026973	25793.5656964
 0	SCUBE3	1	475.5	630.6	13576.7356895	38396.4273422
 ";
-        let mut reader = tsv::Reader::new(io::Cursor::new(&data[..]));
+        let mut reader = tsv::TsvReader::new(io::Cursor::new(&data[..]));
         for r in reader.records() {
             match r {
                 Ok(rec) => {

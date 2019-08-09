@@ -327,15 +327,15 @@ fn main() -> Result<(), Error> {
                 .unwrap();
             match merfishdata::Format::from_path(&raw_data) {
                 merfishdata::Format::Binary => expression.load_counts(
-                    &mut merfishdata::binary::Reader::from_file(&raw_data)?,
+                    &mut merfishdata::binary::BinaryReader::from_file(&raw_data)?,
                     merfishdata::Format::Binary,
                 )?,
                 merfishdata::Format::TSV => expression.load_counts(
-                    &mut merfishdata::tsv::Reader::from_file(&raw_data)?,
+                    &mut merfishdata::tsv::TsvReader::from_file(&raw_data)?,
                     merfishdata::Format::TSV,
                 )?,
                 merfishdata::Format::Simulation => expression.load_counts(
-                    &mut merfishdata::sim::Reader::from_file(&raw_data)?,
+                    &mut merfishdata::sim::SimReader::from_file(&raw_data)?,
                     merfishdata::Format::Simulation,
                 )?,
             }

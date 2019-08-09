@@ -88,26 +88,26 @@ impl MerfishRecord for SimRecord {
 }
 
 /// A reader for MERFISH raw data.
-pub struct Reader<R: io::Read> {
+pub struct SimReader<R: io::Read> {
     inner: csv::Reader<R>,
 }
 
-impl Reader<fs::File> {
+impl SimReader<fs::File> {
     /// Read from a given file path.
     pub fn from_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {
-        fs::File::open(path).map(Reader::new)
+        fs::File::open(path).map(SimReader::new)
     }
 }
 
-impl<R: io::Read> Reader<R> {
+impl<R: io::Read> SimReader<R> {
     pub fn new(rdr: R) -> Self {
-        Reader {
+        SimReader {
             inner: csv::ReaderBuilder::new().delimiter(b'\t').from_reader(rdr),
         }
     }
 }
 
-impl<'a, R: io::Read + 'a> super::Reader<'a> for Reader<R> {
+impl<'a, R: io::Read + 'a> super::Reader<'a> for SimReader<R> {
     type Record = SimRecord;
     type Error = csv::Error;
     type Iterator = DeserializeRecordsIter<'a, R, SimRecord>;

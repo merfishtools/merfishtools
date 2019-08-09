@@ -4,11 +4,15 @@
 // except according to those terms.
 
 use crate::io::merfishdata::{binary, sim, tsv};
+use binary::BinaryRecord;
 use bit_vec::BitVec;
+use enum_dispatch::enum_dispatch;
 use failure::Fail;
+use sim::SimRecord;
 use std::io;
 use std::iter::Iterator;
 use std::path::Path;
+use tsv::TsvRecord;
 
 pub type Readout = BitVec;
 
@@ -47,12 +51,12 @@ pub trait MerfishRecord {
     fn is_exact(&self) -> bool;
 }
 
-//#[enum_dispatch(MerfishRecord)]
-//pub enum Record {
-//    TsvRecord,
-//    SimRecord,
-//    BinaryRecord
-//}
+#[enum_dispatch(MerfishRecord)]
+pub enum Record {
+    TsvRecord,
+    SimRecord,
+    BinaryRecord,
+}
 
 pub trait Reader<'a> {
     type Record: MerfishRecord;
@@ -60,4 +64,37 @@ pub trait Reader<'a> {
     type Iterator: Iterator<Item=Result<Self::Record, Self::Error>> + 'a;
 
     fn records(&'a mut self) -> Self::Iterator;
+}
+
+pub enum RecordReader<R: io::Read> {
+    TsvIterator { reader: tsv::TsvReader<R> },
+    SimIterator { reader: sim::SimReader<R> },
+    BinaryIterator { reader: binary::BinaryReader<R> },
+}
+
+impl<R: io::Read> Iterator for RecordReader<R> {
+    type Item = Record;
+
+    // TODO this... works only for the CSV deserializer, since it somehow does not reset.
+    // This does not work correctly for the binary reader (since its current index pointer will
+    // be reset to 0 every call, invalidating the end-of-file stop-condition.
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            RecordReader::TsvIterator { reader } => reader
+                .records()
+                .filter_map(Result::ok)
+                .map(|v| v.into())
+                .next(),
+            RecordReader::SimIterator { reader } => reader
+                .records()
+                .filter_map(Result::ok)
+                .map(|v| v.into())
+                .next(),
+            RecordReader::BinaryIterator { reader } => reader
+                .records()
+                .filter_map(Result::ok)
+                .map(|v| v.into())
+                .next(),
+        }
+    }
 }

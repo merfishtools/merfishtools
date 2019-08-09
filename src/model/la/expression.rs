@@ -26,6 +26,7 @@ use crate::model::la::problem::{objective, partial_objective};
 use crate::simulation::binary;
 use itertools::{Either, Itertools};
 use std::path::Path;
+use crate::io::merfishdata::common::RecordReader;
 
 #[derive(Serialize, Deserialize, new)]
 pub struct RecordEstimate {
@@ -294,7 +295,7 @@ impl ExpressionT {
                 }
             });
         info!("Reading records...");
-        let records = RecordIterator::from_path(path);
+        let records = RecordReader::from_path(path);
         info!("Finished reading records.");
         let counts = Counts::from_records(records.into_iter(), &expressed_codewords);
         info!("Finished counting.");
