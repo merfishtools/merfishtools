@@ -30,6 +30,8 @@ impl Format {
     }
 }
 
+// TODO use
+#[enum_dispatch]
 pub trait MerfishRecord {
     fn cell_id(&self) -> u32;
     fn cell_name(&self) -> String;
@@ -44,6 +46,13 @@ pub trait MerfishRecord {
     fn count(&self) -> usize;
     fn is_exact(&self) -> bool;
 }
+
+//#[enum_dispatch(MerfishRecord)]
+//pub enum Record {
+//    TsvRecord,
+//    SimRecord,
+//    BinaryRecord
+//}
 
 pub trait Reader<'a> {
     type Record: MerfishRecord;

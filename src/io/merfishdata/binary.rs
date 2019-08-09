@@ -200,11 +200,11 @@ impl<R: io::Read> Reader<R> {
 }
 
 impl<'a, R: io::Read + 'a> super::Reader<'a> for Reader<R> {
-    type Record = CommonRecord;
+    type Record = BinaryRecord;
     type Error = bincode::Error;
     type Iterator = BinaryRecordIterator<'a, R>;
 
-    fn records(&'a mut self) -> BinaryRecordIterator<'a, R> {
+    fn records(&'a mut self) -> Self::Iterator {
         BinaryRecordIterator { reader: self, i: 0 }
     }
 }
@@ -224,21 +224,18 @@ pub struct BinaryRecordIterator<'a, R: io::Read + 'a> {
 }
 
 impl<'a, R: io::Read> Iterator for BinaryRecordIterator<'a, R> {
-    type Item = Result<CommonRecord, bincode::Error>;
+    type Item = Result<BinaryRecord, bincode::Error>;
 
-    fn next(&mut self) -> Option<Result<CommonRecord, bincode::Error>> {
+    fn next(&mut self) -> Option<Self::Item> {
         if self.i >= self.reader.header.num_entries {
             None
         } else {
             self.i += 1;
-            let r = self.reader.read();
-            match r {
-                Ok(r) => Some(Ok(CommonRecord::from_record(r))),
-                Err(e) => Some(Err(e)),
-            }
+            Some(self.reader.read())
         }
     }
 }
+
 
 #[cfg(test)]
 mod tests {

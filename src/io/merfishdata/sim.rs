@@ -108,14 +108,11 @@ impl<R: io::Read> Reader<R> {
 }
 
 impl<'a, R: io::Read + 'a> super::Reader<'a> for Reader<R> {
-    type Record = CommonRecord;
+    type Record = SimRecord;
     type Error = csv::Error;
-    type Iterator = Map<DeserializeRecordsIter<'a, R, SimRecord>, fn(Result<SimRecord, csv::Error>) -> Result<CommonRecord, csv::Error>>;
+    type Iterator = DeserializeRecordsIter<'a, R, SimRecord>;
 
     fn records(&'a mut self) -> Self::Iterator {
-        self.inner.deserialize().into_iter().map(|r| match r {
-            Ok(r) => Ok(CommonRecord::from_record(r)),
-            Err(e) => Err(e),
-        })
+        self.inner.deserialize()
     }
 }

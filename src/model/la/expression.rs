@@ -16,7 +16,7 @@ use regex::Regex;
 use crate::cli::Expression;
 use crate::io::common::Barcode;
 use crate::io::codebook::Codebook;
-use crate::io::counts::{Counts, Records};
+use crate::io::counts::{Counts, RecordIterator};
 use crate::io::merfishdata;
 use crate::io::merfishdata::MerfishRecord;
 use crate::io::simple_codebook::SimpleCodebook;
@@ -294,7 +294,7 @@ impl ExpressionT {
                 }
             });
         info!("Reading records...");
-        let records = Records::from_path(path);
+        let records = RecordIterator::from_path(path);
         info!("Finished reading records.");
         let counts = Counts::from_records(records.into_iter(), &expressed_codewords);
         info!("Finished counting.");

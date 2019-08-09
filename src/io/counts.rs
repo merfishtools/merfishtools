@@ -1,8 +1,10 @@
 use std::collections::{HashMap, HashSet};
+use std::io;
 use std::iter::FromIterator;
 use std::path::Path;
 
 use counter::Counter;
+use failure::Fail;
 use itertools::{Either, Itertools};
 use rand::prelude::StdRng;
 use rand::SeedableRng;
@@ -12,13 +14,13 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator};
 use crate::io::codebook::Codebook;
 use crate::io::common::Barcode;
 use crate::io::merfishdata;
-use crate::io::merfishdata::tsv::modify_record;
-use crate::io::merfishdata::{binary, tsv};
+use crate::io::merfishdata::tsv::{modify_record, TsvRecord};
+use crate::io::merfishdata::{binary, sim, tsv, Format};
 use crate::io::merfishdata::{MerfishRecord, Reader, Readout};
 use crate::model::bayes::readout::Counts as MismatchCounts;
 use crate::model::la::common::hamming_distance16;
-use failure::Fail;
-use std::io;
+use std::marker::PhantomData;
+use bit_vec::BitVec;
 
 pub struct ImageInfo {
     /// The id associated with the field-of-view in which this RNA was imaged.
@@ -132,30 +134,114 @@ impl MerfishRecord for CommonRecord {
     }
 }
 
-pub struct Records {}
+pub enum RecordIterator<R: io::Read> {
+    TsvIterator { reader: tsv::Reader<R> },
+    SimIterator { reader: sim::Reader<R> },
+    BinaryIterator { reader: binary::Reader<R> },
+}
 
-impl Records {
-    pub fn from_path<'a, P: AsRef<Path> + 'a>(path: P) -> Box<dyn Iterator<Item=CommonRecord> + 'a> {
-        let format = merfishdata::Format::from_path(&path);
+impl RecordIterator<std::fs::File> {
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Self {
+        let format = Format::from_path(&path);
         match format {
-            merfishdata::Format::Binary => Box::new(
-                merfishdata::binary::Reader::from_file(&path)
-                    .unwrap()
-                    .records()
-                    .filter_map(Result::ok)
-            ),
-            merfishdata::Format::TSV => Box::new(
-                merfishdata::tsv::Reader::from_file(&path)
-                    .unwrap()
-                    .records()
-                    .filter_map(Result::ok)
-            ),
-            merfishdata::Format::Simulation => Box::new(
-                merfishdata::sim::Reader::from_file(&path)
-                    .unwrap()
-                    .records()
-                    .filter_map(Result::ok)
-            ),
+            Format::TSV => RecordIterator::TsvIterator {
+                reader: tsv::Reader::from_file(path).unwrap(),
+            },
+            Format::Binary => RecordIterator::BinaryIterator {
+                reader: binary::Reader::from_file(path).unwrap(),
+            },
+            Format::Simulation => RecordIterator::SimIterator {
+                reader: sim::Reader::from_file(path).unwrap(),
+            },
+        }
+    }
+}
+
+// TODO use
+// #[enum_dispatch(MerfishRecord)]
+pub enum Record {
+    Tsv(tsv::TsvRecord),
+    Sim(sim::SimRecord),
+    Binary(binary::BinaryRecord),
+}
+
+impl MerfishRecord for Record {
+    fn cell_id(&self) -> u32 {
+        match self {
+            Record::Tsv(r) => r.cell_id(),
+            Record::Sim(r) => r.cell_id(),
+            Record::Binary(r) => r.cell_id(),
+        }
+    }
+
+    fn cell_name(&self) -> String {
+        match self {
+            Record::Tsv(r) => r.cell_name(),
+            Record::Sim(r) => r.cell_name(),
+            Record::Binary(r) => r.cell_name(),
+        }
+    }
+
+    fn cell_pos(&self) -> (f32, f32) {
+        match self {
+            Record::Tsv(r) => r.cell_pos(),
+            Record::Sim(r) => r.cell_pos(),
+            Record::Binary(r) => r.cell_pos(),
+        }
+    }
+
+    fn feature_id(&self) -> u16 {
+        unimplemented!()
+    }
+
+    fn feature_name(&self) -> String {
+        unimplemented!()
+    }
+
+    fn hamming_dist(&self) -> u8 {
+        unimplemented!()
+    }
+
+    fn error_mask(&self) -> u16 {
+        unimplemented!()
+    }
+
+    fn codeword(&self) -> Option<u16> {
+        unimplemented!()
+    }
+
+    fn readout(&self) -> u16 {
+        unimplemented!()
+    }
+
+    fn readout_bitvec(&self) -> BitVec<u32> {
+        unimplemented!()
+    }
+
+    fn count(&self) -> usize {
+        unimplemented!()
+    }
+
+    fn is_exact(&self) -> bool {
+        unimplemented!()
+    }
+}
+
+impl IntoIterator for RecordIterator<std::fs::File> {
+    type Item = Record;
+    type IntoIter = Box<dyn Iterator<Item=Record>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            RecordIterator::TsvIterator { mut reader } => {
+                Box::new(reader.records().filter_map(Result::ok).map(Record::Tsv))
+            }
+            RecordIterator::SimIterator { mut reader } => {
+                Box::new(reader.records().filter_map(Result::ok).map(Record::Sim))
+            }
+            RecordIterator::BinaryIterator { mut reader } => {
+                Box::new(reader.records().filter_map(Result::ok).map(Record::Binary))
+            }
         }
     }
 }
@@ -299,8 +385,9 @@ impl Counts {
 mod tests {
     use std::io::{Error, Write};
 
-    use super::*;
     use crate::io::simple_codebook::SimpleCodebook;
+
+    use super::*;
 
     #[test]
     fn test_counts() -> Result<(), Error> {
@@ -310,7 +397,7 @@ mod tests {
         let path_codebook = "/vol/tiny/merfish/merfishtools-evaluation/codebook/140genesData.1.txt";
         let codebook = SimpleCodebook::from_file(path_codebook)?;
         let (expressed_codewords, _unexpressed_codewords) = codebook.codewords();
-        let records = Records::from_path(path_data);
+        let records = RecordIterator::from_path(path_data);
         let counts = Counts::from_records(records.into_iter(), &expressed_codewords);
         //        let mut file = std::fs::File::create("foo.txt")?;
         //        file.write_all(format!("{:?}", counts["0"].info).replace("}, ", "},\n").as_bytes())?;
